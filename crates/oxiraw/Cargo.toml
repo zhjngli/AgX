@@ -1,0 +1,13 @@
+[package]
+name = "oxiraw"
+version = "0.1.0"
+edition = "2021"
+description = "An open-source photo editing library with a readable, portable preset format"
+
+[dependencies]
+image = "0.25"
+imageproc = "0.25"
+palette = "0.7"
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"

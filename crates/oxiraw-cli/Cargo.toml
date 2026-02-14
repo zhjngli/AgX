@@ -1,0 +1,9 @@
+[package]
+name = "oxiraw-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI for the oxiraw photo editing library"
+
+[dependencies]
+oxiraw = { path = "../oxiraw" }
+clap = { version = "4", features = ["derive"] }
