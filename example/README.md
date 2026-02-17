@@ -24,6 +24,16 @@ Photos from [Unsplash](https://unsplash.com) (free to use under the [Unsplash Li
 | `faded-film.toml` | Low contrast, lifted blacks, warm tint — vintage film feel |
 | `cool-blue.toml` | Cool temperature shift with gentle contrast |
 
+## Sample Outputs
+
+Pre-generated output images in `outputs/`, each pairing a source image with a preset that suits it:
+
+| Original | Preset | Result |
+|----------|--------|--------|
+| `mountain-landscape.jpg` | `high-contrast.toml` | `mountain-landscape-high-contrast.jpg` |
+| `moody-forest.jpg` | `moody-dark.toml` | `moody-forest-moody-dark.jpg` |
+| `city-skyline.jpg` | `golden-hour.toml` | `city-skyline-golden-hour.jpg` |
+
 ## LUTs
 
 | LUT | Description |

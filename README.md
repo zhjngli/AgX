@@ -14,10 +14,13 @@ An open-source photo editing library and CLI written in Rust, with a portable, h
 
 Three source photos are included in `example/images/` along with five presets in `example/presets/`.
 
-| Mountain Landscape | Forest | City Skyline |
+### Before & After
+
+| Original | Preset | Result |
 |:--:|:--:|:--:|
-| ![mountain](example/images/mountain-landscape.jpg) | ![forest](example/images/moody-forest.jpg) | ![city](example/images/city-skyline.jpg) |
-| Good tonal range, blue sky | Backlit, deep shadows | Urban dusk, mixed lighting |
+| ![mountain](example/images/mountain-landscape.jpg) | `high-contrast.toml` | ![mountain-hc](example/outputs/mountain-landscape-high-contrast.jpg) |
+| ![forest](example/images/moody-forest.jpg) | `moody-dark.toml` | ![forest-moody](example/outputs/moody-forest-moody-dark.jpg) |
+| ![city](example/images/city-skyline.jpg) | `golden-hour.toml` | ![city-golden](example/outputs/city-skyline-golden-hour.jpg) |
 
 ### Presets
 
@@ -163,4 +166,9 @@ Sample photos from [Unsplash](https://unsplash.com) (free to use under the [Unsp
 
 ## License
 
-TBD
+Licensed under either of
+
+- [Apache License, Version 2.0](LICENSE-APACHE)
+- [MIT License](LICENSE-MIT)
+
+at your option.

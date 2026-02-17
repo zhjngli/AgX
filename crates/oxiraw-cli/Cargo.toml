@@ -3,6 +3,7 @@ name = "oxiraw-cli"
 version = "0.1.0"
 edition = "2021"
 description = "CLI for the oxiraw photo editing library"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 oxiraw = { path = "../oxiraw" }
