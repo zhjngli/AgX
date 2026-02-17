@@ -36,6 +36,12 @@ A running list of ideas for oxiraw's development. Nothing here is committed — 
 - **Preset marketplace / registry**: A platform for sharing and discovering community presets
 - **Sidecar files**: Store per-image edits alongside the source file (like Lightroom's .xmp sidecars)
 
+## Pipeline Architecture
+
+- **Pluggable pipeline stages**: Refactor the render pipeline into a sequence of discrete stages, each declaring its expected input/output color space. The engine auto-inserts color space conversions between stages. LUTs, adjustments, and future transforms (curves, HSL, etc.) each become a stage. This enables user-configurable pipeline ordering and makes it easy to add new transform types without modifying the core engine.
+- **Stage-level caching**: Cache intermediate results at stage boundaries. When a parameter changes, only recompute from the affected stage forward.
+- **Color-space-aware stages**: Each stage declares whether it operates in linear, sRGB gamma, log, or another space. The pipeline inserts conversions automatically, which also enables proper support for LUTs designed for different input spaces (sRGB, log, linear).
+
 ## Performance & Platforms
 
 - **GPU acceleration**: Use wgpu or compute shaders for real-time rendering
