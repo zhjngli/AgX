@@ -52,6 +52,18 @@ A running list of ideas for oxiraw's development. Nothing here is committed — 
 - **Before/after comparison**: Side-by-side or split view
 - **Undo/redo**: Parameter state history stack
 
+## Color Space & Color Management
+
+- **Adobe RGB support**: Wider gamut for professional print workflows
+- **ProPhoto RGB working space**: Internal processing in a wide-gamut space (like Lightroom does) to avoid clipping colors during editing
+- **Display P3 output**: For Apple displays and modern wide-gamut monitors
+- **ICC profile reading**: Read embedded ICC profiles from input images to determine their color space
+- **ICC profile embedding**: Embed correct ICC profiles in output images
+- **Color space conversion**: Convert between working spaces (sRGB → Adobe RGB → ProPhoto RGB etc.)
+- **Soft proofing**: Preview how an image will look in a different color space (e.g., CMYK for print)
+- **lcms2 integration**: Use the `lcms2` Rust crate for production-quality ICC profile handling
+- **Per-camera color matrices**: Custom color matrices for each camera model to improve color accuracy from raw files
+
 ## Advanced / Research
 
 - **Camera color profiles**: Per-camera color matrix tuning for accurate color rendering

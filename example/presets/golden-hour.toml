@@ -1,0 +1,16 @@
+[metadata]
+name = "Golden Hour"
+version = "1.0"
+author = "oxiraw"
+
+[tone]
+exposure = 0.5
+contrast = 15.0
+highlights = -30.0
+shadows = 25.0
+whites = 10.0
+blacks = -5.0
+
+[white_balance]
+temperature = 40.0
+tint = 5.0

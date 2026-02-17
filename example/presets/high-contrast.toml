@@ -1,0 +1,16 @@
+[metadata]
+name = "High Contrast"
+version = "1.0"
+author = "oxiraw"
+
+[tone]
+exposure = 0.3
+contrast = 50.0
+highlights = 20.0
+shadows = -15.0
+whites = 25.0
+blacks = -25.0
+
+[white_balance]
+temperature = 0.0
+tint = 0.0

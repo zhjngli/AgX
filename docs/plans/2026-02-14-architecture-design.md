@@ -139,6 +139,26 @@ oxiraw/
 | Declarative parameter state | Presets are just values, no ordering. Matches photographer mental model |
 | Workspace with library + CLI | Library is the core product; CLI is a thin consumer. Future UIs, WASM targets, etc. can also consume the library |
 
+## Color Space (MVP Decision)
+
+**For the MVP, we use sRGB exclusively.**
+
+- **sRGB** is the standard color space for displays, web, and consumer photography. JPEG/PNG files are sRGB by default. Most monitors display sRGB.
+- **Adobe RGB** is a wider-gamut space for professional print workflows (more greens/cyans). Not needed for MVP.
+- **ProPhoto RGB** is even wider, used internally by Lightroom. Overkill for now.
+- **Display P3** is Apple's wide-gamut display standard. Future consideration.
+- **Raw files** have no inherent color space — they're sensor data. Color space is applied during demosaicing. When we add LibRaw integration, the raw decoder will output to sRGB.
+
+What this means for the implementation:
+- Decoded standard images (JPEG/PNG/TIFF) are assumed to be sRGB.
+- We convert sRGB → linear sRGB (using palette crate's `Srgb` → `LinSrgb`) for internal processing.
+- Exposure and white balance operate in linear sRGB space.
+- Contrast, highlights, shadows, whites, blacks operate in sRGB gamma space.
+- Output is encoded back to sRGB gamma for saving.
+- No ICC profile handling in MVP — we assume sRGB throughout.
+
+Future: wider gamut support (Adobe RGB, ProPhoto RGB, Display P3), ICC profile reading/embedding, color space conversion between working spaces.
+
 ## Open Questions
 
 - Final project name (oxiraw is a working name)

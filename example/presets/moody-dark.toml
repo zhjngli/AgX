@@ -1,0 +1,16 @@
+[metadata]
+name = "Moody Dark"
+version = "1.0"
+author = "oxiraw"
+
+[tone]
+exposure = -0.7
+contrast = 30.0
+highlights = -40.0
+shadows = -20.0
+whites = -15.0
+blacks = -30.0
+
+[white_balance]
+temperature = -10.0
+tint = 0.0

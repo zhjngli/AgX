@@ -1,0 +1,16 @@
+[metadata]
+name = "Faded Film"
+version = "1.0"
+author = "oxiraw"
+
+[tone]
+exposure = 0.3
+contrast = -15.0
+highlights = -20.0
+shadows = 40.0
+whites = -10.0
+blacks = 30.0
+
+[white_balance]
+temperature = 15.0
+tint = -3.0
