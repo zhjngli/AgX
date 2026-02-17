@@ -8,6 +8,8 @@ pub enum OxirawError {
     Encode(String),
     #[error("Preset error: {0}")]
     Preset(String),
+    #[error("LUT error: {0}")]
+    Lut(String),
     #[error("Image error: {0}")]
     Image(#[from] image::ImageError),
     #[error("IO error: {0}")]
@@ -36,6 +38,12 @@ mod tests {
     fn error_display_preset() {
         let err = OxirawError::Preset("parse failed".into());
         assert_eq!(err.to_string(), "Preset error: parse failed");
+    }
+
+    #[test]
+    fn error_display_lut() {
+        let err = OxirawError::Lut("invalid size".into());
+        assert_eq!(err.to_string(), "LUT error: invalid size");
     }
 
     #[test]

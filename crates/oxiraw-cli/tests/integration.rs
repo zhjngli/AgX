@@ -6,8 +6,7 @@ fn cli_bin() -> Command {
 
 fn create_test_png(path: &std::path::Path) {
     use image::{ImageBuffer, Rgb};
-    let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
-        ImageBuffer::from_pixel(4, 4, Rgb([128u8, 128, 128]));
+    let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_pixel(4, 4, Rgb([128u8, 128, 128]));
     img.save(path).unwrap();
 }
 
@@ -34,7 +33,15 @@ exposure = 1.0
     .unwrap();
 
     let status = cli_bin()
-        .args(["apply", "-i", input.to_str().unwrap(), "-p", preset_path.to_str().unwrap(), "-o", output.to_str().unwrap()])
+        .args([
+            "apply",
+            "-i",
+            input.to_str().unwrap(),
+            "-p",
+            preset_path.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
         .status()
         .expect("failed to run CLI");
 
@@ -66,9 +73,12 @@ fn cli_edit_with_inline_params() {
     let status = cli_bin()
         .args([
             "edit",
-            "-i", input.to_str().unwrap(),
-            "-o", output.to_str().unwrap(),
-            "--exposure", "-1.0",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--exposure",
+            "-1.0",
         ])
         .status()
         .expect("failed to run CLI");
@@ -94,12 +104,100 @@ fn cli_missing_input_fails() {
     let output = cli_bin()
         .args([
             "apply",
-            "-i", "/nonexistent/photo.png",
-            "-p", "/nonexistent/preset.toml",
-            "-o", "/tmp/out.png",
+            "-i",
+            "/nonexistent/photo.png",
+            "-p",
+            "/nonexistent/preset.toml",
+            "-o",
+            "/tmp/out.png",
         ])
         .output()
         .expect("failed to run CLI");
 
-    assert!(!output.status.success(), "CLI should fail for missing input");
+    assert!(
+        !output.status.success(),
+        "CLI should fail for missing input"
+    );
+}
+
+fn create_identity_cube(path: &std::path::Path) {
+    let mut lines = String::from("LUT_3D_SIZE 2\n");
+    for b in 0..2 {
+        for g in 0..2 {
+            for r in 0..2 {
+                lines.push_str(&format!("{}.0 {}.0 {}.0\n", r, g, b));
+            }
+        }
+    }
+    std::fs::write(path, lines).unwrap();
+}
+
+#[test]
+fn cli_edit_with_lut() {
+    let temp_dir = std::env::temp_dir();
+    let input = temp_dir.join("oxiraw_cli_lut_in.png");
+    let lut_path = temp_dir.join("oxiraw_cli_test.cube");
+    let output = temp_dir.join("oxiraw_cli_lut_out.png");
+
+    create_test_png(&input);
+    create_identity_cube(&lut_path);
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--lut",
+            lut_path.to_str().unwrap(),
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "CLI edit with LUT should succeed");
+    assert!(output.exists(), "Output file should exist");
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&lut_path);
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn cli_apply_preset_with_lut() {
+    let temp_dir = std::env::temp_dir();
+    let input = temp_dir.join("oxiraw_cli_preset_lut_in.png");
+    let lut_path = temp_dir.join("oxiraw_cli_preset_lut.cube");
+    let preset_path = temp_dir.join("oxiraw_cli_preset_lut.toml");
+    let output = temp_dir.join("oxiraw_cli_preset_lut_out.png");
+
+    create_test_png(&input);
+    create_identity_cube(&lut_path);
+
+    let preset_content = format!(
+        "[metadata]\nname = \"LUT Preset\"\n\n[tone]\nexposure = 0.5\n\n[lut]\npath = \"{}\"\n",
+        lut_path.file_name().unwrap().to_str().unwrap()
+    );
+    std::fs::write(&preset_path, &preset_content).unwrap();
+
+    let status = cli_bin()
+        .args([
+            "apply",
+            "-i",
+            input.to_str().unwrap(),
+            "-p",
+            preset_path.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "CLI apply with LUT preset should succeed");
+    assert!(output.exists());
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&lut_path);
+    let _ = std::fs::remove_file(&preset_path);
+    let _ = std::fs::remove_file(&output);
 }

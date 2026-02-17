@@ -1,6 +1,6 @@
 # Example
 
-Sample images and presets for trying out oxiraw.
+Sample images, presets, and LUTs for trying out oxiraw.
 
 ## Images
 
@@ -24,6 +24,12 @@ Photos from [Unsplash](https://unsplash.com) (free to use under the [Unsplash Li
 | `faded-film.toml` | Low contrast, lifted blacks, warm tint — vintage film feel |
 | `cool-blue.toml` | Cool temperature shift with gentle contrast |
 
+## LUTs
+
+| LUT | Description |
+|-----|-------------|
+| `identity.cube` | 17x17x17 identity LUT (output = input) — useful for testing |
+
 ## Usage
 
 Apply a preset:
@@ -42,6 +48,15 @@ cargo run -p oxiraw-cli -- edit \
   -i example/images/mountain-landscape.jpg \
   -o /tmp/mountain-bright.jpg \
   --exposure 1.5 --shadows 40 --blacks 20
+```
+
+Apply a LUT:
+
+```bash
+cargo run -p oxiraw-cli -- edit \
+  -i example/images/city-skyline.jpg \
+  -o /tmp/city-lut.jpg \
+  --lut example/luts/identity.cube
 ```
 
 Apply every preset to every image:

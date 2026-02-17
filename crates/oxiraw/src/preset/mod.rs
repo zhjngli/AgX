@@ -40,6 +40,13 @@ struct WhiteBalanceSection {
     tint: f32,
 }
 
+/// LUT section of a preset.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LutSection {
+    #[serde(default)]
+    path: Option<String>,
+}
+
 /// Internal TOML layout for a preset file.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct PresetRaw {
@@ -49,16 +56,25 @@ struct PresetRaw {
     tone: ToneSection,
     #[serde(default)]
     white_balance: WhiteBalanceSection,
+    #[serde(default)]
+    lut: LutSection,
 }
 
 /// A photo editing preset.
 ///
 /// Presets are declarative parameter sets stored as TOML files.
 /// Missing values default to neutral (no change).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Preset {
     pub metadata: PresetMetadata,
     pub params: Parameters,
+    pub lut: Option<crate::lut::Lut3D>,
+}
+
+impl PartialEq for Preset {
+    fn eq(&self, other: &Self) -> bool {
+        self.metadata == other.metadata && self.params == other.params
+    }
 }
 
 impl Default for Preset {
@@ -66,12 +82,17 @@ impl Default for Preset {
         Self {
             metadata: PresetMetadata::default(),
             params: Parameters::default(),
+            lut: None,
         }
     }
 }
 
 impl Preset {
     /// Parse a preset from a TOML string.
+    ///
+    /// Note: LUT paths in the `[lut]` section cannot be resolved without a base
+    /// directory. Use [`load_from_file`](Preset::load_from_file) to load presets
+    /// with LUT references.
     pub fn from_toml(toml_str: &str) -> Result<Self> {
         let raw: PresetRaw =
             toml::from_str(toml_str).map_err(|e| OxirawError::Preset(e.to_string()))?;
@@ -87,6 +108,7 @@ impl Preset {
                 temperature: raw.white_balance.temperature,
                 tint: raw.white_balance.tint,
             },
+            lut: None,
         })
     }
 
@@ -106,14 +128,43 @@ impl Preset {
                 temperature: self.params.temperature,
                 tint: self.params.tint,
             },
+            lut: LutSection::default(),
         };
         toml::to_string_pretty(&raw).map_err(|e| OxirawError::Preset(e.to_string()))
     }
 
     /// Load a preset from a TOML file.
+    ///
+    /// If the preset contains a `[lut]` section with a `path`, the LUT file
+    /// is resolved relative to the preset file's directory and loaded.
     pub fn load_from_file(path: &std::path::Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        Self::from_toml(&content)
+        let raw: PresetRaw =
+            toml::from_str(&content).map_err(|e| OxirawError::Preset(e.to_string()))?;
+
+        let base_dir = path.parent().unwrap_or(std::path::Path::new("."));
+
+        let lut = if let Some(lut_path_str) = &raw.lut.path {
+            let lut_path = base_dir.join(lut_path_str);
+            Some(crate::lut::Lut3D::from_cube_file(&lut_path)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            metadata: raw.metadata,
+            params: Parameters {
+                exposure: raw.tone.exposure,
+                contrast: raw.tone.contrast,
+                highlights: raw.tone.highlights,
+                shadows: raw.tone.shadows,
+                whites: raw.tone.whites,
+                blacks: raw.tone.blacks,
+                temperature: raw.white_balance.temperature,
+                tint: raw.white_balance.tint,
+            },
+            lut,
+        })
     }
 
     /// Save the preset to a TOML file.
@@ -232,5 +283,65 @@ exposure = 1.0
     fn load_nonexistent_file_returns_error() {
         let result = Preset::load_from_file(std::path::Path::new("/nonexistent/preset.toml"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn preset_with_lut_path_loads_lut() {
+        let temp_dir = std::env::temp_dir();
+        let cube_path = temp_dir.join("oxiraw_preset_test.cube");
+        let preset_path = temp_dir.join("oxiraw_preset_test.toml");
+
+        std::fs::write(
+            &cube_path,
+            "\
+LUT_3D_SIZE 2
+0.0 0.0 0.0
+1.0 0.0 0.0
+0.0 1.0 0.0
+1.0 1.0 0.0
+0.0 0.0 1.0
+1.0 0.0 1.0
+0.0 1.0 1.0
+1.0 1.0 1.0
+",
+        )
+        .unwrap();
+
+        let toml_content = format!(
+            "[metadata]\nname = \"LUT Test\"\n\n[tone]\nexposure = 0.5\n\n[lut]\npath = \"{}\"\n",
+            cube_path.file_name().unwrap().to_str().unwrap()
+        );
+        std::fs::write(&preset_path, &toml_content).unwrap();
+
+        let preset = Preset::load_from_file(&preset_path).unwrap();
+        assert_eq!(preset.params.exposure, 0.5);
+        assert!(preset.lut.is_some());
+        assert_eq!(preset.lut.as_ref().unwrap().size, 2);
+
+        let _ = std::fs::remove_file(&cube_path);
+        let _ = std::fs::remove_file(&preset_path);
+    }
+
+    #[test]
+    fn preset_without_lut_section_has_no_lut() {
+        let toml_str = "[metadata]\nname = \"No LUT\"\n\n[tone]\nexposure = 1.0\n";
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert!(preset.lut.is_none());
+    }
+
+    #[test]
+    fn preset_with_missing_lut_file_returns_error() {
+        let temp_dir = std::env::temp_dir();
+        let preset_path = temp_dir.join("oxiraw_missing_lut_test.toml");
+        std::fs::write(
+            &preset_path,
+            "[metadata]\nname = \"Bad\"\n\n[lut]\npath = \"nonexistent.cube\"\n",
+        )
+        .unwrap();
+
+        let result = Preset::load_from_file(&preset_path);
+        assert!(result.is_err());
+
+        let _ = std::fs::remove_file(&preset_path);
     }
 }

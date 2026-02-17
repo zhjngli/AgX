@@ -5,7 +5,10 @@ use std::process;
 use oxiraw::{Engine, Preset};
 
 #[derive(Parser)]
-#[command(name = "oxiraw", about = "Photo editing CLI with portable TOML presets")]
+#[command(
+    name = "oxiraw",
+    about = "Photo editing CLI with portable TOML presets"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -57,6 +60,9 @@ enum Commands {
         /// White balance tint shift
         #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
         tint: f32,
+        /// Path to a .cube LUT file
+        #[arg(long)]
+        lut: Option<PathBuf>,
     },
 }
 
@@ -80,6 +86,7 @@ fn main() {
             blacks,
             temperature,
             tint,
+            lut,
         } => run_edit(
             &input,
             &output,
@@ -91,6 +98,7 @@ fn main() {
             blacks,
             temperature,
             tint,
+            lut.as_deref(),
         ),
     };
 
@@ -127,6 +135,7 @@ fn run_edit(
     blacks: f32,
     temperature: f32,
     tint: f32,
+    lut: Option<&std::path::Path>,
 ) -> oxiraw::Result<()> {
     let linear = oxiraw::decode::decode_standard(input)?;
     let mut engine = Engine::new(linear);
@@ -139,6 +148,10 @@ fn run_edit(
     params.blacks = blacks;
     params.temperature = temperature;
     params.tint = tint;
+    if let Some(lut_path) = lut {
+        let lut = oxiraw::lut::Lut3D::from_cube_file(lut_path)?;
+        engine.set_lut(Some(lut));
+    }
     let rendered = engine.render();
     oxiraw::encode::encode_to_file(&rendered, output)?;
     println!("Saved to {}", output.display());

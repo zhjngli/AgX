@@ -48,6 +48,7 @@ impl Default for Parameters {
 pub struct Engine {
     original: Rgb32FImage,
     params: Parameters,
+    lut: Option<crate::lut::Lut3D>,
 }
 
 impl Engine {
@@ -56,6 +57,7 @@ impl Engine {
         Self {
             original: image,
             params: Parameters::default(),
+            lut: None,
         }
     }
 
@@ -79,9 +81,20 @@ impl Engine {
         self.params = params;
     }
 
-    /// Apply a preset, replacing the current parameters with the preset's parameters.
+    /// Get a reference to the current LUT, if any.
+    pub fn lut(&self) -> Option<&crate::lut::Lut3D> {
+        self.lut.as_ref()
+    }
+
+    /// Set or clear the 3D LUT.
+    pub fn set_lut(&mut self, lut: Option<crate::lut::Lut3D>) {
+        self.lut = lut;
+    }
+
+    /// Apply a preset, replacing the current parameters and LUT.
     pub fn apply_preset(&mut self, preset: &crate::preset::Preset) {
         self.params = preset.params.clone();
+        self.lut = preset.lut.clone();
     }
 
     /// Render the image by applying all adjustments from scratch.
@@ -91,7 +104,8 @@ impl Engine {
     /// 2. Exposure (linear space) — multiply by 2^stops
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
-    /// 5. Convert back to linear space
+    /// 5. LUT application (sRGB gamma space)
+    /// 6. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
@@ -101,7 +115,8 @@ impl Engine {
             let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
 
             // 1. White balance (linear space)
-            let wb = adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
+            let wb =
+                adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
             r = wb.0;
             g = wb.1;
             b = wb.2;
@@ -139,7 +154,15 @@ impl Engine {
             sg = adjust::apply_blacks(sg, self.params.blacks);
             sb = adjust::apply_blacks(sb, self.params.blacks);
 
-            // 9. Convert back to linear space
+            // 9. LUT (sRGB gamma space)
+            if let Some(lut) = &self.lut {
+                let (lr, lg, lb) = lut.lookup(sr, sg, sb);
+                sr = lr;
+                sg = lg;
+                sb = lb;
+            }
+
+            // 10. Convert back to linear space
             let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
             Rgb([lr, lg, lb])
@@ -246,6 +269,56 @@ mod tests {
         let pixel = *engine.render().get_pixel(0, 0);
         // Should be brighter than original 0.2
         assert!(pixel.0[0] > 0.2, "Expected brighter, got {}", pixel.0[0]);
+    }
+
+    #[test]
+    fn render_with_identity_lut_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let mut engine = Engine::new(img);
+        let size = 17;
+        let n = (size - 1) as f32;
+        let mut table = Vec::with_capacity(size * size * size);
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    table.push([r as f32 / n, g as f32 / n, b as f32 / n]);
+                }
+            }
+        }
+        let lut = crate::lut::Lut3D {
+            title: None,
+            size,
+            domain_min: [0.0, 0.0, 0.0],
+            domain_max: [1.0, 1.0, 1.0],
+            table,
+        };
+        engine.set_lut(Some(lut));
+
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 0.01,
+                "Channel {}: expected ~{}, got {}",
+                i,
+                orig.0[i],
+                rend.0[i]
+            );
+        }
+    }
+
+    #[test]
+    fn render_with_no_lut_unchanged() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let engine = Engine::new(img);
+        assert!(engine.lut().is_none());
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!((orig.0[i] - rend.0[i]).abs() < 1e-5);
+        }
     }
 
     #[test]

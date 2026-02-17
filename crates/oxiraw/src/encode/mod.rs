@@ -32,8 +32,7 @@ mod tests {
     #[test]
     fn roundtrip_linear_to_srgb_pixel_values() {
         // linear 0.2159 should round-trip to sRGB ~128
-        let linear: Rgb32FImage =
-            ImageBuffer::from_pixel(1, 1, Rgb([0.2159f32, 0.2159, 0.2159]));
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([0.2159f32, 0.2159, 0.2159]));
         let dynamic = linear_to_srgb_dynamic(&linear);
         let rgb8 = dynamic.to_rgb8();
         let pixel = rgb8.get_pixel(0, 0);
