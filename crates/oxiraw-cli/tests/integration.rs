@@ -201,3 +201,41 @@ fn cli_apply_preset_with_lut() {
     let _ = std::fs::remove_file(&preset_path);
     let _ = std::fs::remove_file(&output);
 }
+
+/// Test that the CLI can process a raw file.
+/// This test is ignored by default since it requires a sample raw file.
+/// To run: place a .dng file at /tmp/oxiraw_test_sample.dng and run:
+///   cargo test -p oxiraw-cli -- --ignored cli_edit_raw_file
+#[test]
+#[ignore]
+fn cli_edit_raw_file() {
+    let input = std::path::PathBuf::from("/tmp/oxiraw_test_sample.dng");
+    if !input.exists() {
+        eprintln!("Skipping: no sample raw file at {}", input.display());
+        return;
+    }
+
+    let output = std::env::temp_dir().join("oxiraw_cli_raw_out.jpg");
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--exposure",
+            "0.5",
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "CLI should process raw file successfully");
+    assert!(output.exists(), "Output file should exist");
+
+    let out_img = image::open(&output).unwrap();
+    assert!(out_img.width() > 0);
+    assert!(out_img.height() > 0);
+
+    let _ = std::fs::remove_file(&output);
+}

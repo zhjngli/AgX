@@ -26,6 +26,16 @@ A running list of ideas for oxiraw's development. Nothing here is committed — 
 - **Preset versioning**: Schema version in presets for forward/backward compatibility
 - **Preset validation**: CLI command to validate a preset against the current schema
 
+## Image Quality & Metadata
+
+- **EXIF/metadata preservation**: Preserve all metadata (camera, lens, shutter speed, aperture, ISO, GPS, date/time, copyright, etc.) from input to output. Currently all metadata is stripped during processing. Likely needs the `kamadak-exif` or `rexiv2` crate to read metadata from the source and re-embed it in the output.
+- **JPEG quality control**: Allow specifying JPEG output quality (e.g., `--quality 95`). The `image` crate defaults to quality 80. Original JPEG quality cannot be read back from the file, so it must be user-specified. Consider a sensible default (e.g., 92-95) for photo editing use cases.
+- **Output format selection**: Allow choosing output format (JPEG, PNG, TIFF, WebP) independently of input format. Currently output format is inferred from the output file extension.
+
+## API Service
+
+- **REST API**: Expose oxiraw as an HTTP API service. Accept an image + a preset file or inline adjustment parameters, return the processed image. Could serve as the backend for a web UI, mobile app, or the preset marketplace. Key considerations: multipart upload for image + preset, JSON body for inline adjustments, streaming response for large images, authentication, rate limiting, job queuing for heavy processing.
+
 ## Ecosystem & Interop
 
 - **Lightroom XMP import**: Parse Adobe Camera Raw XMP presets and convert to oxiraw format
@@ -69,6 +79,24 @@ A running list of ideas for oxiraw's development. Nothing here is committed — 
 - **Soft proofing**: Preview how an image will look in a different color space (e.g., CMYK for print)
 - **lcms2 integration**: Use the `lcms2` Rust crate for production-quality ICC profile handling
 - **Per-camera color matrices**: Custom color matrices for each camera model to improve color accuracy from raw files
+
+## Processing Parity
+
+Rendering differences between oxiraw and other photo editors (Capture One, Lightroom, darktable) are expected for any input format — not just raw files. Multiple factors contribute:
+
+- **Demosaicing algorithm**: LibRaw defaults (AHD/PPG) differ from Capture One's proprietary algorithms, affecting detail and color at the pixel level
+- **Tone curves**: Each processor applies its own base tone curve to raw data before user adjustments. LibRaw's default rendering is fairly flat compared to commercial processors
+- **White balance calculation**: "Auto" white balance varies between implementations; camera-stored WB may be interpreted differently
+- **Exposure mapping**: How "+1 stop" translates to pixel values may differ (linear multiply vs curve-aware lift)
+- **Color matrices**: Each processor may use different per-camera color calibration data
+- **Gamma/highlight handling**: Highlight recovery, highlight reconstruction, and rolloff behavior vary significantly
+
+This is the nature of raw processing — there is no single "correct" rendering, only different interpretations. Normalizing output to match a specific processor is possible but complex (would require reverse-engineering their tone curves and color science). For now, oxiraw produces its own look. Future work could include:
+
+- Configurable base tone curves (flat, medium contrast, match-Lightroom, etc.)
+- Per-camera color profiles (DCP/ICC) for more accurate starting points
+- User-adjustable demosaicing algorithm selection
+- A/B comparison tooling to visualize differences against reference renders
 
 ## Advanced / Research
 

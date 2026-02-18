@@ -6,6 +6,7 @@ An open-source photo editing library and CLI written in Rust, with a portable, h
 
 - **Tone adjustments**: exposure, contrast, highlights, shadows, whites, blacks
 - **White balance**: temperature and tint shifts
+- **Raw format support**: decode CR2, CR3, NEF, ARW, RAF, DNG, and 1000+ camera formats via LibRaw
 - **3D LUT support**: apply `.cube` LUT files for color grading and film emulation
 - **TOML presets**: human-readable, shareable, version-controllable editing presets
 - **Library + CLI**: use as a Rust library or through the command-line interface
@@ -67,6 +68,12 @@ cargo run -p oxiraw-cli -- edit \
   -i example/images/mountain-landscape.jpg \
   -o graded.jpg \
   --exposure 0.5 --contrast 10 --lut film-emulation.cube
+
+# Process a raw file (CR2, NEF, ARW, DNG, etc.)
+cargo run -p oxiraw-cli -- edit \
+  -i photo.dng \
+  -o edited.jpg \
+  --exposure 0.5 --contrast 15
 ```
 
 ## Preset Format
@@ -105,11 +112,11 @@ Missing values default to neutral (no change). See `example/presets/` for more e
 
 ```rust
 use oxiraw::{Engine, Lut3D, Preset};
-use oxiraw::decode::decode_standard;
+use oxiraw::decode::decode;
 use oxiraw::encode::encode_to_file;
 
-// Decode an image
-let image = decode_standard("photo.jpg".as_ref()).unwrap();
+// Decode an image (auto-detects format: JPEG, PNG, TIFF, CR2, NEF, DNG, etc.)
+let image = decode("photo.jpg".as_ref()).unwrap();
 
 // Create engine and apply a preset
 let mut engine = Engine::new(image);
@@ -153,6 +160,26 @@ oxiraw/
 The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. This makes the system order-independent from the user's perspective — presets are purely declarative parameter values, not operation sequences.
 
 All processing happens in **sRGB** color space. Exposure and white balance operate in linear sRGB; contrast, highlights, shadows, whites, blacks, and LUTs operate in sRGB gamma space. See `docs/reference/color-spaces.md` for a detailed explanation.
+
+## Building with Raw Support
+
+Raw format decoding requires [LibRaw](https://www.libraw.org/) installed on your system:
+
+```bash
+# macOS
+brew install libraw
+
+# Ubuntu/Debian
+sudo apt install libraw-dev
+```
+
+The CLI enables raw support by default. To use the library without raw support (no LibRaw dependency):
+
+```toml
+# Cargo.toml — no "raw" feature, only standard formats
+[dependencies]
+oxiraw = "0.1"
+```
 
 ## Running Tests
 

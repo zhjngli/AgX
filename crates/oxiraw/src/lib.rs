@@ -6,6 +6,7 @@ pub mod error;
 pub mod lut;
 pub mod preset;
 
+pub use decode::decode;
 pub use engine::{Engine, Parameters};
 pub use error::{OxirawError, Result};
 pub use lut::Lut3D;

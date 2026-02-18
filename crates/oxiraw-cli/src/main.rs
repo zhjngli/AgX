@@ -113,7 +113,7 @@ fn run_apply(
     preset_path: &std::path::Path,
     output: &std::path::Path,
 ) -> oxiraw::Result<()> {
-    let linear = oxiraw::decode::decode_standard(input)?;
+    let linear = oxiraw::decode::decode(input)?;
     let preset = Preset::load_from_file(preset_path)?;
     let mut engine = Engine::new(linear);
     engine.apply_preset(&preset);
@@ -137,7 +137,7 @@ fn run_edit(
     tint: f32,
     lut: Option<&std::path::Path>,
 ) -> oxiraw::Result<()> {
-    let linear = oxiraw::decode::decode_standard(input)?;
+    let linear = oxiraw::decode::decode(input)?;
     let mut engine = Engine::new(linear);
     let params = engine.params_mut();
     params.exposure = exposure;

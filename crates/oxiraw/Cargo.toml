@@ -12,3 +12,7 @@ palette = "0.7"
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
+
+[features]
+default = []
+raw = []
