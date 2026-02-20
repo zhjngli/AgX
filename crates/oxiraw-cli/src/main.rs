@@ -27,6 +27,12 @@ enum Commands {
         /// Output image path
         #[arg(short, long)]
         output: PathBuf,
+        /// JPEG output quality (1-100, default 92)
+        #[arg(long, default_value_t = 92)]
+        quality: u8,
+        /// Output format (jpeg, png, tiff). Inferred from extension if not specified.
+        #[arg(long)]
+        format: Option<String>,
     },
     /// Edit an image with inline parameters
     Edit {
@@ -63,6 +69,12 @@ enum Commands {
         /// Path to a .cube LUT file
         #[arg(long)]
         lut: Option<PathBuf>,
+        /// JPEG output quality (1-100, default 92)
+        #[arg(long, default_value_t = 92)]
+        quality: u8,
+        /// Output format (jpeg, png, tiff). Inferred from extension if not specified.
+        #[arg(long)]
+        format: Option<String>,
     },
 }
 
@@ -74,7 +86,9 @@ fn main() {
             input,
             preset,
             output,
-        } => run_apply(&input, &preset, &output),
+            quality,
+            format,
+        } => run_apply(&input, &preset, &output, quality, format.as_deref()),
         Commands::Edit {
             input,
             output,
@@ -87,6 +101,8 @@ fn main() {
             temperature,
             tint,
             lut,
+            quality,
+            format,
         } => run_edit(
             &input,
             &output,
@@ -99,6 +115,8 @@ fn main() {
             temperature,
             tint,
             lut.as_deref(),
+            quality,
+            format.as_deref(),
         ),
     };
 
@@ -108,18 +126,38 @@ fn main() {
     }
 }
 
+fn parse_output_format(s: &str) -> oxiraw::Result<oxiraw::encode::OutputFormat> {
+    match s.to_ascii_lowercase().as_str() {
+        "jpeg" | "jpg" => Ok(oxiraw::encode::OutputFormat::Jpeg),
+        "png" => Ok(oxiraw::encode::OutputFormat::Png),
+        "tiff" | "tif" => Ok(oxiraw::encode::OutputFormat::Tiff),
+        _ => Err(oxiraw::OxirawError::Encode(format!(
+            "unsupported output format '{s}'. Use: jpeg, png, or tiff"
+        ))),
+    }
+}
+
 fn run_apply(
     input: &std::path::Path,
     preset_path: &std::path::Path,
     output: &std::path::Path,
+    quality: u8,
+    format: Option<&str>,
 ) -> oxiraw::Result<()> {
+    let metadata = oxiraw::encode::extract_metadata(input);
     let linear = oxiraw::decode::decode(input)?;
     let preset = Preset::load_from_file(preset_path)?;
     let mut engine = Engine::new(linear);
     engine.apply_preset(&preset);
     let rendered = engine.render();
-    oxiraw::encode::encode_to_file(&rendered, output)?;
-    println!("Saved to {}", output.display());
+    let fmt = format.map(parse_output_format).transpose()?;
+    let opts = oxiraw::encode::EncodeOptions {
+        jpeg_quality: quality,
+        format: fmt,
+    };
+    let final_path =
+        oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
+    println!("Saved to {}", final_path.display());
     Ok(())
 }
 
@@ -136,7 +174,10 @@ fn run_edit(
     temperature: f32,
     tint: f32,
     lut: Option<&std::path::Path>,
+    quality: u8,
+    format: Option<&str>,
 ) -> oxiraw::Result<()> {
+    let metadata = oxiraw::encode::extract_metadata(input);
     let linear = oxiraw::decode::decode(input)?;
     let mut engine = Engine::new(linear);
     let params = engine.params_mut();
@@ -153,7 +194,13 @@ fn run_edit(
         engine.set_lut(Some(lut));
     }
     let rendered = engine.render();
-    oxiraw::encode::encode_to_file(&rendered, output)?;
-    println!("Saved to {}", output.display());
+    let fmt = format.map(parse_output_format).transpose()?;
+    let opts = oxiraw::encode::EncodeOptions {
+        jpeg_quality: quality,
+        format: fmt,
+    };
+    let final_path =
+        oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
+    println!("Saved to {}", final_path.display());
     Ok(())
 }

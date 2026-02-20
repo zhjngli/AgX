@@ -202,6 +202,90 @@ fn cli_apply_preset_with_lut() {
     let _ = std::fs::remove_file(&output);
 }
 
+/// Create a larger test PNG with varied pixel values for quality comparison tests.
+fn create_test_png_large(path: &std::path::Path) {
+    use image::{ImageBuffer, Rgb};
+    let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(64, 64, |x, y| {
+        Rgb([(x * 4) as u8, (y * 4) as u8, ((x + y) * 2) as u8])
+    });
+    img.save(path).unwrap();
+}
+
+#[test]
+fn cli_edit_with_quality() {
+    let temp_dir = std::env::temp_dir();
+    let input = temp_dir.join("oxiraw_cli_quality_in.png");
+    let output_low = temp_dir.join("oxiraw_cli_q50.jpg");
+    let output_high = temp_dir.join("oxiraw_cli_q95.jpg");
+
+    create_test_png_large(&input);
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output_low.to_str().unwrap(),
+            "--quality",
+            "50",
+        ])
+        .status()
+        .expect("failed to run CLI");
+    assert!(status.success());
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output_high.to_str().unwrap(),
+            "--quality",
+            "95",
+        ])
+        .status()
+        .expect("failed to run CLI");
+    assert!(status.success());
+
+    let size_low = std::fs::metadata(&output_low).unwrap().len();
+    let size_high = std::fs::metadata(&output_high).unwrap().len();
+    assert!(size_high > size_low, "q95 should be larger than q50");
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&output_low);
+    let _ = std::fs::remove_file(&output_high);
+}
+
+#[test]
+fn cli_edit_with_format_override() {
+    let temp_dir = std::env::temp_dir();
+    let input = temp_dir.join("oxiraw_cli_fmt_in.png");
+    let output = temp_dir.join("oxiraw_cli_fmt_out.png");
+
+    create_test_png(&input);
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--format",
+            "jpeg",
+        ])
+        .status()
+        .expect("failed to run CLI");
+    assert!(status.success());
+
+    let expected = temp_dir.join("oxiraw_cli_fmt_out.png.jpeg");
+    assert!(expected.exists(), "Should have appended .jpeg extension");
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&expected);
+}
+
 /// Test that the CLI can process a raw file.
 /// This test is ignored by default since it requires a sample raw file.
 /// To run: place a .dng file at /tmp/oxiraw_test_sample.dng and run:

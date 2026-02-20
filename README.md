@@ -74,7 +74,26 @@ cargo run -p oxiraw-cli -- edit \
   -i photo.dng \
   -o edited.jpg \
   --exposure 0.5 --contrast 15
+
+# Set JPEG output quality (default: 92)
+cargo run -p oxiraw-cli -- edit \
+  -i photo.jpg \
+  -o output.jpg \
+  --quality 95
+
+# Specify output format explicitly
+cargo run -p oxiraw-cli -- edit \
+  -i photo.jpg \
+  -o output.tiff \
+  --format tiff
 ```
+
+### Metadata Preservation
+
+Metadata (EXIF, ICC profiles) is automatically preserved from input to output:
+- **JPEG/PNG**: Lossless byte-level copy via `img-parts`
+- **TIFF-based raw** (CR2, NEF, DNG, ARW): EXIF extracted via `kamadak-exif`
+- **Non-TIFF raw** (RAF, RW2, CR3): Key shooting data reconstructed from LibRaw fields
 
 ## Preset Format
 

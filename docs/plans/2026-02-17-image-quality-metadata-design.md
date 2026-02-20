@@ -34,19 +34,40 @@ The pipeline becomes:
 
 Metadata copy is **best-effort** — if metadata can't be read from the source (corrupt EXIF, unsupported container), produce the output without metadata. Image processing should never fail because of metadata issues.
 
+#### Extraction by Input Format
+
+**Standard formats (JPEG, PNG):**
+- `img-parts` reads EXIF and ICC as raw byte blobs. Lossless — all tags preserved verbatim.
+
+**TIFF-based raw formats (CR2, NEF, DNG, ARW, PEF, ORF, etc.):**
+- `kamadak-exif` reads EXIF from these files since they use TIFF containers internally.
+- Returns raw EXIF bytes via `Exif::buf()` which can be injected into output.
+- Near-lossless — preserves all standard EXIF tags including maker notes.
+
+**Non-TIFF raw formats (RAF/Fuji, RW2/Panasonic, CR3/Canon, etc.):**
+- `kamadak-exif` cannot read these containers.
+- Fallback: read parsed metadata fields from LibRaw's C structs (`imgdata.idata` for camera make/model, `imgdata.other` for ISO/shutter/aperture/focal length/timestamp/GPS, `imgdata.lens` for lens info).
+- Construct EXIF using `little_exif` from the parsed fields.
+- Lossy — preserves key shooting data (camera, lens, exposure, GPS, date) but loses maker notes and vendor-specific tags.
+- Requires additional LibRaw FFI bindings for metadata struct access (behind `raw` feature flag).
+
+The extraction strategy is: try `img-parts` (JPEG/PNG) → try `kamadak-exif` (TIFF-based raw) → try LibRaw fields (all other raw) → give up gracefully.
+
+#### Injection by Output Format
+
+- **JPEG/PNG output**: `img-parts` injects EXIF and ICC byte blobs.
+- **TIFF output**: `little_exif` writes EXIF at the tag level.
+
 #### Crate Selection
 
 | Crate | Purpose | When used |
 |-------|---------|-----------|
-| `img-parts` | Byte-level EXIF/ICC copy for JPEG/PNG/WebP | JPEG/PNG output (most common) |
-| `kamadak-exif` | Read EXIF bytes from raw files | Raw file input (raw containers aren't supported by `img-parts`) |
-| `little_exif` | Write EXIF to TIFF output | TIFF output only |
+| `img-parts` | Byte-level EXIF/ICC read+write for JPEG/PNG | JPEG/PNG input and output |
+| `kamadak-exif` | Read EXIF bytes from TIFF-based raw files | CR2, NEF, DNG, ARW, PEF, ORF input |
+| `little_exif` | Construct EXIF from parsed fields; write EXIF to TIFF output | LibRaw fallback + TIFF output |
+| LibRaw (existing FFI) | Read parsed metadata fields from any raw format | RAF, RW2, CR3, and other non-TIFF raw input |
 
-All pure Rust, no new system dependencies.
-
-- **JPEG/PNG output**: `img-parts` copies EXIF and ICC as raw byte blobs. Lossless — all tags preserved verbatim.
-- **TIFF output**: `little_exif` copies EXIF at the tag level. Some obscure tags may be dropped since it parses individually.
-- **Raw input**: `kamadak-exif` reads EXIF bytes from raw containers (CR2, NEF, RAF, DNG, etc.), then `img-parts` injects them into the JPEG/PNG output.
+All pure Rust crate additions, no new system dependencies (LibRaw is already linked for raw decoding).
 
 ### JPEG Quality Control
 
@@ -107,6 +128,8 @@ The CLI gets `--format <jpeg|png|tiff>` and `--quality <1-100>` on both `edit` a
 
 **In scope:**
 - Metadata byte-level copy (EXIF, ICC, XMP, IPTC) from input to output
+- Raw file metadata: lossless for TIFF-based raw (via kamadak-exif), constructed fallback for non-TIFF raw (via LibRaw fields + little_exif)
+- Additional LibRaw FFI bindings for metadata structs (idata, other, lens)
 - `EncodeOptions` struct with JPEG quality and output format
 - `OutputFormat` enum and format resolution logic
 - `--quality` and `--format` CLI flags
@@ -132,7 +155,8 @@ The CLI gets `--format <jpeg|png|tiff>` and `--quality <1-100>` on both `edit` a
 |----------|-----------|
 | Byte-level copy, not tag-level | Preserves all metadata without risk of dropping unknown tags. Simplest approach. |
 | `img-parts` for JPEG/PNG | Pure Rust, high adoption (~7.8M downloads), lossless byte-level EXIF/ICC copy. |
-| `kamadak-exif` for raw input | Most robust EXIF reader in Rust (~393k/month). Needed because `img-parts` can't read raw containers. |
+| `kamadak-exif` for TIFF-based raw | Most robust EXIF reader in Rust (~393k/month). Reads TIFF containers (CR2, NEF, DNG, ARW) which `img-parts` can't. |
+| LibRaw fallback for non-TIFF raw | Already linked for decoding. Exposes parsed EXIF fields for all 1000+ camera formats. Covers RAF, RW2, CR3 where kamadak-exif fails. |
 | `little_exif` for TIFF output | Only pure-Rust crate that can write EXIF to TIFF files. |
 | Best-effort metadata | Metadata issues should never block image processing. Warn and continue. |
 | Default JPEG quality 92 | Visually lossless for photo work. Matches Lightroom's default (~93). Current default of 80 loses too much quality. |
