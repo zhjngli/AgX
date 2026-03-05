@@ -55,7 +55,7 @@ Some LUTs (particularly in video workflows) expect **log** input (S-Log3, LogC, 
 
 **Our approach:** Apply the LUT in sRGB gamma space, which is where our pipeline already operates for perceptual adjustments. This is correct for the vast majority of LUTs.
 
-**Future:** When we add wider color space support and a pluggable pipeline architecture, LUTs can declare their expected input/output color space, and the pipeline can auto-insert conversions. See `docs/ideas/future-features.md` for the pluggable pipeline vision.
+**Future:** When we add wider color space support and a pluggable pipeline architecture, LUTs can declare their expected input/output color space, and the pipeline can auto-insert conversions. See `docs/ideas/pluggable-pipeline.md` for the pluggable pipeline vision.
 
 ## Design
 

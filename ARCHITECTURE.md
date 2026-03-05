@@ -122,7 +122,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 
 | Document                                              |
 |-------------------------------------------------------|
-| [Future Features](docs/ideas/future-features.md)      |
+| [Ideas Backlog](docs/ideas/README.md)                  |
 
 ## When a Structural Test Fails
 

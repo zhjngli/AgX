@@ -93,4 +93,4 @@ Future versions may add:
 - **ICC profile handling**: Read embedded profiles from input images, embed profiles in output
 - **Log input LUTs**: Support for LUTs designed for video log curves (S-Log3, LogC)
 
-See `docs/ideas/future-features.md` for the full roadmap.
+See `docs/ideas/color-management.md` for the full roadmap.

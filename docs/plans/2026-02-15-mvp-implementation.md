@@ -38,7 +38,7 @@ Key design decisions already made:
 - Output is encoded back to sRGB gamma for saving.
 - No ICC profile handling in MVP — we assume sRGB throughout.
 
-**Future:** Support for wider gamuts (Adobe RGB, ProPhoto RGB, Display P3), ICC profile reading/embedding, and color space conversion. This should be tracked in `docs/ideas/future-features.md`.
+**Future:** Support for wider gamuts (Adobe RGB, ProPhoto RGB, Display P3), ICC profile reading/embedding, and color space conversion. This should be tracked in `docs/ideas/`.
 
 ---
 
