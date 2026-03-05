@@ -17,7 +17,7 @@ Decode image files into linear sRGB `Rgb32FImage` buffers for the engine.
 ## Does NOT
 - Process or adjust images after decoding.
 - Encode or write output files.
-- Define metadata types (uses `metadata::ImageMetadata` from the metadata module).
+- Define or use metadata types -- returns raw EXIF bytes (`Vec<u8>`) and leaves wrapping to the metadata module.
 
 ## Key Decisions
 - **Output is always linear sRGB f32.** Standard images are assumed sRGB gamma and converted to linear on decode. Raw images are demosaicked by LibRaw and converted to linear sRGB via its color pipeline.

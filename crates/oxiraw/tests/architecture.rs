@@ -1,9 +1,12 @@
 //! Structural tests that enforce module layering rules.
 //!
-//! These tests scan Rust source files for `use crate::` imports and verify that
+//! These tests scan Rust source files for `crate::` references and verify that
 //! no module imports from a forbidden peer module. This prevents architectural
 //! regressions such as circular dependencies or upward dependencies from
 //! low-level modules into higher-level ones.
+//!
+//! Test code (`#[cfg(test)]` blocks) is excluded from scanning — cross-module
+//! imports in tests are allowed.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -50,23 +53,26 @@ fn is_comment_line(trimmed: &str) -> bool {
     trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*')
 }
 
-/// Scan all `.rs` files in `dir` for forbidden `use crate::{module}` imports.
+/// Scan all `.rs` files for forbidden `crate::{module}` references.
 ///
 /// Returns a list of violations. Each forbidden module is checked as a
-/// `use crate::{module}` prefix (catching both `use crate::module;` and
-/// `use crate::module::Something`).
+/// `crate::{module}` substring (catching both `use crate::module::Thing` and
+/// inline paths like `crate::module::function()`).
+///
+/// Lines inside `#[cfg(test)]` blocks are excluded — test code may import freely.
 fn check_forbidden_imports(files: &[PathBuf], forbidden_modules: &[&str]) -> Vec<Violation> {
     let mut violations = Vec::new();
 
-    // Build the patterns we look for, e.g. "use crate::engine"
+    // Build the patterns we look for, e.g. "crate::engine"
     let patterns: Vec<String> = forbidden_modules
         .iter()
-        .map(|m| format!("use crate::{m}"))
+        .map(|m| format!("crate::{m}"))
         .collect();
 
     for file in files {
         let contents = fs::read_to_string(file).expect("failed to read source file");
-        for (i, line) in contents.lines().enumerate() {
+        let non_test_lines = exclude_test_blocks(&contents);
+        for (line_number, line) in non_test_lines {
             let trimmed = line.trim();
 
             // Skip comment lines
@@ -79,7 +85,7 @@ fn check_forbidden_imports(files: &[PathBuf], forbidden_modules: &[&str]) -> Vec
                 if trimmed.contains(pattern.as_str()) {
                     violations.push(Violation {
                         file: file.clone(),
-                        line_number: i + 1,
+                        line_number,
                         line: line.to_string(),
                     });
                 }
@@ -88,6 +94,54 @@ fn check_forbidden_imports(files: &[PathBuf], forbidden_modules: &[&str]) -> Vec
     }
 
     violations
+}
+
+/// Returns lines from `source` that are NOT inside `#[cfg(test)]` blocks.
+///
+/// Each returned tuple is `(1-based line number, line content)`.
+/// This uses brace-counting to detect the extent of `#[cfg(test)]` mod blocks.
+fn exclude_test_blocks(source: &str) -> Vec<(usize, &str)> {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut result = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+
+        // Detect #[cfg(test)] followed by a mod block
+        if trimmed == "#[cfg(test)]" {
+            // Skip the attribute line and the entire block that follows
+            i += 1;
+            // Find the opening brace
+            while i < lines.len() {
+                if lines[i].contains('{') {
+                    break;
+                }
+                i += 1;
+            }
+            // Count braces to find the end of the block
+            let mut depth = 0;
+            while i < lines.len() {
+                for ch in lines[i].chars() {
+                    if ch == '{' {
+                        depth += 1;
+                    } else if ch == '}' {
+                        depth -= 1;
+                    }
+                }
+                i += 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        result.push((i + 1, lines[i]));
+        i += 1;
+    }
+
+    result
 }
 
 /// Format violations into a clear assertion message.
