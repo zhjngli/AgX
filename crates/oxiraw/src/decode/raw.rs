@@ -283,8 +283,6 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
     Ok(linear)
 }
 
-use crate::encode::ImageMetadata;
-
 struct RawMetadataFields {
     make: String,
     model: String,
@@ -298,7 +296,9 @@ struct RawMetadataFields {
 }
 
 /// Extract metadata from a raw file using LibRaw's parsed fields.
-pub fn extract_raw_metadata(path: &Path) -> Option<ImageMetadata> {
+///
+/// Returns raw EXIF bytes (not wrapped in `ImageMetadata`).
+pub fn extract_raw_metadata(path: &Path) -> Option<Vec<u8>> {
     let processor = LibRawProcessor::new().ok()?;
     processor.open_file(path).ok()?;
 
@@ -317,7 +317,7 @@ pub fn extract_raw_metadata(path: &Path) -> Option<ImageMetadata> {
     construct_exif_from_fields(&fields)
 }
 
-fn construct_exif_from_fields(fields: &RawMetadataFields) -> Option<ImageMetadata> {
+fn construct_exif_from_fields(fields: &RawMetadataFields) -> Option<Vec<u8>> {
     use little_exif::exif_tag::ExifTag;
     use little_exif::metadata::Metadata;
     use little_exif::rational::uR64;
@@ -380,10 +380,7 @@ fn construct_exif_from_fields(fields: &RawMetadataFields) -> Option<ImageMetadat
         return None;
     }
 
-    Some(ImageMetadata {
-        exif: Some(exif_bytes),
-        icc_profile: None,
-    })
+    Some(exif_bytes)
 }
 
 fn timestamp_to_exif_datetime(timestamp: i64) -> Option<String> {
