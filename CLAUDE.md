@@ -2,22 +2,15 @@
 
 Open-source photo editing library + CLI in Rust with a portable, human-readable preset format.
 
-## Project Structure
+## Workspace Layout
 
 Cargo workspace with two crates:
-- `crates/oxiraw/` — core library (decode, engine, adjustments, presets, encode)
-- `crates/oxiraw-cli/` — thin CLI wrapper
+- `crates/oxiraw/` -- core library (decode, engine, adjustments, presets, encode)
+- `crates/oxiraw-cli/` -- thin CLI wrapper
 
 ## Architecture
 
-- **Always-re-render-from-original**: Engine holds immutable original image + mutable parameter state. Every render applies all adjustments from scratch. This makes the system order-independent from the user's perspective.
-- **Declarative presets**: TOML files declaring parameter values, not operation sequences.
-- **Raw decoding**: LibRaw via FFI for raw formats; `image` crate for standard formats (JPEG, PNG, TIFF).
-
-## Key Design Docs
-
-- Architecture design: `docs/plans/2026-02-14-architecture-design.md`
-- Future ideas: `docs/ideas/future-features.md`
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency rules, core invariants, and per-module READMEs.
 
 ## Conventions
 
@@ -25,3 +18,21 @@ Cargo workspace with two crates:
 - `thiserror` for error types
 - `serde` for all serializable types
 - Tests live alongside source in standard Rust `#[cfg(test)]` modules
+- Structural tests in `crates/oxiraw/tests/architecture.rs` enforce module dependency rules; see "When a Structural Test Fails" in `ARCHITECTURE.md`
+
+## Definition of Done
+
+Every change must satisfy all applicable items before merging:
+
+1. Implementation code + tests
+2. Update `ARCHITECTURE.md` if the change adds modules, changes dependencies, or introduces new invariants
+3. Update affected module `README.md` files (public API, extension guide)
+4. Verify `tests/architecture.rs` still passes
+5. If a new design doc was written, add a cross-link from `ARCHITECTURE.md`
+
+## Key Docs
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) -- module layering, dependency rules, invariants
+- [`docs/plans/`](docs/plans/) -- design and implementation plans
+- [`docs/ideas/`](docs/ideas/) -- future feature ideas
+- [`docs/contributing/`](docs/contributing/) -- contribution guides (evolving architecture, etc.)
