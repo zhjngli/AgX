@@ -64,7 +64,7 @@ struct PresetRaw {
 ///
 /// Presets are declarative parameter sets stored as TOML files.
 /// Missing values default to neutral (no change).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Preset {
     pub metadata: PresetMetadata,
     pub params: Parameters,
@@ -74,16 +74,6 @@ pub struct Preset {
 impl PartialEq for Preset {
     fn eq(&self, other: &Self) -> bool {
         self.metadata == other.metadata && self.params == other.params
-    }
-}
-
-impl Default for Preset {
-    fn default() -> Self {
-        Self {
-            metadata: PresetMetadata::default(),
-            params: Parameters::default(),
-            lut: None,
-        }
     }
 }
 
