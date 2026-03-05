@@ -7,43 +7,41 @@ Oxiraw is an open-source photo editing library and CLI in Rust. The architecture
 ## Module Dependency Graph
 
 ```
-                    +---------------+
-                    |  oxiraw-cli   |  (consumer of library API)
-                    +-------+-------+
-                            |
-       +--------------------+--------------------+
-       |                    |                    |
-       v                    v                    v
-  +---------+         +-----------+        +---------+
-  | preset  |-------->|  engine   |<-------| encode  |
-  +---------+         +-----------+        +---------+
-       |               /    |    \              |
-       |              /     |     \             |
-       v             v      v      v            v
-  +---------+  +--------+ +-----+ +------+ +----------+
-  |   lut   |  | adjust | | lut | |preset| | metadata |
-  +---------+  +--------+ +-----+ +------+ +----------+
-       |                                        |
-       v                                        v
-  +---------+                              +---------+
-  | error   |                              | decode  |
-  +---------+                              +---------+
-       ^                                        |
-       |                                        v
-       +----------------------------------------+
-                        error
-```
-
-Simplified layering:
-
-```
-Layer 0 (foundation):  error
-Layer 1 (leaf):        adjust, lut, decode
-Layer 2 (mid):         metadata (depends on decode)
-Layer 3 (mid):         encode (depends on metadata)
-Layer 4 (core):        engine (depends on adjust, lut, preset)
-                       preset (depends on engine, lut)
-Layer 5 (consumer):    oxiraw-cli
+                    ┌──────────────┐
+                    │   error.rs   │   (foundation — no deps on other modules)
+                    └──────┬───────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+   ┌──────────┐      ┌──────────┐      ┌──────────┐
+   │  adjust   │      │   lut    │      │  decode   │
+   └──────┬───┘      └─────┬────┘      └─────┬────┘
+          │                │                  │
+          │                │           ┌──────┴──────┐
+          │                │           ▼             │
+          │                │     ┌──────────┐        │
+          │                │     │ metadata │        │
+          │                │     └─────┬────┘        │
+          │                │           │             │
+          │           ┌────┘     ┌─────┘             │
+          │           │          ▼                   │
+          │           │    ┌──────────┐              │
+          │           │    │  encode  │              │
+          │           │    └──────────┘              │
+          │           │                              │
+          │    ┌──────┴─────┐                        │
+          │    │   preset   │                        │
+          │    └──────┬─────┘                        │
+          │           │                              │
+          └─────┬─────┘                              │
+                ▼                                    │
+          ┌──────────────┐                           │
+          │    engine    │◄──────────────────────────┘
+          └──────┬───────┘
+                 │
+          ┌──────────────┐
+          │  oxiraw-cli  │   (consumer — depends on library only)
+          └──────────────┘
 ```
 
 ## Dependency Rules
@@ -59,7 +57,7 @@ These rules are enforced by `crates/oxiraw/tests/architecture.rs`.
 | `encode`   | engine, preset, adjust, lut, decode                | error, metadata (`ImageMetadata`)                        |
 | `preset`   | decode, encode, metadata                           | engine (`Parameters`), lut (`Lut3D`), error              |
 | `engine`   | no restrictions within library                     | adjust, lut, preset, error                               |
-| oxiraw-cli | library API only                                   | public `oxiraw::` types                                  |
+| oxiraw-cli | —                                                  | oxiraw (library API only)                                |
 
 ## Negative Constraints
 
@@ -90,17 +88,16 @@ These invariants must hold across the entire codebase:
 
 Each module has (or will have) a README.md documenting its public API, internal structure, and specific constraints.
 
-| Module     | Path                                      |
-|------------|-------------------------------------------|
-| error      | `crates/oxiraw/src/error.rs`              |
-| adjust     | `crates/oxiraw/src/adjust/`               |
-| lut        | `crates/oxiraw/src/lut/`                  |
-| decode     | `crates/oxiraw/src/decode/`               |
-| metadata   | `crates/oxiraw/src/metadata.rs`           |
-| encode     | `crates/oxiraw/src/encode/`               |
-| preset     | `crates/oxiraw/src/preset/`               |
-| engine     | `crates/oxiraw/src/engine/`               |
-| oxiraw-cli | `crates/oxiraw-cli/`                      |
+| Module     | README                                               |
+|------------|------------------------------------------------------|
+| adjust     | [`crates/oxiraw/src/adjust/README.md`](crates/oxiraw/src/adjust/README.md)     |
+| lut        | [`crates/oxiraw/src/lut/README.md`](crates/oxiraw/src/lut/README.md)           |
+| decode     | [`crates/oxiraw/src/decode/README.md`](crates/oxiraw/src/decode/README.md)     |
+| metadata   | [`crates/oxiraw/src/metadata/README.md`](crates/oxiraw/src/metadata/README.md) |
+| encode     | [`crates/oxiraw/src/encode/README.md`](crates/oxiraw/src/encode/README.md)     |
+| preset     | [`crates/oxiraw/src/preset/README.md`](crates/oxiraw/src/preset/README.md)     |
+| engine     | [`crates/oxiraw/src/engine/README.md`](crates/oxiraw/src/engine/README.md)     |
+| oxiraw-cli | [`crates/oxiraw-cli/README.md`](crates/oxiraw-cli/README.md)                   |
 
 ## Design Docs
 
@@ -133,10 +130,10 @@ The architectural tests in `crates/oxiraw/tests/architecture.rs` enforce the dep
 
 2. **Check if the import is accidental.** Most failures are unintentional -- a quick refactor pulled in a type from the wrong module, or a new `use` statement crossed a boundary. Fix by moving the type, re-exporting it from the correct module, or restructuring the code.
 
-3. **If the dependency is genuinely needed**, the architecture may need to evolve. Do not simply suppress the test. Instead:
-   - Document why the new dependency is necessary.
-   - Update the dependency rules table in this file.
-   - Update the structural test to reflect the new rule.
-   - Get the change reviewed -- boundary changes affect the entire codebase.
+3. **If the dependency is genuinely needed**, the architecture may need to evolve. Do not simply suppress the test. Instead, follow the process in `docs/contributing/evolving-architecture.md`:
+   - Document why the new dependency is necessary in a design doc.
+   - Update the dependency rules table in this file and the structural test.
+   - Update affected module READMEs.
+   - Get the change reviewed — boundary changes affect the entire codebase.
 
 The goal is not to prevent all change, but to make boundary changes visible and intentional rather than accidental.
