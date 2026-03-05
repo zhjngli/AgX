@@ -144,7 +144,7 @@ fn run_apply(
     quality: u8,
     format: Option<&str>,
 ) -> oxiraw::Result<()> {
-    let metadata = oxiraw::encode::extract_metadata(input);
+    let metadata = oxiraw::metadata::extract_metadata(input);
     let linear = oxiraw::decode::decode(input)?;
     let preset = Preset::load_from_file(preset_path)?;
     let mut engine = Engine::new(linear);
@@ -177,7 +177,7 @@ fn run_edit(
     quality: u8,
     format: Option<&str>,
 ) -> oxiraw::Result<()> {
-    let metadata = oxiraw::encode::extract_metadata(input);
+    let metadata = oxiraw::metadata::extract_metadata(input);
     let linear = oxiraw::decode::decode(input)?;
     let mut engine = Engine::new(linear);
     let params = engine.params_mut();

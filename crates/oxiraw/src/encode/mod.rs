@@ -8,6 +8,7 @@ use image::{DynamicImage, Rgb, Rgb32FImage};
 use palette::{LinSrgb, Srgb};
 
 use crate::error::Result;
+use crate::metadata::ImageMetadata;
 
 /// Supported output image formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,15 +54,6 @@ impl Default for EncodeOptions {
             format: None,
         }
     }
-}
-
-/// Extracted metadata from an input image (EXIF, ICC profile).
-#[derive(Debug, Clone)]
-pub struct ImageMetadata {
-    /// Raw EXIF bytes.
-    pub exif: Option<Vec<u8>>,
-    /// Raw ICC profile bytes.
-    pub icc_profile: Option<Vec<u8>>,
 }
 
 /// Resolve the output file path and format.
@@ -236,110 +228,6 @@ fn inject_metadata_tiff(path: &std::path::Path, metadata: &ImageMetadata) {
             let _ = exif_meta.write_to_file(path);
         }
     }
-}
-
-/// Extract EXIF from a TIFF-based raw file using kamadak-exif.
-///
-/// Works for: CR2, NEF, DNG, ARW, PEF, ORF (TIFF-container raw formats).
-/// Returns raw EXIF bytes suitable for injection into output files.
-#[cfg(feature = "raw")]
-fn extract_metadata_raw_tiff(path: &std::path::Path) -> Option<ImageMetadata> {
-    let file = std::fs::File::open(path).ok()?;
-    let mut reader = std::io::BufReader::new(file);
-    let exif = exif::Reader::new().read_from_container(&mut reader).ok()?;
-    let raw_buf = exif.buf();
-    if raw_buf.is_empty() {
-        return None;
-    }
-    // kamadak-exif returns raw EXIF bytes (TIFF header + IFDs).
-    // For injection into JPEG via img-parts, we need "Exif\0\0" prefix.
-    let exif_bytes = if raw_buf.starts_with(b"Exif\0\0") {
-        raw_buf.to_vec()
-    } else {
-        let mut prefixed = b"Exif\0\0".to_vec();
-        prefixed.extend_from_slice(raw_buf);
-        prefixed
-    };
-    Some(ImageMetadata {
-        exif: Some(exif_bytes),
-        icc_profile: None,
-    })
-}
-
-/// Extract metadata (EXIF, ICC profile) from an input image file.
-///
-/// Extraction strategy (best-effort, cascading):
-/// 1. `img-parts` for JPEG/PNG — lossless byte-level copy
-/// 2. `kamadak-exif` for TIFF-based raw files (behind `raw` feature)
-/// 3. LibRaw parsed fields for non-TIFF raw files (behind `raw` feature)
-/// 4. Return None — no metadata extracted
-///
-/// Returns `None` for unsupported formats or if the file can't be read.
-/// This is best-effort — metadata extraction failure should never block processing.
-pub fn extract_metadata(path: &std::path::Path) -> Option<ImageMetadata> {
-    let bytes = std::fs::read(path).ok()?;
-
-    // Strategy 1: Try img-parts for JPEG
-    if let Some(meta) = extract_metadata_jpeg(&bytes) {
-        return Some(meta);
-    }
-
-    // Strategy 2: Try img-parts for PNG
-    if let Some(meta) = extract_metadata_png(&bytes) {
-        return Some(meta);
-    }
-
-    // Strategy 3: Try kamadak-exif for TIFF-based raw files (CR2, NEF, DNG, ARW, PEF, ORF)
-    #[cfg(feature = "raw")]
-    {
-        if crate::decode::is_raw_extension(path) {
-            if let Some(meta) = extract_metadata_raw_tiff(path) {
-                return Some(meta);
-            }
-        }
-    }
-
-    // Strategy 4: Try LibRaw parsed fields for non-TIFF raw files (RAF, RW2, CR3, etc.)
-    #[cfg(feature = "raw")]
-    {
-        if crate::decode::is_raw_extension(path) {
-            if let Some(meta) = crate::decode::raw::extract_raw_metadata(path) {
-                return Some(meta);
-            }
-        }
-    }
-
-    None
-}
-
-fn extract_metadata_jpeg(bytes: &[u8]) -> Option<ImageMetadata> {
-    use img_parts::{ImageEXIF, ImageICC};
-
-    let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.to_vec().into()).ok()?;
-    let exif = jpeg.exif().map(|b| b.to_vec());
-    let icc = jpeg.icc_profile().map(|b| b.to_vec());
-    if exif.is_some() || icc.is_some() {
-        return Some(ImageMetadata {
-            exif,
-            icc_profile: icc,
-        });
-    }
-    None
-}
-
-fn extract_metadata_png(bytes: &[u8]) -> Option<ImageMetadata> {
-    use img_parts::{ImageEXIF, ImageICC};
-
-    let png = img_parts::png::Png::from_bytes(bytes.to_vec().into()).ok()?;
-    let exif = png.exif().map(|b| b.to_vec());
-    let icc = png.icc_profile().map(|b| b.to_vec());
-    if exif.is_some() || icc.is_some() {
-        return Some(ImageMetadata {
-            exif,
-            icc_profile: icc,
-        });
-    }
-    None
 }
 
 #[cfg(test)]
@@ -527,39 +415,6 @@ mod tests {
     }
 
     #[test]
-    fn extract_metadata_from_jpeg_with_no_exif() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_no_exif.jpg");
-        let img: image::ImageBuffer<Rgb<u8>, Vec<u8>> =
-            ImageBuffer::from_pixel(4, 4, Rgb([128u8, 128, 128]));
-        img.save(&temp_path).unwrap();
-
-        let meta = extract_metadata(&temp_path);
-        if let Some(m) = meta {
-            assert!(m.exif.is_none() || m.exif.as_ref().unwrap().is_empty() == false);
-        }
-
-        let _ = std::fs::remove_file(&temp_path);
-    }
-
-    #[test]
-    fn extract_metadata_nonexistent_file_returns_none() {
-        let meta = extract_metadata(std::path::Path::new("/nonexistent/file.jpg"));
-        assert!(meta.is_none());
-    }
-
-    #[test]
-    fn extract_metadata_from_png() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_meta.png");
-        let img: image::ImageBuffer<Rgb<u8>, Vec<u8>> =
-            ImageBuffer::from_pixel(4, 4, Rgb([128u8, 128, 128]));
-        img.save(&temp_path).unwrap();
-
-        let _meta = extract_metadata(&temp_path);
-        // Should not crash
-        let _ = std::fs::remove_file(&temp_path);
-    }
-
-    #[test]
     fn metadata_roundtrip_jpeg() {
         let exif_bytes = vec![
             0x45, 0x78, 0x69, 0x66, 0x00, 0x00, // "Exif\0\0"
@@ -580,7 +435,7 @@ mod tests {
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
 
-        let meta_out = extract_metadata(&temp_path);
+        let meta_out = crate::metadata::extract_metadata(&temp_path);
         assert!(meta_out.is_some(), "Should have metadata in output");
         assert!(
             meta_out.as_ref().unwrap().exif.is_some(),
@@ -598,39 +453,5 @@ mod tests {
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
         let _ = std::fs::remove_file(&result.unwrap());
-    }
-}
-
-#[cfg(all(test, feature = "raw"))]
-mod raw_metadata_tests {
-    use super::*;
-
-    #[test]
-    fn extract_metadata_raw_tiff_nonexistent_returns_none() {
-        let meta = extract_metadata_raw_tiff(std::path::Path::new("/nonexistent/photo.cr2"));
-        assert!(meta.is_none());
-    }
-
-    #[test]
-    fn extract_metadata_raw_tiff_non_tiff_file_returns_none() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_not_tiff_raw.jpg");
-        let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
-            image::ImageBuffer::from_pixel(4, 4, image::Rgb([128u8, 128, 128]));
-        img.save(&temp_path).unwrap();
-
-        let _meta = extract_metadata_raw_tiff(&temp_path);
-        // kamadak-exif may or may not return EXIF from a JPEG — either way is fine
-        let _ = std::fs::remove_file(&temp_path);
-    }
-
-    #[test]
-    fn extract_metadata_falls_through_to_none_for_unknown() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_unknown.bmp");
-        let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
-            image::ImageBuffer::from_pixel(4, 4, image::Rgb([128u8, 128, 128]));
-        img.save(&temp_path).unwrap();
-        let meta = extract_metadata(&temp_path);
-        assert!(meta.is_none());
-        let _ = std::fs::remove_file(&temp_path);
     }
 }
