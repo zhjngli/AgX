@@ -3,6 +3,92 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjust;
 
+/// Per-channel HSL adjustment (hue shift, saturation, luminance).
+///
+/// Ranges: hue -180.0 to +180.0 (degrees), saturation/luminance -100.0 to +100.0.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct HslChannel {
+    #[serde(default)]
+    pub hue: f32,
+    #[serde(default)]
+    pub saturation: f32,
+    #[serde(default)]
+    pub luminance: f32,
+}
+
+/// HSL adjustments for all 8 color channels.
+///
+/// Channel order: Red (0deg), Orange (30deg), Yellow (60deg), Green (120deg),
+/// Aqua (180deg), Blue (240deg), Purple (270deg), Magenta (330deg).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct HslChannels {
+    #[serde(default)]
+    pub red: HslChannel,
+    #[serde(default)]
+    pub orange: HslChannel,
+    #[serde(default)]
+    pub yellow: HslChannel,
+    #[serde(default)]
+    pub green: HslChannel,
+    #[serde(default)]
+    pub aqua: HslChannel,
+    #[serde(default)]
+    pub blue: HslChannel,
+    #[serde(default)]
+    pub purple: HslChannel,
+    #[serde(default)]
+    pub magenta: HslChannel,
+}
+
+impl HslChannels {
+    /// Returns true if all channels are at default (zero) values.
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// Extract hue shifts as an array ordered by channel index.
+    pub fn hue_shifts(&self) -> [f32; 8] {
+        [
+            self.red.hue,
+            self.orange.hue,
+            self.yellow.hue,
+            self.green.hue,
+            self.aqua.hue,
+            self.blue.hue,
+            self.purple.hue,
+            self.magenta.hue,
+        ]
+    }
+
+    /// Extract saturation shifts as an array ordered by channel index.
+    pub fn saturation_shifts(&self) -> [f32; 8] {
+        [
+            self.red.saturation,
+            self.orange.saturation,
+            self.yellow.saturation,
+            self.green.saturation,
+            self.aqua.saturation,
+            self.blue.saturation,
+            self.purple.saturation,
+            self.magenta.saturation,
+        ]
+    }
+
+    /// Extract luminance shifts as an array ordered by channel index.
+    pub fn luminance_shifts(&self) -> [f32; 8] {
+        [
+            self.red.luminance,
+            self.orange.luminance,
+            self.yellow.luminance,
+            self.green.luminance,
+            self.aqua.luminance,
+            self.blue.luminance,
+            self.purple.luminance,
+            self.magenta.luminance,
+        ]
+    }
+}
+
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
@@ -24,6 +110,9 @@ pub struct Parameters {
     pub temperature: f32,
     /// White balance tint shift (green/magenta)
     pub tint: f32,
+    /// Per-channel HSL adjustments
+    #[serde(default)]
+    pub hsl: HslChannels,
 }
 
 impl Default for Parameters {
@@ -37,6 +126,7 @@ impl Default for Parameters {
             blacks: 0.0,
             temperature: 0.0,
             tint: 0.0,
+            hsl: HslChannels::default(),
         }
     }
 }
@@ -319,6 +409,55 @@ mod tests {
         for i in 0..3 {
             assert!((orig.0[i] - rend.0[i]).abs() < 1e-5);
         }
+    }
+
+    #[test]
+    fn hsl_channel_default_is_zero() {
+        let ch = super::HslChannel::default();
+        assert_eq!(ch.hue, 0.0);
+        assert_eq!(ch.saturation, 0.0);
+        assert_eq!(ch.luminance, 0.0);
+    }
+
+    #[test]
+    fn hsl_channels_default_all_zero() {
+        let hsl = super::HslChannels::default();
+        assert_eq!(hsl.red, super::HslChannel::default());
+        assert_eq!(hsl.green, super::HslChannel::default());
+        assert_eq!(hsl.magenta, super::HslChannel::default());
+    }
+
+    #[test]
+    fn hsl_channels_is_default_true_when_default() {
+        let hsl = super::HslChannels::default();
+        assert!(hsl.is_default());
+    }
+
+    #[test]
+    fn hsl_channels_is_default_false_when_modified() {
+        let mut hsl = super::HslChannels::default();
+        hsl.red.hue = 10.0;
+        assert!(!hsl.is_default());
+    }
+
+    #[test]
+    fn hsl_channels_extracts_shift_arrays() {
+        let mut hsl = super::HslChannels::default();
+        hsl.red.hue = 15.0;
+        hsl.green.saturation = -30.0;
+        hsl.blue.luminance = 20.0;
+        let h = hsl.hue_shifts();
+        let s = hsl.saturation_shifts();
+        let l = hsl.luminance_shifts();
+        assert_eq!(h[0], 15.0); // red
+        assert_eq!(s[3], -30.0); // green
+        assert_eq!(l[5], 20.0); // blue
+    }
+
+    #[test]
+    fn parameters_default_hsl_is_default() {
+        let p = Parameters::default();
+        assert!(p.hsl.is_default());
     }
 
     #[test]

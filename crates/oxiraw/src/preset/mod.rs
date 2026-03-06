@@ -97,6 +97,7 @@ impl Preset {
                 blacks: raw.tone.blacks,
                 temperature: raw.white_balance.temperature,
                 tint: raw.white_balance.tint,
+                hsl: crate::engine::HslChannels::default(),
             },
             lut: None,
         })
@@ -152,6 +153,7 @@ impl Preset {
                 blacks: raw.tone.blacks,
                 temperature: raw.white_balance.temperature,
                 tint: raw.white_balance.tint,
+                hsl: crate::engine::HslChannels::default(),
             },
             lut,
         })
