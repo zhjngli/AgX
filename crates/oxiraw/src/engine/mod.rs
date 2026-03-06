@@ -194,11 +194,16 @@ impl Engine {
     /// 2. Exposure (linear space) — multiply by 2^stops
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
-    /// 5. LUT application (sRGB gamma space)
-    /// 6. Convert back to linear space
+    /// 5. HSL adjustments (sRGB gamma space)
+    /// 6. LUT application (sRGB gamma space)
+    /// 7. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
+        let hsl_active = !self.params.hsl.is_default();
+        let hue_shifts = self.params.hsl.hue_shifts();
+        let sat_shifts = self.params.hsl.saturation_shifts();
+        let lum_shifts = self.params.hsl.luminance_shifts();
 
         Rgb32FImage::from_fn(w, h, |x, y| {
             let p = self.original.get_pixel(x, y);
@@ -244,7 +249,23 @@ impl Engine {
             sg = adjust::apply_blacks(sg, self.params.blacks);
             sb = adjust::apply_blacks(sb, self.params.blacks);
 
-            // 9. LUT (sRGB gamma space)
+            // 9. HSL adjustments (sRGB gamma space)
+            if hsl_active {
+                let (hr, hg, hb) = adjust::apply_hsl(
+                    sr,
+                    sg,
+                    sb,
+                    &hue_shifts,
+                    &sat_shifts,
+                    &lum_shifts,
+                    adjust::cosine_weight,
+                );
+                sr = hr;
+                sg = hg;
+                sb = hb;
+            }
+
+            // 10. LUT (sRGB gamma space)
             if let Some(lut) = &self.lut {
                 let (lr, lg, lb) = lut.lookup(sr, sg, sb);
                 sr = lr;
@@ -252,7 +273,7 @@ impl Engine {
                 sb = lb;
             }
 
-            // 10. Convert back to linear space
+            // 11. Convert back to linear space
             let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
             Rgb([lr, lg, lb])
@@ -458,6 +479,58 @@ mod tests {
     fn parameters_default_hsl_is_default() {
         let p = Parameters::default();
         assert!(p.hsl.is_default());
+    }
+
+    #[test]
+    fn render_hsl_neutral_is_identity() {
+        // Red-ish pixel in linear space
+        let img = make_test_image(0.5, 0.01, 0.01);
+        let engine = Engine::new(img);
+        // HSL defaults to all zeros, so render should be identity
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = engine.render().get_pixel(0, 0).clone();
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-4,
+                "Channel {i}: expected {}, got {}",
+                orig.0[i],
+                rend.0[i]
+            );
+        }
+    }
+
+    #[test]
+    fn render_hsl_red_saturation_decrease() {
+        // Pure-ish red in linear space
+        let img = make_test_image(0.5, 0.01, 0.01);
+        let mut engine = Engine::new(img);
+        engine.params_mut().hsl.red.saturation = -100.0;
+        let rendered = engine.render();
+        let p = rendered.get_pixel(0, 0);
+        // Desaturated: channels should be closer together than original
+        let spread = (p.0[0] - p.0[1]).abs() + (p.0[0] - p.0[2]).abs();
+        let orig = engine.original().get_pixel(0, 0);
+        let orig_spread = (orig.0[0] - orig.0[1]).abs() + (orig.0[0] - orig.0[2]).abs();
+        assert!(
+            spread < orig_spread,
+            "Expected less spread after desaturation: {spread} vs {orig_spread}"
+        );
+    }
+
+    #[test]
+    fn render_hsl_green_shift_does_not_affect_red_image() {
+        let img = make_test_image(0.5, 0.01, 0.01);
+        let mut engine = Engine::new(img);
+        engine.params_mut().hsl.green.saturation = -100.0;
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-3,
+                "Channel {i}: red image should be unaffected by green HSL"
+            );
+        }
     }
 
     #[test]
