@@ -323,3 +323,33 @@ fn cli_edit_raw_file() {
 
     let _ = std::fs::remove_file(&output);
 }
+
+#[test]
+fn cli_edit_with_hsl_flags() {
+    let temp_dir = std::env::temp_dir();
+    let input = temp_dir.join("oxiraw_cli_hsl_in.png");
+    let output = temp_dir.join("oxiraw_cli_hsl_out.png");
+
+    // Create a solid red image so HSL red-saturation changes are visible.
+    let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
+        image::ImageBuffer::from_pixel(4, 4, image::Rgb([255u8, 0, 0]));
+    img.save(&input).unwrap();
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--hsl-red-s",
+            "-100",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success(), "CLI should succeed with HSL flags");
+    assert!(output.exists(), "Output file should exist");
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&output);
+}
