@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::engine::Parameters;
+use crate::engine::{HslChannels, Parameters};
 use crate::error::{OxirawError, Result};
 
 /// Preset metadata (name, version, author).
@@ -58,6 +58,8 @@ struct PresetRaw {
     white_balance: WhiteBalanceSection,
     #[serde(default)]
     lut: LutSection,
+    #[serde(default)]
+    hsl: HslChannels,
 }
 
 /// A photo editing preset.
@@ -97,7 +99,7 @@ impl Preset {
                 blacks: raw.tone.blacks,
                 temperature: raw.white_balance.temperature,
                 tint: raw.white_balance.tint,
-                hsl: crate::engine::HslChannels::default(),
+                hsl: raw.hsl,
             },
             lut: None,
         })
@@ -120,6 +122,7 @@ impl Preset {
                 tint: self.params.tint,
             },
             lut: LutSection::default(),
+            hsl: self.params.hsl.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| OxirawError::Preset(e.to_string()))
     }
@@ -153,7 +156,7 @@ impl Preset {
                 blacks: raw.tone.blacks,
                 temperature: raw.white_balance.temperature,
                 tint: raw.white_balance.tint,
-                hsl: crate::engine::HslChannels::default(),
+                hsl: raw.hsl,
             },
             lut,
         })
@@ -319,6 +322,39 @@ LUT_3D_SIZE 2
         let toml_str = "[metadata]\nname = \"No LUT\"\n\n[tone]\nexposure = 1.0\n";
         let preset = Preset::from_toml(toml_str).unwrap();
         assert!(preset.lut.is_none());
+    }
+
+    #[test]
+    fn preset_hsl_roundtrip() {
+        let mut preset = Preset::default();
+        preset.params.hsl.red.hue = 15.0;
+        preset.params.hsl.green.saturation = -30.0;
+        preset.params.hsl.blue.luminance = 20.0;
+        let toml_str = preset.to_toml().unwrap();
+        let parsed = Preset::from_toml(&toml_str).unwrap();
+        assert_eq!(preset.params.hsl, parsed.params.hsl);
+    }
+
+    #[test]
+    fn preset_missing_hsl_defaults_to_zero() {
+        let toml_str = "[metadata]\nname = \"No HSL\"\n\n[tone]\nexposure = 1.0\n";
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert!(preset.params.hsl.is_default());
+    }
+
+    #[test]
+    fn preset_partial_hsl_channels_default() {
+        let toml_str = r#"
+[metadata]
+name = "Partial HSL"
+
+[hsl.red]
+hue = 10.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.params.hsl.red.hue, 10.0);
+        assert_eq!(preset.params.hsl.red.saturation, 0.0);
+        assert!(preset.params.hsl.green == crate::engine::HslChannel::default());
     }
 
     #[test]
