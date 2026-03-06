@@ -117,6 +117,33 @@ pub fn apply_blacks(value: f32, blacks: f32) -> f32 {
     (value + adjustment).clamp(0.0, 1.0)
 }
 
+// --- HSL helpers ---
+
+/// Type alias for HSL weight functions. Takes (hue_distance, half_width) in degrees,
+/// returns a 0.0–1.0 weight.
+pub type WeightFn = fn(f32, f32) -> f32;
+
+/// Compute the shortest angular distance between two hue angles in degrees.
+/// Result is always in [0, 180].
+pub fn hue_distance(a: f32, b: f32) -> f32 {
+    let d = (a - b).rem_euclid(360.0);
+    if d > 180.0 {
+        360.0 - d
+    } else {
+        d
+    }
+}
+
+/// Cosine falloff: smooth bell curve, 1.0 at center, 0.0 at half_width.
+/// hue_distance and half_width are in degrees.
+pub fn cosine_weight(hue_dist: f32, half_width: f32) -> f32 {
+    if hue_dist >= half_width {
+        0.0
+    } else {
+        ((hue_dist / half_width) * std::f32::consts::PI).cos() * 0.5 + 0.5
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,5 +347,49 @@ mod tests {
         assert!(r >= 0.0);
         assert!(g >= 0.0);
         assert!(b >= 0.0);
+    }
+
+    // --- HSL helpers ---
+
+    #[test]
+    fn hue_distance_same_is_zero() {
+        assert_eq!(hue_distance(120.0, 120.0), 0.0);
+    }
+
+    #[test]
+    fn hue_distance_opposite_is_180() {
+        assert!((hue_distance(0.0, 180.0) - 180.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hue_distance_wraps_around() {
+        assert!((hue_distance(350.0, 10.0) - 20.0).abs() < 1e-6);
+        assert!((hue_distance(10.0, 350.0) - 20.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn hue_distance_is_symmetric() {
+        assert!((hue_distance(30.0, 90.0) - hue_distance(90.0, 30.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cosine_weight_at_center_is_one() {
+        assert!((cosine_weight(0.0, 30.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cosine_weight_at_half_width_is_zero() {
+        assert!(cosine_weight(30.0, 30.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn cosine_weight_beyond_half_width_is_zero() {
+        assert_eq!(cosine_weight(45.0, 30.0), 0.0);
+    }
+
+    #[test]
+    fn cosine_weight_at_half_distance_is_between_zero_and_one() {
+        let w = cosine_weight(15.0, 30.0);
+        assert!(w > 0.0 && w < 1.0, "Expected 0 < {} < 1", w);
     }
 }
