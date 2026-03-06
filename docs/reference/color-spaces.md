@@ -45,7 +45,8 @@ Original image (linear sRGB)
   |-- 5. Shadows (sRGB gamma) -- adjust dark regions
   |-- 6. Whites (sRGB gamma) -- adjust upper range
   |-- 7. Blacks (sRGB gamma) -- adjust lower range
-  |-- 8. LUT application (sRGB gamma)
+  |-- 8. HSL adjustments (sRGB gamma) -- per-channel hue/saturation/luminance
+  |-- 9. LUT application (sRGB gamma)
   |
   |-- Convert: sRGB gamma -> linear
   |
