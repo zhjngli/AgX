@@ -117,6 +117,8 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-04 | [Harness Engineering Implementation](docs/plans/2026-03-04-harness-engineering-implementation.md)|
 | 2026-03-05 | [Developer Loop Design](docs/plans/2026-03-05-developer-loop-design.md)                          |
 | 2026-03-05 | [Developer Loop Implementation](docs/plans/2026-03-05-developer-loop-implementation.md)          |
+| 2026-03-05 | [HSL Adjustments Design](docs/plans/2026-03-05-hsl-adjustments-design.md)                        |
+| 2026-03-05 | [HSL Adjustments Implementation](docs/plans/2026-03-05-hsl-adjustments-implementation.md)        |
 
 ### Ideas
 
