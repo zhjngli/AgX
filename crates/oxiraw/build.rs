@@ -26,8 +26,7 @@ fn main() {
 
         // Fallback: if libraw/libraw.h is not found system-wide, use a minimal stub
         // so the crate compiles (raw decoding will fail at link/runtime without the real lib).
-        let manifest_dir =
-            std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
         let stub_dir = format!("{manifest_dir}/libraw-stub");
         if std::path::Path::new(&stub_dir).exists() && libraw_include.is_none() {
             build.include(&stub_dir);

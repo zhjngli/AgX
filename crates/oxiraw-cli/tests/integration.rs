@@ -353,3 +353,136 @@ fn cli_edit_with_hsl_flags() {
     let _ = std::fs::remove_file(&input);
     let _ = std::fs::remove_file(&output);
 }
+
+#[test]
+fn cli_batch_apply_with_preset() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let input_dir = temp.path().join("input");
+    let output_dir = temp.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+
+    create_test_png(&input_dir.join("img1.png"));
+    create_test_png(&input_dir.join("img2.png"));
+
+    let preset = temp.path().join("test.toml");
+    std::fs::write(
+        &preset,
+        "[metadata]\nname = \"test\"\nversion = \"1.0\"\nauthor = \"t\"\n\n[tone]\nexposure = 0.5\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "batch-apply",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "--preset",
+            preset.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+            "--jobs",
+            "1",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert!(output_dir.join("img1.png").exists());
+    assert!(output_dir.join("img2.png").exists());
+}
+
+#[test]
+fn cli_batch_edit_with_suffix() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let input_dir = temp.path().join("input");
+    let output_dir = temp.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+
+    create_test_png(&input_dir.join("photo.png"));
+
+    let status = cli_bin()
+        .args([
+            "batch-edit",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+            "--exposure",
+            "1.0",
+            "--suffix",
+            "_bright",
+            "--jobs",
+            "1",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert!(output_dir.join("photo_bright.png").exists());
+}
+
+#[test]
+fn cli_batch_apply_recursive() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let input_dir = temp.path().join("input");
+    let output_dir = temp.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+    let sub = input_dir.join("sub");
+    std::fs::create_dir(&sub).unwrap();
+
+    create_test_png(&input_dir.join("top.png"));
+    create_test_png(&sub.join("nested.png"));
+
+    let preset = temp.path().join("p.toml");
+    std::fs::write(
+        &preset,
+        "[metadata]\nname = \"p\"\nversion = \"1.0\"\nauthor = \"t\"\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "batch-apply",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "--preset",
+            preset.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+            "--recursive",
+            "--jobs",
+            "1",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert!(output_dir.join("top.png").exists());
+    assert!(output_dir.join("sub/nested.png").exists());
+}
+
+#[test]
+fn cli_batch_apply_empty_dir_succeeds() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let input_dir = temp.path().join("input");
+    let output_dir = temp.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+
+    let preset = temp.path().join("p.toml");
+    std::fs::write(
+        &preset,
+        "[metadata]\nname = \"p\"\nversion = \"1.0\"\nauthor = \"t\"\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "batch-apply",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "--preset",
+            preset.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+}

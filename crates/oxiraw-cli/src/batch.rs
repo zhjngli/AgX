@@ -86,15 +86,19 @@ pub fn resolve_output_path(
 /// Result of processing a single image in a batch.
 pub struct BatchResult {
     pub input: PathBuf,
+    #[allow(dead_code)]
     pub output: PathBuf,
     pub outcome: Result<Duration, String>,
 }
 
 /// Summary of a batch run.
 pub struct BatchSummary {
+    #[allow(dead_code)]
     pub total: usize,
+    #[allow(dead_code)]
     pub succeeded: usize,
     pub failed: Vec<(PathBuf, String)>,
+    #[allow(dead_code)]
     pub elapsed: Duration,
 }
 
@@ -106,10 +110,7 @@ fn report_progress(
     outcome: &Result<Duration, String>,
 ) {
     let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
-    let name = input
-        .file_name()
-        .and_then(|f| f.to_str())
-        .unwrap_or("?");
+    let name = input.file_name().and_then(|f| f.to_str()).unwrap_or("?");
     match outcome {
         Ok(dur) => eprintln!("[{n}/{total}] {name}... done ({:.1}s)", dur.as_secs_f64()),
         Err(e) => eprintln!("[{n}/{total}] {name}... FAILED: {e}"),
@@ -238,8 +239,7 @@ pub fn run_batch_apply(
         images
             .par_iter()
             .map(|input| {
-                let output =
-                    resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
+                let output = resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
                 let outcome = process_apply_single(input, &output, &preset, quality, format);
                 report_progress(&counter, total, input, &outcome);
 
@@ -334,8 +334,7 @@ pub fn run_batch_edit(
         images
             .par_iter()
             .map(|input| {
-                let output =
-                    resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
+                let output = resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
                 let outcome = process_edit_single(input, &output, params, lut, quality, format);
                 report_progress(&counter, total, input, &outcome);
 
