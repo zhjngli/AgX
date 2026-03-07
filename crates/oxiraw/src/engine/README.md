@@ -4,13 +4,18 @@
 Hold the immutable original image and mutable parameters, and render the final output by applying all adjustments from scratch on each call.
 
 ## Public API
-- `Parameters` -- all adjustment fields (`exposure`, `contrast`, `highlights`, `shadows`, `whites`, `blacks`, `temperature`, `tint`)
+- `Parameters` -- all adjustment fields (`exposure`, `contrast`, `highlights`, `shadows`, `whites`, `blacks`, `temperature`, `tint`, `hsl`)
+- `PartialParameters` -- partial parameter set with `Option<T>` fields for preset composability; `None` means "not specified"
+- `PartialHslChannel` / `PartialHslChannels` -- partial HSL types with `Option<f32>` fields
+- `PartialParameters::merge(&self, other)` -- last-write-wins merge of two partial parameter sets
+- `PartialParameters::materialize(&self)` -- convert to concrete `Parameters` (None → default)
 - `Engine::new(image)` -- create engine with a linear sRGB `Rgb32FImage` and neutral parameters
 - `Engine::original()` -- reference to the unmodified source image
 - `Engine::params()` / `Engine::params_mut()` -- read/write current parameters
 - `Engine::set_params(params)` -- replace all parameters
 - `Engine::lut()` / `Engine::set_lut(lut)` -- read/write the optional 3D LUT
 - `Engine::apply_preset(preset)` -- replace parameters and LUT from a `Preset`
+- `Engine::layer_preset(preset)` -- layer a preset on top of current parameters (only specified fields override)
 - `Engine::render()` -- apply the full pipeline, returning a new `Rgb32FImage`
 
 ## Extension Guide

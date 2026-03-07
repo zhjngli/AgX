@@ -501,3 +501,45 @@ fn cli_batch_apply_empty_dir_succeeds() {
         "batch-apply on empty dir should succeed gracefully"
     );
 }
+
+#[test]
+fn cli_apply_multiple_presets() {
+    let temp_dir = std::env::temp_dir();
+    let input = temp_dir.join("oxiraw_cli_multi_in.png");
+    let output = temp_dir.join("oxiraw_cli_multi_out.png");
+    let preset1 = temp_dir.join("oxiraw_cli_multi_p1.toml");
+    let preset2 = temp_dir.join("oxiraw_cli_multi_p2.toml");
+
+    create_test_png(&input);
+
+    std::fs::write(
+        &preset1,
+        "[metadata]\nname = \"P1\"\n\n[tone]\nexposure = 1.0\n",
+    )
+    .unwrap();
+    std::fs::write(
+        &preset2,
+        "[metadata]\nname = \"P2\"\n\n[tone]\ncontrast = 20.0\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "apply",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--presets",
+            &format!("{},{}", preset1.display(), preset2.display()),
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success(), "CLI should succeed with --presets");
+    assert!(output.exists(), "Output file should exist");
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&output);
+    let _ = std::fs::remove_file(&preset1);
+    let _ = std::fs::remove_file(&preset2);
+}

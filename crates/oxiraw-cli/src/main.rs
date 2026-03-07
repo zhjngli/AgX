@@ -23,9 +23,12 @@ enum Commands {
         /// Input image path
         #[arg(short, long)]
         input: PathBuf,
-        /// Preset TOML file path
-        #[arg(short, long)]
-        preset: PathBuf,
+        /// Preset TOML file path (single preset, full replacement)
+        #[arg(short, long, conflicts_with = "presets")]
+        preset: Option<PathBuf>,
+        /// Comma-separated list of preset TOML files to layer (left-to-right, last-write-wins)
+        #[arg(long, conflicts_with = "preset")]
+        presets: Option<String>,
         /// Output image path
         #[arg(short, long)]
         output: PathBuf,
@@ -573,10 +576,18 @@ fn main() {
         Commands::Apply {
             input,
             preset,
+            presets,
             output,
             quality,
             format,
-        } => run_apply(&input, &preset, &output, quality, format.as_deref()),
+        } => run_apply(
+            &input,
+            preset.as_deref(),
+            presets.as_deref(),
+            &output,
+            quality,
+            format.as_deref(),
+        ),
         Commands::Edit {
             input,
             output,
@@ -842,16 +853,33 @@ fn parse_output_format(s: &str) -> oxiraw::Result<oxiraw::encode::OutputFormat> 
 
 fn run_apply(
     input: &std::path::Path,
-    preset_path: &std::path::Path,
+    preset_path: Option<&std::path::Path>,
+    presets_str: Option<&str>,
     output: &std::path::Path,
     quality: u8,
     format: Option<&str>,
 ) -> oxiraw::Result<()> {
     let metadata = oxiraw::metadata::extract_metadata(input);
     let linear = oxiraw::decode::decode(input)?;
-    let preset = Preset::load_from_file(preset_path)?;
     let mut engine = Engine::new(linear);
-    engine.apply_preset(&preset);
+
+    if let Some(presets_csv) = presets_str {
+        // Multi-preset mode: layer left-to-right
+        for path_str in presets_csv.split(',') {
+            let path = std::path::Path::new(path_str.trim());
+            let preset = Preset::load_from_file(path)?;
+            engine.layer_preset(&preset);
+        }
+    } else if let Some(path) = preset_path {
+        // Single preset mode: full replacement (backward compatible)
+        let preset = Preset::load_from_file(path)?;
+        engine.apply_preset(&preset);
+    } else {
+        return Err(oxiraw::OxirawError::Preset(
+            "either --preset or --presets must be provided".to_string(),
+        ));
+    }
+
     let rendered = engine.render();
     let fmt = format.map(parse_output_format).transpose()?;
     let opts = oxiraw::encode::EncodeOptions {

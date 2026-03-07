@@ -9,7 +9,10 @@ pub mod preset;
 
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
-pub use engine::{Engine, HslChannel, HslChannels, Parameters};
+pub use engine::{
+    Engine, HslChannel, HslChannels, Parameters, PartialHslChannel, PartialHslChannels,
+    PartialParameters,
+};
 pub use error::{OxirawError, Result};
 pub use lut::Lut3D;
 pub use metadata::ImageMetadata;

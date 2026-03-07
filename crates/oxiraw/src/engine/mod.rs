@@ -131,6 +131,240 @@ impl Default for Parameters {
     }
 }
 
+/// Partial per-channel HSL adjustment — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialHslChannel {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hue: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saturation: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub luminance: Option<f32>,
+}
+
+impl PartialHslChannel {
+    /// Merge overlay on top of self (last-write-wins).
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            hue: overlay.hue.or(self.hue),
+            saturation: overlay.saturation.or(self.saturation),
+            luminance: overlay.luminance.or(self.luminance),
+        }
+    }
+
+    /// Convert to concrete HslChannel. None fields become 0.0.
+    pub fn materialize(&self) -> HslChannel {
+        HslChannel {
+            hue: self.hue.unwrap_or(0.0),
+            saturation: self.saturation.unwrap_or(0.0),
+            luminance: self.luminance.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&HslChannel> for PartialHslChannel {
+    fn from(ch: &HslChannel) -> Self {
+        Self {
+            hue: Some(ch.hue),
+            saturation: Some(ch.saturation),
+            luminance: Some(ch.luminance),
+        }
+    }
+}
+
+/// Partial HSL adjustments for all 8 channels — `None` means channel not specified.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialHslChannels {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub red: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orange: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yellow: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub green: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aqua: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blue: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purple: Option<PartialHslChannel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub magenta: Option<PartialHslChannel>,
+}
+
+impl PartialHslChannels {
+    fn merge_channel(
+        base: &Option<PartialHslChannel>,
+        overlay: &Option<PartialHslChannel>,
+    ) -> Option<PartialHslChannel> {
+        match (base, overlay) {
+            (None, None) => None,
+            (Some(b), None) => Some(b.clone()),
+            (None, Some(o)) => Some(o.clone()),
+            (Some(b), Some(o)) => Some(b.merge(o)),
+        }
+    }
+
+    /// Merge overlay on top of self (last-write-wins per field).
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            red: Self::merge_channel(&self.red, &overlay.red),
+            orange: Self::merge_channel(&self.orange, &overlay.orange),
+            yellow: Self::merge_channel(&self.yellow, &overlay.yellow),
+            green: Self::merge_channel(&self.green, &overlay.green),
+            aqua: Self::merge_channel(&self.aqua, &overlay.aqua),
+            blue: Self::merge_channel(&self.blue, &overlay.blue),
+            purple: Self::merge_channel(&self.purple, &overlay.purple),
+            magenta: Self::merge_channel(&self.magenta, &overlay.magenta),
+        }
+    }
+
+    /// Convert to concrete HslChannels. None channels/fields become default (0.0).
+    pub fn materialize(&self) -> HslChannels {
+        HslChannels {
+            red: self
+                .red
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            orange: self
+                .orange
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            yellow: self
+                .yellow
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            green: self
+                .green
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            aqua: self
+                .aqua
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            blue: self
+                .blue
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            purple: self
+                .purple
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            magenta: self
+                .magenta
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&HslChannels> for PartialHslChannels {
+    fn from(hsl: &HslChannels) -> Self {
+        Self {
+            red: Some(PartialHslChannel::from(&hsl.red)),
+            orange: Some(PartialHslChannel::from(&hsl.orange)),
+            yellow: Some(PartialHslChannel::from(&hsl.yellow)),
+            green: Some(PartialHslChannel::from(&hsl.green)),
+            aqua: Some(PartialHslChannel::from(&hsl.aqua)),
+            blue: Some(PartialHslChannel::from(&hsl.blue)),
+            purple: Some(PartialHslChannel::from(&hsl.purple)),
+            magenta: Some(PartialHslChannel::from(&hsl.magenta)),
+        }
+    }
+}
+
+/// Partial parameter set — `None` means "not specified by this preset".
+///
+/// Used for preset deserialization and merging. Convert to concrete
+/// `Parameters` via `materialize()` for the engine.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialParameters {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exposure: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contrast: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlights: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shadows: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whites: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blacks: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tint: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hsl: Option<PartialHslChannels>,
+}
+
+impl PartialParameters {
+    /// Merge `other` on top of `self` (last-write-wins).
+    pub fn merge(&self, other: &Self) -> Self {
+        Self {
+            exposure: other.exposure.or(self.exposure),
+            contrast: other.contrast.or(self.contrast),
+            highlights: other.highlights.or(self.highlights),
+            shadows: other.shadows.or(self.shadows),
+            whites: other.whites.or(self.whites),
+            blacks: other.blacks.or(self.blacks),
+            temperature: other.temperature.or(self.temperature),
+            tint: other.tint.or(self.tint),
+            hsl: match (&self.hsl, &other.hsl) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
+        }
+    }
+
+    /// Convert to concrete Parameters. `None` fields become their default (0.0).
+    pub fn materialize(&self) -> Parameters {
+        Parameters {
+            exposure: self.exposure.unwrap_or(0.0),
+            contrast: self.contrast.unwrap_or(0.0),
+            highlights: self.highlights.unwrap_or(0.0),
+            shadows: self.shadows.unwrap_or(0.0),
+            whites: self.whites.unwrap_or(0.0),
+            blacks: self.blacks.unwrap_or(0.0),
+            temperature: self.temperature.unwrap_or(0.0),
+            tint: self.tint.unwrap_or(0.0),
+            hsl: self
+                .hsl
+                .as_ref()
+                .map(|h| h.materialize())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&Parameters> for PartialParameters {
+    fn from(params: &Parameters) -> Self {
+        Self {
+            exposure: Some(params.exposure),
+            contrast: Some(params.contrast),
+            highlights: Some(params.highlights),
+            shadows: Some(params.shadows),
+            whites: Some(params.whites),
+            blacks: Some(params.blacks),
+            temperature: Some(params.temperature),
+            tint: Some(params.tint),
+            hsl: Some(PartialHslChannels::from(&params.hsl)),
+        }
+    }
+}
+
 /// The rendering engine. Holds an immutable original image and mutable parameters.
 ///
 /// On each `render()` call, all adjustments are applied from scratch in a fixed
@@ -185,6 +419,18 @@ impl Engine {
     pub fn apply_preset(&mut self, preset: &crate::preset::Preset) {
         self.params = preset.params.clone();
         self.lut = preset.lut.clone();
+    }
+
+    /// Layer a preset on top of current parameters.
+    /// Only fields specified in the preset (Some values in partial_params)
+    /// are overridden. Unspecified fields keep their current values.
+    pub fn layer_preset(&mut self, preset: &crate::preset::Preset) {
+        let current_partial = PartialParameters::from(&self.params);
+        let merged = current_partial.merge(&preset.partial_params);
+        self.params = merged.materialize();
+        if preset.lut.is_some() {
+            self.lut = preset.lut.clone();
+        }
     }
 
     /// Render the image by applying all adjustments from scratch.
@@ -531,6 +777,251 @@ mod tests {
                 "Channel {i}: red image should be unaffected by green HSL"
             );
         }
+    }
+
+    // --- PartialHslChannel tests ---
+
+    #[test]
+    fn partial_hsl_channel_default_is_all_none() {
+        let ch = super::PartialHslChannel::default();
+        assert_eq!(ch.hue, None);
+        assert_eq!(ch.saturation, None);
+        assert_eq!(ch.luminance, None);
+    }
+
+    #[test]
+    fn partial_hsl_channels_default_is_all_none() {
+        let hsl = super::PartialHslChannels::default();
+        assert_eq!(hsl.red, None);
+        assert_eq!(hsl.green, None);
+        assert_eq!(hsl.blue, None);
+    }
+
+    #[test]
+    fn partial_hsl_channel_merge_overlay_wins() {
+        let base = super::PartialHslChannel {
+            hue: Some(10.0),
+            saturation: Some(20.0),
+            luminance: None,
+        };
+        let overlay = super::PartialHslChannel {
+            hue: Some(30.0),
+            saturation: None,
+            luminance: Some(5.0),
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.hue, Some(30.0));
+        assert_eq!(merged.saturation, Some(20.0));
+        assert_eq!(merged.luminance, Some(5.0));
+    }
+
+    #[test]
+    fn partial_hsl_channels_merge_channel_level() {
+        let mut base = super::PartialHslChannels::default();
+        base.red = Some(super::PartialHslChannel {
+            hue: Some(10.0),
+            saturation: None,
+            luminance: None,
+        });
+        let mut overlay = super::PartialHslChannels::default();
+        overlay.red = Some(super::PartialHslChannel {
+            hue: None,
+            saturation: Some(20.0),
+            luminance: None,
+        });
+        overlay.green = Some(super::PartialHslChannel {
+            hue: Some(5.0),
+            saturation: None,
+            luminance: None,
+        });
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.red.as_ref().unwrap().hue, Some(10.0));
+        assert_eq!(merged.red.as_ref().unwrap().saturation, Some(20.0));
+        assert_eq!(merged.green.as_ref().unwrap().hue, Some(5.0));
+        assert_eq!(merged.blue, None);
+    }
+
+    #[test]
+    fn partial_hsl_channel_materialize() {
+        let partial = super::PartialHslChannel {
+            hue: Some(15.0),
+            saturation: None,
+            luminance: Some(-10.0),
+        };
+        let concrete = partial.materialize();
+        assert_eq!(concrete.hue, 15.0);
+        assert_eq!(concrete.saturation, 0.0);
+        assert_eq!(concrete.luminance, -10.0);
+    }
+
+    #[test]
+    fn partial_hsl_channels_materialize() {
+        let mut partial = super::PartialHslChannels::default();
+        partial.red = Some(super::PartialHslChannel {
+            hue: Some(15.0),
+            saturation: None,
+            luminance: None,
+        });
+        let concrete = partial.materialize();
+        assert_eq!(concrete.red.hue, 15.0);
+        assert_eq!(concrete.red.saturation, 0.0);
+        assert_eq!(concrete.green, super::HslChannel::default());
+    }
+
+    // --- PartialParameters tests ---
+
+    #[test]
+    fn partial_parameters_default_is_all_none() {
+        let p = super::PartialParameters::default();
+        assert_eq!(p.exposure, None);
+        assert_eq!(p.contrast, None);
+        assert_eq!(p.hsl, None);
+    }
+
+    #[test]
+    fn partial_parameters_merge_overlay_wins() {
+        let base = super::PartialParameters {
+            exposure: Some(1.0),
+            contrast: Some(20.0),
+            ..Default::default()
+        };
+        let overlay = super::PartialParameters {
+            exposure: Some(2.0),
+            highlights: Some(-30.0),
+            ..Default::default()
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.exposure, Some(2.0));
+        assert_eq!(merged.contrast, Some(20.0));
+        assert_eq!(merged.highlights, Some(-30.0));
+        assert_eq!(merged.shadows, None);
+    }
+
+    #[test]
+    fn partial_parameters_materialize_defaults() {
+        let partial = super::PartialParameters {
+            exposure: Some(1.5),
+            ..Default::default()
+        };
+        let params = partial.materialize();
+        assert_eq!(params.exposure, 1.5);
+        assert_eq!(params.contrast, 0.0);
+        assert_eq!(params.temperature, 0.0);
+        assert!(params.hsl.is_default());
+    }
+
+    #[test]
+    fn partial_parameters_from_parameters_all_some() {
+        let params = Parameters {
+            exposure: 1.0,
+            contrast: 20.0,
+            ..Default::default()
+        };
+        let partial = super::PartialParameters::from(&params);
+        assert_eq!(partial.exposure, Some(1.0));
+        assert_eq!(partial.contrast, Some(20.0));
+        assert_eq!(partial.highlights, Some(0.0));
+    }
+
+    #[test]
+    fn partial_parameters_merge_with_hsl() {
+        let base = super::PartialParameters {
+            exposure: Some(1.0),
+            ..Default::default()
+        };
+        let mut hsl = super::PartialHslChannels::default();
+        hsl.red = Some(super::PartialHslChannel {
+            hue: Some(10.0),
+            saturation: None,
+            luminance: None,
+        });
+        let overlay = super::PartialParameters {
+            hsl: Some(hsl),
+            ..Default::default()
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.exposure, Some(1.0));
+        assert!(merged.hsl.is_some());
+        assert_eq!(
+            merged.hsl.as_ref().unwrap().red.as_ref().unwrap().hue,
+            Some(10.0)
+        );
+    }
+
+    // --- layer_preset tests ---
+
+    #[test]
+    fn layer_preset_only_overrides_specified_fields() {
+        let img = make_test_image(0.5, 0.5, 0.5);
+        let mut engine = Engine::new(img);
+        engine.params_mut().exposure = 1.0;
+        engine.params_mut().contrast = 20.0;
+
+        let mut preset = crate::preset::Preset::default();
+        preset.partial_params.contrast = Some(50.0);
+        preset.params = preset.partial_params.materialize();
+
+        engine.layer_preset(&preset);
+        assert_eq!(engine.params().exposure, 1.0);
+        assert_eq!(engine.params().contrast, 50.0);
+    }
+
+    #[test]
+    fn layer_preset_preserves_unspecified_hsl() {
+        let img = make_test_image(0.5, 0.5, 0.5);
+        let mut engine = Engine::new(img);
+        engine.params_mut().hsl.red.hue = 15.0;
+
+        let mut preset = crate::preset::Preset::default();
+        let mut partial_hsl = PartialHslChannels::default();
+        partial_hsl.green = Some(PartialHslChannel {
+            hue: Some(10.0),
+            saturation: None,
+            luminance: None,
+        });
+        preset.partial_params.hsl = Some(partial_hsl);
+        preset.params = preset.partial_params.materialize();
+
+        engine.layer_preset(&preset);
+        assert_eq!(engine.params().hsl.red.hue, 15.0);
+        assert_eq!(engine.params().hsl.green.hue, 10.0);
+    }
+
+    #[test]
+    fn layer_multiple_presets_last_wins() {
+        let img = make_test_image(0.5, 0.5, 0.5);
+        let mut engine = Engine::new(img);
+
+        let mut preset1 = crate::preset::Preset::default();
+        preset1.partial_params.exposure = Some(1.0);
+        preset1.partial_params.contrast = Some(20.0);
+        preset1.params = preset1.partial_params.materialize();
+
+        let mut preset2 = crate::preset::Preset::default();
+        preset2.partial_params.exposure = Some(2.0);
+        preset2.params = preset2.partial_params.materialize();
+
+        engine.layer_preset(&preset1);
+        engine.layer_preset(&preset2);
+
+        assert_eq!(engine.params().exposure, 2.0);
+        assert_eq!(engine.params().contrast, 20.0);
+    }
+
+    #[test]
+    fn apply_preset_still_does_full_replacement() {
+        let img = make_test_image(0.5, 0.5, 0.5);
+        let mut engine = Engine::new(img);
+        engine.params_mut().exposure = 1.0;
+        engine.params_mut().contrast = 20.0;
+
+        let mut preset = crate::preset::Preset::default();
+        preset.partial_params.exposure = Some(0.5);
+        preset.params = preset.partial_params.materialize();
+
+        engine.apply_preset(&preset);
+        assert_eq!(engine.params().exposure, 0.5);
+        assert_eq!(engine.params().contrast, 0.0);
     }
 
     #[test]
