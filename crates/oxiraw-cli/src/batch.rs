@@ -36,6 +36,49 @@ fn collect_images(dir: &Path, recursive: bool, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// Resolve the output path for a batch-processed image.
+///
+/// - Mirrors subdirectory structure from `input_dir` into `output_dir`
+/// - Appends optional suffix before the extension (e.g., `_edited`)
+/// - Overrides extension if `format_ext` is provided
+/// - Raw format inputs default to `.jpg` extension when no format override
+pub fn resolve_output_path(
+    input: &Path,
+    input_dir: &Path,
+    output_dir: &Path,
+    suffix: Option<&str>,
+    format_ext: Option<&str>,
+) -> PathBuf {
+    let relative = input
+        .strip_prefix(input_dir)
+        .unwrap_or(input.file_name().map(Path::new).unwrap_or(input));
+
+    let ext = if let Some(fmt) = format_ext {
+        fmt.to_string()
+    } else if oxiraw::decode::is_raw_extension(input) {
+        "jpg".to_string()
+    } else {
+        input
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("jpg")
+            .to_string()
+    };
+
+    let stem = relative
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+
+    let filename = match suffix {
+        Some(s) => format!("{stem}{s}.{ext}"),
+        None => format!("{stem}.{ext}"),
+    };
+
+    let parent = relative.parent().unwrap_or(Path::new(""));
+    output_dir.join(parent).join(filename)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,5 +140,77 @@ mod tests {
             .map(|p| p.file_name().unwrap().to_str().unwrap())
             .collect();
         assert_eq!(names, vec!["a.jpg", "b.jpg", "c.jpg"]);
+    }
+
+    #[test]
+    fn resolve_output_preserves_filename() {
+        let result = resolve_output_path(
+            Path::new("/photos/IMG_001.jpg"),
+            Path::new("/photos"),
+            Path::new("/edited"),
+            None,
+            None,
+        );
+        assert_eq!(result, PathBuf::from("/edited/IMG_001.jpg"));
+    }
+
+    #[test]
+    fn resolve_output_preserves_subdirectory() {
+        let result = resolve_output_path(
+            Path::new("/photos/day1/IMG_001.jpg"),
+            Path::new("/photos"),
+            Path::new("/edited"),
+            None,
+            None,
+        );
+        assert_eq!(result, PathBuf::from("/edited/day1/IMG_001.jpg"));
+    }
+
+    #[test]
+    fn resolve_output_applies_suffix() {
+        let result = resolve_output_path(
+            Path::new("/photos/IMG_001.jpg"),
+            Path::new("/photos"),
+            Path::new("/edited"),
+            Some("_processed"),
+            None,
+        );
+        assert_eq!(result, PathBuf::from("/edited/IMG_001_processed.jpg"));
+    }
+
+    #[test]
+    fn resolve_output_overrides_format() {
+        let result = resolve_output_path(
+            Path::new("/photos/IMG_001.png"),
+            Path::new("/photos"),
+            Path::new("/edited"),
+            None,
+            Some("jpeg"),
+        );
+        assert_eq!(result, PathBuf::from("/edited/IMG_001.jpeg"));
+    }
+
+    #[test]
+    fn resolve_output_raw_defaults_to_jpg() {
+        let result = resolve_output_path(
+            Path::new("/photos/IMG_001.cr2"),
+            Path::new("/photos"),
+            Path::new("/edited"),
+            None,
+            None,
+        );
+        assert_eq!(result, PathBuf::from("/edited/IMG_001.jpg"));
+    }
+
+    #[test]
+    fn resolve_output_suffix_plus_format() {
+        let result = resolve_output_path(
+            Path::new("/photos/IMG_001.cr2"),
+            Path::new("/photos"),
+            Path::new("/edited"),
+            Some("_edited"),
+            Some("tiff"),
+        );
+        assert_eq!(result, PathBuf::from("/edited/IMG_001_edited.tiff"));
     }
 }
