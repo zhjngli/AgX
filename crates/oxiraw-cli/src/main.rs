@@ -4,6 +4,9 @@ use std::process;
 
 use oxiraw::{Engine, Preset};
 
+#[allow(dead_code)]
+mod batch;
+
 #[derive(Parser)]
 #[command(
     name = "oxiraw",
