@@ -119,6 +119,8 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-05 | [Developer Loop Implementation](docs/plans/2026-03-05-developer-loop-implementation.md)          |
 | 2026-03-05 | [HSL Adjustments Design](docs/plans/2026-03-05-hsl-adjustments-design.md)                        |
 | 2026-03-05 | [HSL Adjustments Implementation](docs/plans/2026-03-05-hsl-adjustments-implementation.md)        |
+| 2026-03-07 | [Batch Processing Design](docs/plans/2026-03-07-batch-processing-design.md)                      |
+| 2026-03-12 | [Batch Processing Implementation](docs/plans/2026-03-12-batch-processing-implementation.md)      |
 
 ### Ideas
 
