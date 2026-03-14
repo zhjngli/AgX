@@ -1,4 +1,9 @@
 use std::path::{Path, PathBuf};
+#[allow(unused_imports)]
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
+#[allow(unused_imports)]
+use std::time::Instant;
 
 /// Standard (non-raw) image file extensions recognized by the CLI.
 const STANDARD_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "tiff", "tif"];
@@ -85,6 +90,75 @@ pub fn resolve_output_path(
     // 5. Join output_dir + parent of relative + filename.
     let parent = relative.parent().unwrap_or(Path::new(""));
     output_dir.join(parent).join(filename)
+}
+
+/// Result of processing a single image in a batch.
+pub struct BatchResult {
+    pub input: PathBuf,
+    pub output: PathBuf,
+    pub outcome: Result<Duration, String>,
+}
+
+/// Summary of a batch run.
+pub struct BatchSummary {
+    pub total: usize,
+    pub succeeded: usize,
+    pub failed: Vec<(PathBuf, String)>,
+    pub elapsed: Duration,
+}
+
+/// Print progress for a completed image. Thread-safe via atomic counter.
+fn report_progress(
+    counter: &AtomicUsize,
+    total: usize,
+    input: &Path,
+    outcome: &Result<Duration, String>,
+) {
+    let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
+    let name = input.file_name().and_then(|f| f.to_str()).unwrap_or("?");
+    match outcome {
+        Ok(dur) => eprintln!("[{n}/{total}] {name}... done ({:.1}s)", dur.as_secs_f64()),
+        Err(e) => eprintln!("[{n}/{total}] {name}... FAILED: {e}"),
+    }
+}
+
+/// Summarize batch results and print to stderr.
+pub fn summarize(results: &[BatchResult], elapsed: Duration) -> BatchSummary {
+    let total = results.len();
+    let mut succeeded = 0;
+    let mut failed = Vec::new();
+
+    for r in results {
+        match &r.outcome {
+            Ok(_) => succeeded += 1,
+            Err(e) => failed.push((r.input.clone(), e.clone())),
+        }
+    }
+
+    eprintln!(
+        "\nBatch complete: {succeeded}/{total} succeeded in {:.1}s",
+        elapsed.as_secs_f64()
+    );
+    if !failed.is_empty() {
+        eprintln!("Errors ({}):", failed.len());
+        for (path, err) in &failed {
+            eprintln!("  {}: {err}", path.display());
+        }
+    }
+
+    BatchSummary {
+        total,
+        succeeded,
+        failed,
+        elapsed,
+    }
+}
+
+/// Get the number of available CPU cores.
+fn num_cpus() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
 }
 
 #[cfg(test)]
