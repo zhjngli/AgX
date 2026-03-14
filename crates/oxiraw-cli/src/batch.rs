@@ -276,6 +276,110 @@ pub fn run_batch_apply(
     summarize(&results, batch_start.elapsed())
 }
 
+/// Process a single image with inline parameters (used by batch-edit).
+fn process_edit_single(
+    input: &Path,
+    output: &Path,
+    params: &oxiraw::Parameters,
+    lut: Option<&oxiraw::Lut3D>,
+    quality: u8,
+    format: Option<oxiraw::encode::OutputFormat>,
+) -> Result<Duration, String> {
+    let start = Instant::now();
+    let metadata = oxiraw::metadata::extract_metadata(input);
+    let linear = oxiraw::decode::decode(input).map_err(|e| e.to_string())?;
+    let mut engine = oxiraw::Engine::new(linear);
+    engine.set_params(params.clone());
+    if let Some(l) = lut {
+        engine.set_lut(Some(l.clone()));
+    }
+    let rendered = engine.render();
+    let opts = oxiraw::encode::EncodeOptions {
+        jpeg_quality: quality,
+        format,
+    };
+
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())
+        .map_err(|e| e.to_string())?;
+    Ok(start.elapsed())
+}
+
+/// Run batch-edit: apply inline parameters to all images in a directory, in parallel.
+#[allow(clippy::too_many_arguments)]
+pub fn run_batch_edit(
+    input_dir: &Path,
+    output_dir: &Path,
+    recursive: bool,
+    params: &oxiraw::Parameters,
+    lut: Option<&oxiraw::Lut3D>,
+    quality: u8,
+    format: Option<oxiraw::encode::OutputFormat>,
+    suffix: Option<&str>,
+    jobs: usize,
+    skip_errors: bool,
+) -> BatchSummary {
+    let batch_start = Instant::now();
+
+    let images = discover_images(input_dir, recursive);
+    if images.is_empty() {
+        eprintln!("No image files found in {}", input_dir.display());
+        return BatchSummary {
+            total: 0,
+            succeeded: 0,
+            failed: Vec::new(),
+            elapsed: batch_start.elapsed(),
+        };
+    }
+
+    let format_ext = format.map(|f| f.extension());
+    let total = images.len();
+    let counter = AtomicUsize::new(0);
+    let should_stop = AtomicBool::new(false);
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(if jobs == 0 { num_cpus() } else { jobs })
+        .build()
+        .expect("failed to create thread pool");
+
+    let num_threads = pool.current_num_threads();
+    eprintln!("Processing {total} images with {num_threads} workers...");
+
+    let results: Vec<BatchResult> = pool.install(|| {
+        images
+            .par_iter()
+            .map(|input| {
+                if !skip_errors && should_stop.load(Ordering::Relaxed) {
+                    return BatchResult {
+                        input: input.clone(),
+                        output: PathBuf::new(),
+                        outcome: Err("skipped (earlier error in fail-fast mode)".to_string()),
+                    };
+                }
+
+                let output = resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
+                let outcome = process_edit_single(input, &output, params, lut, quality, format);
+
+                if outcome.is_err() && !skip_errors {
+                    should_stop.store(true, Ordering::Relaxed);
+                }
+
+                report_progress(&counter, total, input, &outcome);
+                BatchResult {
+                    input: input.clone(),
+                    output,
+                    outcome,
+                }
+            })
+            .collect()
+    });
+
+    summarize(&results, batch_start.elapsed())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460,5 +564,35 @@ mod tests {
         assert!(summary.failed.is_empty());
         assert!(output_dir.join("a.png").exists());
         assert!(output_dir.join("b.png").exists());
+    }
+
+    #[test]
+    fn batch_edit_processes_with_params() {
+        let dir = TempDir::new().unwrap();
+        let input_dir = dir.path().join("input");
+        let output_dir = dir.path().join("output");
+        fs::create_dir(&input_dir).unwrap();
+
+        write_test_png(&input_dir.join("photo.png"));
+
+        let params = oxiraw::Parameters::default();
+
+        let summary = run_batch_edit(
+            &input_dir,
+            &output_dir,
+            false,
+            &params,
+            None,
+            92,
+            None,
+            None,
+            1,
+            false,
+        );
+
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.succeeded, 1);
+        assert!(summary.failed.is_empty());
+        assert!(output_dir.join("photo.png").exists());
     }
 }
