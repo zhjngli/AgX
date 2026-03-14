@@ -353,3 +353,151 @@ fn cli_edit_with_hsl_flags() {
     let _ = std::fs::remove_file(&input);
     let _ = std::fs::remove_file(&output);
 }
+
+#[test]
+fn cli_batch_apply_with_preset() {
+    let dir = tempfile::tempdir().unwrap();
+    let input_dir = dir.path().join("input");
+    let output_dir = dir.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+
+    create_test_png(&input_dir.join("a.png"));
+    create_test_png(&input_dir.join("b.png"));
+
+    let preset_path = dir.path().join("test.toml");
+    std::fs::write(
+        &preset_path,
+        "[metadata]\nname = \"test\"\nversion = \"1.0\"\nauthor = \"t\"\n\n[tone]\nexposure = 0.5\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "batch-apply",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "-p",
+            preset_path.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+            "--jobs",
+            "1",
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "batch-apply should succeed");
+    assert!(output_dir.join("a.png").exists(), "a.png should exist");
+    assert!(output_dir.join("b.png").exists(), "b.png should exist");
+}
+
+#[test]
+fn cli_batch_edit_with_suffix() {
+    let dir = tempfile::tempdir().unwrap();
+    let input_dir = dir.path().join("input");
+    let output_dir = dir.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+
+    create_test_png(&input_dir.join("photo.png"));
+
+    let status = cli_bin()
+        .args([
+            "batch-edit",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+            "--exposure",
+            "1.0",
+            "--suffix",
+            "_bright",
+            "--jobs",
+            "1",
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "batch-edit should succeed");
+    assert!(
+        output_dir.join("photo_bright.png").exists(),
+        "photo_bright.png should exist"
+    );
+}
+
+#[test]
+fn cli_batch_apply_recursive() {
+    let dir = tempfile::tempdir().unwrap();
+    let input_dir = dir.path().join("input");
+    let output_dir = dir.path().join("output");
+    let sub_dir = input_dir.join("sub");
+    std::fs::create_dir_all(&sub_dir).unwrap();
+
+    create_test_png(&input_dir.join("top.png"));
+    create_test_png(&sub_dir.join("nested.png"));
+
+    let preset_path = dir.path().join("test.toml");
+    std::fs::write(
+        &preset_path,
+        "[metadata]\nname = \"test\"\nversion = \"1.0\"\nauthor = \"t\"\n\n[tone]\nexposure = 0.5\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "batch-apply",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "-p",
+            preset_path.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+            "--recursive",
+            "--jobs",
+            "1",
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "batch-apply --recursive should succeed");
+    assert!(
+        output_dir.join("top.png").exists(),
+        "top.png should exist in output"
+    );
+    assert!(
+        output_dir.join("sub").join("nested.png").exists(),
+        "sub/nested.png should exist in output"
+    );
+}
+
+#[test]
+fn cli_batch_apply_empty_dir_succeeds() {
+    let dir = tempfile::tempdir().unwrap();
+    let input_dir = dir.path().join("empty_input");
+    let output_dir = dir.path().join("output");
+    std::fs::create_dir(&input_dir).unwrap();
+
+    let preset_path = dir.path().join("test.toml");
+    std::fs::write(
+        &preset_path,
+        "[metadata]\nname = \"test\"\nversion = \"1.0\"\nauthor = \"t\"\n\n[tone]\nexposure = 0.5\n",
+    )
+    .unwrap();
+
+    let status = cli_bin()
+        .args([
+            "batch-apply",
+            "--input-dir",
+            input_dir.to_str().unwrap(),
+            "-p",
+            preset_path.to_str().unwrap(),
+            "--output-dir",
+            output_dir.to_str().unwrap(),
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(
+        status.success(),
+        "batch-apply on empty dir should succeed gracefully"
+    );
+}
