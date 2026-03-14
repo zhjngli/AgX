@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{HslChannels, Parameters};
+use crate::engine::{Parameters, PartialHslChannels, PartialParameters};
 use crate::error::{OxirawError, Result};
 
 /// Preset metadata (name, version, author).
@@ -12,32 +12,35 @@ pub struct PresetMetadata {
     pub version: String,
     #[serde(default)]
     pub author: String,
+    /// Optional path to a base preset this preset extends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends: Option<String>,
 }
 
-/// Tone adjustment section of a preset.
+/// Tone adjustment section of a preset (Option fields for composability).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 struct ToneSection {
-    #[serde(default)]
-    exposure: f32,
-    #[serde(default)]
-    contrast: f32,
-    #[serde(default)]
-    highlights: f32,
-    #[serde(default)]
-    shadows: f32,
-    #[serde(default)]
-    whites: f32,
-    #[serde(default)]
-    blacks: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    exposure: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    contrast: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    highlights: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    shadows: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    whites: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    blacks: Option<f32>,
 }
 
-/// White balance section of a preset.
+/// White balance section of a preset (Option fields for composability).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 struct WhiteBalanceSection {
-    #[serde(default)]
-    temperature: f32,
-    #[serde(default)]
-    tint: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    temperature: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tint: Option<f32>,
 }
 
 /// LUT section of a preset.
@@ -58,24 +61,46 @@ struct PresetRaw {
     white_balance: WhiteBalanceSection,
     #[serde(default)]
     lut: LutSection,
-    #[serde(default)]
-    hsl: HslChannels,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hsl: Option<PartialHslChannels>,
+}
+
+/// Build a PartialParameters from a PresetRaw.
+fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
+    PartialParameters {
+        exposure: raw.tone.exposure,
+        contrast: raw.tone.contrast,
+        highlights: raw.tone.highlights,
+        shadows: raw.tone.shadows,
+        whites: raw.tone.whites,
+        blacks: raw.tone.blacks,
+        temperature: raw.white_balance.temperature,
+        tint: raw.white_balance.tint,
+        hsl: raw.hsl.clone(),
+    }
 }
 
 /// A photo editing preset.
 ///
 /// Presets are declarative parameter sets stored as TOML files.
 /// Missing values default to neutral (no change).
+///
+/// `partial_params` preserves which fields were explicitly set (`Some`)
+/// vs absent (`None`), enabling preset layering and composability.
+/// `params` is the materialized version with defaults filled in.
 #[derive(Debug, Clone, Default)]
 pub struct Preset {
     pub metadata: PresetMetadata,
     pub params: Parameters,
+    pub partial_params: PartialParameters,
     pub lut: Option<crate::lut::Lut3D>,
 }
 
 impl PartialEq for Preset {
     fn eq(&self, other: &Self) -> bool {
-        self.metadata == other.metadata && self.params == other.params
+        self.metadata == other.metadata
+            && self.params == other.params
+            && self.partial_params == other.partial_params
     }
 }
 
@@ -88,41 +113,36 @@ impl Preset {
     pub fn from_toml(toml_str: &str) -> Result<Self> {
         let raw: PresetRaw =
             toml::from_str(toml_str).map_err(|e| OxirawError::Preset(e.to_string()))?;
+        let partial = build_partial_params(&raw);
+        let params = partial.materialize();
         Ok(Self {
             metadata: raw.metadata,
-            params: Parameters {
-                exposure: raw.tone.exposure,
-                contrast: raw.tone.contrast,
-                highlights: raw.tone.highlights,
-                shadows: raw.tone.shadows,
-                whites: raw.tone.whites,
-                blacks: raw.tone.blacks,
-                temperature: raw.white_balance.temperature,
-                tint: raw.white_balance.tint,
-                hsl: raw.hsl,
-            },
+            params,
+            partial_params: partial,
             lut: None,
         })
     }
 
     /// Serialize the preset to a TOML string.
+    ///
+    /// Uses `partial_params` to preserve which fields were explicitly set.
     pub fn to_toml(&self) -> Result<String> {
         let raw = PresetRaw {
             metadata: self.metadata.clone(),
             tone: ToneSection {
-                exposure: self.params.exposure,
-                contrast: self.params.contrast,
-                highlights: self.params.highlights,
-                shadows: self.params.shadows,
-                whites: self.params.whites,
-                blacks: self.params.blacks,
+                exposure: self.partial_params.exposure,
+                contrast: self.partial_params.contrast,
+                highlights: self.partial_params.highlights,
+                shadows: self.partial_params.shadows,
+                whites: self.partial_params.whites,
+                blacks: self.partial_params.blacks,
             },
             white_balance: WhiteBalanceSection {
-                temperature: self.params.temperature,
-                tint: self.params.tint,
+                temperature: self.partial_params.temperature,
+                tint: self.partial_params.tint,
             },
             lut: LutSection::default(),
-            hsl: self.params.hsl.clone(),
+            hsl: self.partial_params.hsl.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| OxirawError::Preset(e.to_string()))
     }
@@ -131,33 +151,57 @@ impl Preset {
     ///
     /// If the preset contains a `[lut]` section with a `path`, the LUT file
     /// is resolved relative to the preset file's directory and loaded.
+    ///
+    /// If the preset contains an `extends` field in `[metadata]`, the base
+    /// preset is loaded recursively and merged (last-write-wins). Circular
+    /// inheritance chains are detected and return an error.
     pub fn load_from_file(path: &std::path::Path) -> Result<Self> {
+        let mut visited = std::collections::HashSet::new();
+        Self::load_from_file_with_visited(path, &mut visited)
+    }
+
+    fn load_from_file_with_visited(
+        path: &std::path::Path,
+        visited: &mut std::collections::HashSet<std::path::PathBuf>,
+    ) -> Result<Self> {
+        let canonical = path.canonicalize().map_err(OxirawError::Io)?;
+        if !visited.insert(canonical.clone()) {
+            return Err(OxirawError::Preset(format!(
+                "circular extends: {} already visited",
+                canonical.display()
+            )));
+        }
+
         let content = std::fs::read_to_string(path)?;
         let raw: PresetRaw =
             toml::from_str(&content).map_err(|e| OxirawError::Preset(e.to_string()))?;
 
         let base_dir = path.parent().unwrap_or(std::path::Path::new("."));
+        let this_partial = build_partial_params(&raw);
 
+        // Resolve inheritance
+        let (merged_partial, base_lut) = if let Some(extends_path) = &raw.metadata.extends {
+            let extends_full = base_dir.join(extends_path);
+            let base_preset = Self::load_from_file_with_visited(&extends_full, visited)?;
+            let merged = base_preset.partial_params.merge(&this_partial);
+            (merged, base_preset.lut)
+        } else {
+            (this_partial.clone(), None)
+        };
+
+        // Load this preset's LUT (overrides base LUT if present)
         let lut = if let Some(lut_path_str) = &raw.lut.path {
             let lut_path = base_dir.join(lut_path_str);
             Some(crate::lut::Lut3D::from_cube_file(&lut_path)?)
         } else {
-            None
+            base_lut
         };
 
+        let params = merged_partial.materialize();
         Ok(Self {
             metadata: raw.metadata,
-            params: Parameters {
-                exposure: raw.tone.exposure,
-                contrast: raw.tone.contrast,
-                highlights: raw.tone.highlights,
-                shadows: raw.tone.shadows,
-                whites: raw.tone.whites,
-                blacks: raw.tone.blacks,
-                temperature: raw.white_balance.temperature,
-                tint: raw.white_balance.tint,
-                hsl: raw.hsl,
-            },
+            params,
+            partial_params: merged_partial,
             lut,
         })
     }
@@ -185,8 +229,9 @@ mod tests {
     fn serialize_contains_expected_keys() {
         let mut preset = Preset::default();
         preset.metadata.name = "Test".into();
-        preset.params.exposure = 1.5;
-        preset.params.temperature = 30.0;
+        preset.partial_params.exposure = Some(1.5);
+        preset.partial_params.temperature = Some(30.0);
+        preset.params = preset.partial_params.materialize();
 
         let toml_str = preset.to_toml().unwrap();
         assert!(toml_str.contains("name = \"Test\""));
@@ -226,10 +271,11 @@ tint = 10.0
     fn roundtrip_serialize_deserialize() {
         let mut preset = Preset::default();
         preset.metadata.name = "Roundtrip".into();
-        preset.params.exposure = 2.0;
-        preset.params.contrast = -10.0;
-        preset.params.temperature = 50.0;
-        preset.params.tint = -5.0;
+        preset.partial_params.exposure = Some(2.0);
+        preset.partial_params.contrast = Some(-10.0);
+        preset.partial_params.temperature = Some(50.0);
+        preset.partial_params.tint = Some(-5.0);
+        preset.params = preset.partial_params.materialize();
 
         let toml_str = preset.to_toml().unwrap();
         let parsed = Preset::from_toml(&toml_str).unwrap();
@@ -264,8 +310,9 @@ exposure = 1.0
 
         let mut preset = Preset::default();
         preset.metadata.name = "File Test".into();
-        preset.params.exposure = 1.5;
-        preset.params.contrast = 20.0;
+        preset.partial_params.exposure = Some(1.5);
+        preset.partial_params.contrast = Some(20.0);
+        preset.params = preset.partial_params.materialize();
 
         preset.save_to_file(&temp_path).unwrap();
         let loaded = Preset::load_from_file(&temp_path).unwrap();
@@ -326,10 +373,26 @@ LUT_3D_SIZE 2
 
     #[test]
     fn preset_hsl_roundtrip() {
+        use crate::engine::{PartialHslChannel, PartialHslChannels};
         let mut preset = Preset::default();
-        preset.params.hsl.red.hue = 15.0;
-        preset.params.hsl.green.saturation = -30.0;
-        preset.params.hsl.blue.luminance = 20.0;
+        let mut hsl = PartialHslChannels::default();
+        hsl.red = Some(PartialHslChannel {
+            hue: Some(15.0),
+            saturation: None,
+            luminance: None,
+        });
+        hsl.green = Some(PartialHslChannel {
+            hue: None,
+            saturation: Some(-30.0),
+            luminance: None,
+        });
+        hsl.blue = Some(PartialHslChannel {
+            hue: None,
+            saturation: None,
+            luminance: Some(20.0),
+        });
+        preset.partial_params.hsl = Some(hsl);
+        preset.params = preset.partial_params.materialize();
         let toml_str = preset.to_toml().unwrap();
         let parsed = Preset::from_toml(&toml_str).unwrap();
         assert_eq!(preset.params.hsl, parsed.params.hsl);
@@ -371,5 +434,248 @@ hue = 10.0
         assert!(result.is_err());
 
         let _ = std::fs::remove_file(&preset_path);
+    }
+
+    // --- Partial parameters tests ---
+
+    #[test]
+    fn preset_partial_only_specified_fields_are_some() {
+        let toml_str = r#"
+[metadata]
+name = "Warm"
+
+[tone]
+exposure = 1.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.partial_params.exposure, Some(1.0));
+        assert_eq!(preset.partial_params.contrast, None);
+        assert_eq!(preset.partial_params.temperature, None);
+    }
+
+    #[test]
+    fn preset_partial_explicit_zero_is_some() {
+        let toml_str = r#"
+[metadata]
+name = "Zero"
+
+[tone]
+exposure = 0.0
+contrast = 0.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.partial_params.exposure, Some(0.0));
+        assert_eq!(preset.partial_params.contrast, Some(0.0));
+        assert_eq!(preset.partial_params.highlights, None);
+    }
+
+    #[test]
+    fn preset_partial_hsl_only_specified() {
+        let toml_str = r#"
+[metadata]
+name = "HSL"
+
+[hsl.red]
+hue = 10.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let hsl = preset.partial_params.hsl.as_ref().unwrap();
+        assert!(hsl.red.is_some());
+        assert_eq!(hsl.red.as_ref().unwrap().hue, Some(10.0));
+        assert_eq!(hsl.red.as_ref().unwrap().saturation, None);
+        assert!(hsl.green.is_none());
+    }
+
+    #[test]
+    fn preset_materialized_params_match_legacy_behavior() {
+        let toml_str = r#"
+[metadata]
+name = "Full"
+
+[tone]
+exposure = 1.0
+contrast = 20.0
+highlights = -10.0
+shadows = 15.0
+whites = 5.0
+blacks = -5.0
+
+[white_balance]
+temperature = 30.0
+tint = -5.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.params.exposure, 1.0);
+        assert_eq!(preset.params.contrast, 20.0);
+        assert_eq!(preset.params.temperature, 30.0);
+    }
+
+    #[test]
+    fn preset_roundtrip_preserves_partial() {
+        let toml_str = r#"
+[metadata]
+name = "Partial"
+
+[tone]
+exposure = 1.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.partial_params.exposure, Some(1.0));
+        assert_eq!(preset.partial_params.contrast, None);
+        assert_eq!(preset.params.exposure, 1.0);
+        assert_eq!(preset.params.contrast, 0.0);
+    }
+
+    // --- Preset inheritance tests ---
+
+    #[test]
+    fn preset_extends_single_level() {
+        let temp_dir = std::env::temp_dir();
+        let base_path = temp_dir.join("oxiraw_extends_base.toml");
+        let child_path = temp_dir.join("oxiraw_extends_child.toml");
+
+        std::fs::write(
+            &base_path,
+            r#"
+[metadata]
+name = "Base"
+
+[tone]
+exposure = 1.0
+contrast = 20.0
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            &child_path,
+            format!(
+                r#"
+[metadata]
+name = "Child"
+extends = "{}"
+
+[tone]
+contrast = 50.0
+"#,
+                base_path.file_name().unwrap().to_str().unwrap()
+            ),
+        )
+        .unwrap();
+
+        let preset = Preset::load_from_file(&child_path).unwrap();
+        assert_eq!(preset.metadata.name, "Child");
+        assert_eq!(preset.params.exposure, 1.0);
+        assert_eq!(preset.params.contrast, 50.0);
+
+        let _ = std::fs::remove_file(&base_path);
+        let _ = std::fs::remove_file(&child_path);
+    }
+
+    #[test]
+    fn preset_extends_multi_level() {
+        let temp_dir = std::env::temp_dir();
+        let grandparent = temp_dir.join("oxiraw_extends_gp.toml");
+        let parent = temp_dir.join("oxiraw_extends_parent.toml");
+        let child = temp_dir.join("oxiraw_extends_child2.toml");
+
+        std::fs::write(
+            &grandparent,
+            r#"
+[metadata]
+name = "Grandparent"
+
+[tone]
+exposure = 1.0
+contrast = 10.0
+highlights = -20.0
+"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            &parent,
+            format!(
+                r#"
+[metadata]
+name = "Parent"
+extends = "{}"
+
+[tone]
+contrast = 30.0
+"#,
+                grandparent.file_name().unwrap().to_str().unwrap()
+            ),
+        )
+        .unwrap();
+
+        std::fs::write(
+            &child,
+            format!(
+                r#"
+[metadata]
+name = "Child"
+extends = "{}"
+
+[tone]
+highlights = 10.0
+"#,
+                parent.file_name().unwrap().to_str().unwrap()
+            ),
+        )
+        .unwrap();
+
+        let preset = Preset::load_from_file(&child).unwrap();
+        assert_eq!(preset.params.exposure, 1.0);
+        assert_eq!(preset.params.contrast, 30.0);
+        assert_eq!(preset.params.highlights, 10.0);
+
+        let _ = std::fs::remove_file(&grandparent);
+        let _ = std::fs::remove_file(&parent);
+        let _ = std::fs::remove_file(&child);
+    }
+
+    #[test]
+    fn preset_extends_cycle_detection() {
+        let temp_dir = std::env::temp_dir();
+        let a_path = temp_dir.join("oxiraw_cycle_a.toml");
+        let b_path = temp_dir.join("oxiraw_cycle_b.toml");
+
+        std::fs::write(
+            &a_path,
+            format!(
+                r#"
+[metadata]
+name = "A"
+extends = "{}"
+"#,
+                b_path.file_name().unwrap().to_str().unwrap()
+            ),
+        )
+        .unwrap();
+
+        std::fs::write(
+            &b_path,
+            format!(
+                r#"
+[metadata]
+name = "B"
+extends = "{}"
+"#,
+                a_path.file_name().unwrap().to_str().unwrap()
+            ),
+        )
+        .unwrap();
+
+        let result = Preset::load_from_file(&a_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("circular"),
+            "Expected circular error, got: {err_msg}"
+        );
+
+        let _ = std::fs::remove_file(&a_path);
+        let _ = std::fs::remove_file(&b_path);
     }
 }
