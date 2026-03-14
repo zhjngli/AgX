@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
-#[allow(unused_imports)]
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
-#[allow(unused_imports)]
 use std::time::Instant;
+
+use rayon::prelude::*;
 
 /// Standard (non-raw) image file extensions recognized by the CLI.
 const STANDARD_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "tiff", "tif"];
@@ -161,6 +161,121 @@ fn num_cpus() -> usize {
         .unwrap_or(1)
 }
 
+/// Process a single image with a preset (used by batch-apply).
+fn process_apply_single(
+    input: &Path,
+    output: &Path,
+    preset: &oxiraw::Preset,
+    quality: u8,
+    format: Option<oxiraw::encode::OutputFormat>,
+) -> Result<Duration, String> {
+    let start = Instant::now();
+    let metadata = oxiraw::metadata::extract_metadata(input);
+    let linear = oxiraw::decode::decode(input).map_err(|e| e.to_string())?;
+    let mut engine = oxiraw::Engine::new(linear);
+    engine.apply_preset(preset);
+    let rendered = engine.render();
+    let opts = oxiraw::encode::EncodeOptions {
+        jpeg_quality: quality,
+        format,
+    };
+
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())
+        .map_err(|e| e.to_string())?;
+    Ok(start.elapsed())
+}
+
+/// Run batch-apply: apply a preset to all images in a directory, in parallel.
+#[allow(clippy::too_many_arguments)]
+pub fn run_batch_apply(
+    input_dir: &Path,
+    preset_path: &Path,
+    output_dir: &Path,
+    recursive: bool,
+    quality: u8,
+    format: Option<oxiraw::encode::OutputFormat>,
+    suffix: Option<&str>,
+    jobs: usize,
+    skip_errors: bool,
+) -> BatchSummary {
+    let batch_start = Instant::now();
+
+    let images = discover_images(input_dir, recursive);
+    if images.is_empty() {
+        eprintln!("No image files found in {}", input_dir.display());
+        return BatchSummary {
+            total: 0,
+            succeeded: 0,
+            failed: Vec::new(),
+            elapsed: batch_start.elapsed(),
+        };
+    }
+
+    let preset = match oxiraw::Preset::load_from_file(preset_path) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Failed to load preset: {e}");
+            return BatchSummary {
+                total: images.len(),
+                succeeded: 0,
+                failed: images
+                    .iter()
+                    .map(|p| (p.clone(), format!("preset load failed: {e}")))
+                    .collect(),
+                elapsed: batch_start.elapsed(),
+            };
+        }
+    };
+
+    let format_ext = format.map(|f| f.extension());
+    let total = images.len();
+    let counter = AtomicUsize::new(0);
+    let should_stop = AtomicBool::new(false);
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(if jobs == 0 { num_cpus() } else { jobs })
+        .build()
+        .expect("failed to create thread pool");
+
+    let num_threads = pool.current_num_threads();
+    eprintln!("Processing {total} images with {num_threads} workers...");
+
+    let results: Vec<BatchResult> = pool.install(|| {
+        images
+            .par_iter()
+            .map(|input| {
+                if !skip_errors && should_stop.load(Ordering::Relaxed) {
+                    return BatchResult {
+                        input: input.clone(),
+                        output: PathBuf::new(),
+                        outcome: Err("skipped (earlier error in fail-fast mode)".to_string()),
+                    };
+                }
+
+                let output = resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
+                let outcome = process_apply_single(input, &output, &preset, quality, format);
+
+                if outcome.is_err() && !skip_errors {
+                    should_stop.store(true, Ordering::Relaxed);
+                }
+
+                report_progress(&counter, total, input, &outcome);
+                BatchResult {
+                    input: input.clone(),
+                    output,
+                    outcome,
+                }
+            })
+            .collect()
+    });
+
+    summarize(&results, batch_start.elapsed())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,5 +417,48 @@ mod tests {
             Some("tiff"),
         );
         assert_eq!(result, PathBuf::from("/edited/IMG_001_edited.tiff"));
+    }
+
+    fn write_test_png(path: &Path) {
+        use image::ImageBuffer;
+        let img: ImageBuffer<image::Rgb<u8>, Vec<u8>> =
+            ImageBuffer::from_pixel(2, 2, image::Rgb([128u8, 64, 32]));
+        img.save(path).unwrap();
+    }
+
+    #[test]
+    fn batch_apply_processes_multiple_images() {
+        let dir = TempDir::new().unwrap();
+        let input_dir = dir.path().join("input");
+        let output_dir = dir.path().join("output");
+        fs::create_dir(&input_dir).unwrap();
+
+        write_test_png(&input_dir.join("a.png"));
+        write_test_png(&input_dir.join("b.png"));
+
+        let preset_path = dir.path().join("test.toml");
+        fs::write(
+            &preset_path,
+            "[metadata]\nname = \"test\"\nversion = \"1.0\"\nauthor = \"test\"\n",
+        )
+        .unwrap();
+
+        let summary = run_batch_apply(
+            &input_dir,
+            &preset_path,
+            &output_dir,
+            false,
+            92,
+            None,
+            None,
+            1,
+            false,
+        );
+
+        assert_eq!(summary.total, 2);
+        assert_eq!(summary.succeeded, 2);
+        assert!(summary.failed.is_empty());
+        assert!(output_dir.join("a.png").exists());
+        assert!(output_dir.join("b.png").exists());
     }
 }
