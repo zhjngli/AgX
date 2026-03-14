@@ -531,7 +531,8 @@ fn cli_apply_multiple_presets() {
             "-o",
             output.to_str().unwrap(),
             "--presets",
-            &format!("{},{}", preset1.display(), preset2.display()),
+            preset1.to_str().unwrap(),
+            preset2.to_str().unwrap(),
         ])
         .status()
         .unwrap();
