@@ -93,6 +93,7 @@ pub fn resolve_output_path(
 }
 
 /// Result of processing a single image in a batch.
+#[allow(dead_code)]
 pub struct BatchResult {
     pub input: PathBuf,
     pub output: PathBuf,
@@ -100,6 +101,7 @@ pub struct BatchResult {
 }
 
 /// Summary of a batch run.
+#[allow(dead_code)]
 pub struct BatchSummary {
     pub total: usize,
     pub succeeded: usize,
