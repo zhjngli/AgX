@@ -7,10 +7,7 @@ use agx::{Engine, Preset};
 mod batch;
 
 #[derive(Parser)]
-#[command(
-    name = "agx",
-    about = "Photo editing CLI with portable TOML presets"
-)]
+#[command(name = "agx", about = "Photo editing CLI with portable TOML presets")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

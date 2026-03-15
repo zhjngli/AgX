@@ -153,8 +153,7 @@ pub fn encode_to_file_with_options(
         buf
     };
 
-    std::fs::write(&final_path, &buf)
-        .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+    std::fs::write(&final_path, &buf).map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
 
     // For TIFF output, inject metadata via little_exif after writing
     if format == OutputFormat::Tiff {
@@ -185,9 +184,8 @@ fn inject_metadata(
 
     match format {
         OutputFormat::Jpeg => {
-            let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into()).map_err(|e| {
-                crate::error::AgxError::Encode(format!("metadata injection: {e}"))
-            })?;
+            let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
             if let Some(exif) = &metadata.exif {
                 jpeg.set_exif(Some(exif.clone().into()));
             }
@@ -201,9 +199,8 @@ fn inject_metadata(
             Ok(out)
         }
         OutputFormat::Png => {
-            let mut png = img_parts::png::Png::from_bytes(buf.into()).map_err(|e| {
-                crate::error::AgxError::Encode(format!("metadata injection: {e}"))
-            })?;
+            let mut png = img_parts::png::Png::from_bytes(buf.into())
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
             if let Some(exif) = &metadata.exif {
                 png.set_exif(Some(exif.clone().into()));
             }
