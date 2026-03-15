@@ -4,7 +4,7 @@ pub mod raw;
 use image::{Rgb, Rgb32FImage};
 use palette::{LinSrgb, Srgb};
 
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 /// Known raw file extensions supported via LibRaw.
 const RAW_EXTENSIONS: &[&str] = &[
@@ -33,7 +33,7 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
         }
         #[cfg(not(feature = "raw"))]
         {
-            return Err(OxirawError::Decode(
+            return Err(AgxError::Decode(
                 "raw format support requires the 'raw' feature flag".into(),
             ));
         }
@@ -47,9 +47,9 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
 /// to linear sRGB for internal processing.
 pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let img = image::ImageReader::open(path)
-        .map_err(OxirawError::Io)?
+        .map_err(AgxError::Io)?
         .decode()
-        .map_err(OxirawError::Image)?;
+        .map_err(AgxError::Image)?;
     let srgb_f32 = img.into_rgb32f();
     let (w, h) = srgb_f32.dimensions();
     let linear = Rgb32FImage::from_fn(w, h, |x, y| {

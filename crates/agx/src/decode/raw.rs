@@ -9,7 +9,7 @@ use std::path::Path;
 use image::{Rgb, Rgb32FImage};
 use palette::{LinSrgb, Srgb};
 
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 // --- FFI declarations ---
 
@@ -78,7 +78,7 @@ fn check_libraw(err: c_int) -> Result<()> {
     if err == 0 {
         Ok(())
     } else {
-        Err(OxirawError::Decode(format!(
+        Err(AgxError::Decode(format!(
             "LibRaw: {}",
             libraw_error_msg(err)
         )))
@@ -96,7 +96,7 @@ impl LibRawProcessor {
     fn new() -> Result<Self> {
         let ptr = unsafe { libraw_init(0) };
         if ptr.is_null() {
-            return Err(OxirawError::Decode("LibRaw: failed to initialize".into()));
+            return Err(AgxError::Decode("LibRaw: failed to initialize".into()));
         }
         Ok(Self { ptr })
     }
@@ -104,9 +104,9 @@ impl LibRawProcessor {
     fn open_file(&self, path: &Path) -> Result<()> {
         let c_path = CString::new(
             path.to_str()
-                .ok_or_else(|| OxirawError::Decode("invalid file path encoding".into()))?,
+                .ok_or_else(|| AgxError::Decode("invalid file path encoding".into()))?,
         )
-        .map_err(|_| OxirawError::Decode("file path contains null byte".into()))?;
+        .map_err(|_| AgxError::Decode("file path contains null byte".into()))?;
         check_libraw(unsafe { libraw_open_file(self.ptr, c_path.as_ptr()) })
     }
 
@@ -122,7 +122,7 @@ impl LibRawProcessor {
         let mut errc: c_int = 0;
         let ptr = unsafe { libraw_dcraw_make_mem_image(self.ptr, &mut errc) };
         if ptr.is_null() {
-            return Err(OxirawError::Decode(format!(
+            return Err(AgxError::Decode(format!(
                 "LibRaw: failed to create memory image: {}",
                 libraw_error_msg(errc)
             )));
@@ -249,7 +249,7 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
     let bits = img.bits();
 
     if colors != 3 {
-        return Err(OxirawError::Decode(format!(
+        return Err(AgxError::Decode(format!(
             "LibRaw: expected 3 color channels, got {colors}"
         )));
     }
@@ -274,7 +274,7 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
             Rgb([lin.red, lin.green, lin.blue])
         }),
         _ => {
-            return Err(OxirawError::Decode(format!(
+            return Err(AgxError::Decode(format!(
                 "LibRaw: unsupported bit depth {bits}"
             )));
         }

@@ -126,14 +126,14 @@ pub fn encode_to_file_with_options(
             let mut buf = Vec::new();
             let encoder = JpegEncoder::new_with_quality(&mut buf, options.jpeg_quality);
             rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
             buf
         }
         OutputFormat::Png => {
             let mut buf = Vec::new();
             let encoder = PngEncoder::new(&mut buf);
             rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
             buf
         }
         OutputFormat::Tiff => {
@@ -141,7 +141,7 @@ pub fn encode_to_file_with_options(
             let cursor = Cursor::new(&mut buf);
             let encoder = TiffEncoder::new(cursor);
             rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
             buf
         }
     };
@@ -154,7 +154,7 @@ pub fn encode_to_file_with_options(
     };
 
     std::fs::write(&final_path, &buf)
-        .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+        .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
 
     // For TIFF output, inject metadata via little_exif after writing
     if format == OutputFormat::Tiff {
@@ -186,7 +186,7 @@ fn inject_metadata(
     match format {
         OutputFormat::Jpeg => {
             let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into()).map_err(|e| {
-                crate::error::OxirawError::Encode(format!("metadata injection: {e}"))
+                crate::error::AgxError::Encode(format!("metadata injection: {e}"))
             })?;
             if let Some(exif) = &metadata.exif {
                 jpeg.set_exif(Some(exif.clone().into()));
@@ -197,12 +197,12 @@ fn inject_metadata(
             let mut out = Vec::new();
             jpeg.encoder()
                 .write_to(&mut out)
-                .map_err(|e| crate::error::OxirawError::Encode(format!("metadata write: {e}")))?;
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
             Ok(out)
         }
         OutputFormat::Png => {
             let mut png = img_parts::png::Png::from_bytes(buf.into()).map_err(|e| {
-                crate::error::OxirawError::Encode(format!("metadata injection: {e}"))
+                crate::error::AgxError::Encode(format!("metadata injection: {e}"))
             })?;
             if let Some(exif) = &metadata.exif {
                 png.set_exif(Some(exif.clone().into()));
@@ -213,7 +213,7 @@ fn inject_metadata(
             let mut out = Vec::new();
             png.encoder()
                 .write_to(&mut out)
-                .map_err(|e| crate::error::OxirawError::Encode(format!("metadata write: {e}")))?;
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
             Ok(out)
         }
         OutputFormat::Tiff => Ok(buf), // Handled separately via inject_metadata_tiff

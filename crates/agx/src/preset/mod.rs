@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{Parameters, PartialHslChannels, PartialParameters};
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 /// Preset metadata (name, version, author).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -116,7 +116,7 @@ impl Preset {
     /// with LUT references.
     pub fn from_toml(toml_str: &str) -> Result<Self> {
         let raw: PresetRaw =
-            toml::from_str(toml_str).map_err(|e| OxirawError::Preset(e.to_string()))?;
+            toml::from_str(toml_str).map_err(|e| AgxError::Preset(e.to_string()))?;
         let partial = build_partial_params(&raw);
         Ok(Self {
             metadata: raw.metadata,
@@ -146,7 +146,7 @@ impl Preset {
             lut: LutSection::default(),
             hsl: self.partial_params.hsl.clone(),
         };
-        toml::to_string_pretty(&raw).map_err(|e| OxirawError::Preset(e.to_string()))
+        toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
 
     /// Load a preset from a TOML file.
@@ -166,9 +166,9 @@ impl Preset {
         path: &std::path::Path,
         visited: &mut std::collections::HashSet<std::path::PathBuf>,
     ) -> Result<Self> {
-        let canonical = path.canonicalize().map_err(OxirawError::Io)?;
+        let canonical = path.canonicalize().map_err(AgxError::Io)?;
         if !visited.insert(canonical.clone()) {
-            return Err(OxirawError::Preset(format!(
+            return Err(AgxError::Preset(format!(
                 "circular extends: {} already visited",
                 canonical.display()
             )));
@@ -176,7 +176,7 @@ impl Preset {
 
         let content = std::fs::read_to_string(path)?;
         let raw: PresetRaw =
-            toml::from_str(&content).map_err(|e| OxirawError::Preset(e.to_string()))?;
+            toml::from_str(&content).map_err(|e| AgxError::Preset(e.to_string()))?;
 
         let base_dir = path.parent().unwrap_or(std::path::Path::new("."));
         let this_partial = build_partial_params(&raw);

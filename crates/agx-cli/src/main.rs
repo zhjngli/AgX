@@ -457,7 +457,7 @@ fn main() {
 
 fn parse_output_format(s: &str) -> oxiraw::Result<oxiraw::encode::OutputFormat> {
     oxiraw::encode::OutputFormat::from_extension(s).ok_or_else(|| {
-        oxiraw::OxirawError::Encode(format!(
+        oxiraw::AgxError::Encode(format!(
             "unsupported output format '{s}'. Use: jpeg, png, or tiff"
         ))
     })

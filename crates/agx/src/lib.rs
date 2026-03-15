@@ -13,7 +13,7 @@ pub use engine::{
     Engine, HslChannel, HslChannels, Parameters, PartialHslChannel, PartialHslChannels,
     PartialParameters,
 };
-pub use error::{OxirawError, Result};
+pub use error::{AgxError, Result};
 pub use lut::Lut3D;
 pub use metadata::ImageMetadata;
 pub use preset::Preset;
