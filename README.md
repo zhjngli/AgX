@@ -1,4 +1,4 @@
-# oxiraw
+# AgX
 
 An open-source photo editing library and CLI written in Rust, with a portable, human-readable preset format.
 
@@ -36,7 +36,7 @@ Three source photos are included in `example/images/` along with five presets in
 Try them out:
 
 ```bash
-cargo run -p oxiraw-cli -- apply \
+cargo run -p agx-cli -- apply \
   -i example/images/moody-forest.jpg \
   -p example/presets/golden-hour.toml \
   -o edited.jpg
@@ -46,43 +46,43 @@ cargo run -p oxiraw-cli -- apply \
 
 ```bash
 # Apply a preset to an image
-cargo run -p oxiraw-cli -- apply \
+cargo run -p agx-cli -- apply \
   -i example/images/mountain-landscape.jpg \
   -p example/presets/golden-hour.toml \
   -o edited.jpg
 
 # Edit with inline parameters
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i example/images/moody-forest.jpg \
   -o edited.jpg \
   --exposure 1.0 --contrast 25 --temperature 30
 
 # Apply a .cube LUT
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i example/images/city-skyline.jpg \
   -o graded.jpg \
   --lut film-emulation.cube
 
 # Combine adjustments with a LUT
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i example/images/mountain-landscape.jpg \
   -o graded.jpg \
   --exposure 0.5 --contrast 10 --lut film-emulation.cube
 
 # Process a raw file (CR2, NEF, ARW, DNG, etc.)
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i photo.dng \
   -o edited.jpg \
   --exposure 0.5 --contrast 15
 
 # Set JPEG output quality (default: 92)
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i photo.jpg \
   -o output.jpg \
   --quality 95
 
 # Specify output format explicitly
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i photo.jpg \
   -o output.tiff \
   --format tiff
@@ -103,7 +103,7 @@ Presets are TOML files with a simple, declarative structure:
 [metadata]
 name = "Golden Hour"
 version = "1.0"
-author = "oxiraw"
+author = "agx"
 
 [tone]
 exposure = 0.5       # stops, -5.0 to +5.0
@@ -130,9 +130,9 @@ Missing values default to neutral (no change). See `example/presets/` for more e
 ## Library Usage
 
 ```rust
-use oxiraw::{Engine, Lut3D, Preset};
-use oxiraw::decode::decode;
-use oxiraw::encode::encode_to_file;
+use agx::{Engine, Lut3D, Preset};
+use agx::decode::decode;
+use agx::encode::encode_to_file;
 
 // Decode an image (auto-detects format: JPEG, PNG, TIFF, CR2, NEF, DNG, etc.)
 let image = decode("photo.jpg".as_ref()).unwrap();
@@ -158,9 +158,9 @@ encode_to_file(&result, "output.jpg".as_ref()).unwrap();
 ## Project Structure
 
 ```
-oxiraw/
+agx/
 ├── crates/
-│   ├── oxiraw/          # core library
+│   ├── agx/             # core library
 │   │   └── src/
 │   │       ├── adjust/  # adjustment algorithms
 │   │       ├── decode/  # image decoding (sRGB → linear)
@@ -169,7 +169,7 @@ oxiraw/
 │   │       ├── lut/     # 3D LUT parsing and interpolation
 │   │       ├── preset/  # TOML preset serialization
 │   │       └── error.rs # error types
-│   └── oxiraw-cli/      # CLI wrapper
+│   └── agx-cli/         # CLI wrapper
 ├── example/             # sample images, presets, and LUTs
 └── docs/                # design docs, plans, and references
 ```
@@ -197,7 +197,7 @@ The CLI enables raw support by default. To use the library without raw support (
 ```toml
 # Cargo.toml — no "raw" feature, only standard formats
 [dependencies]
-oxiraw = "0.1"
+agx = "0.1"
 ```
 
 ## Running Tests
