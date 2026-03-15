@@ -417,7 +417,7 @@ impl Engine {
 
     /// Apply a preset, replacing the current parameters and LUT.
     pub fn apply_preset(&mut self, preset: &crate::preset::Preset) {
-        self.params = preset.params.clone();
+        self.params = preset.params();
         self.lut = preset.lut.clone();
     }
 
@@ -959,7 +959,6 @@ mod tests {
 
         let mut preset = crate::preset::Preset::default();
         preset.partial_params.contrast = Some(50.0);
-        preset.params = preset.partial_params.materialize();
 
         engine.layer_preset(&preset);
         assert_eq!(engine.params().exposure, 1.0);
@@ -980,7 +979,6 @@ mod tests {
             luminance: None,
         });
         preset.partial_params.hsl = Some(partial_hsl);
-        preset.params = preset.partial_params.materialize();
 
         engine.layer_preset(&preset);
         assert_eq!(engine.params().hsl.red.hue, 15.0);
@@ -995,11 +993,9 @@ mod tests {
         let mut preset1 = crate::preset::Preset::default();
         preset1.partial_params.exposure = Some(1.0);
         preset1.partial_params.contrast = Some(20.0);
-        preset1.params = preset1.partial_params.materialize();
 
         let mut preset2 = crate::preset::Preset::default();
         preset2.partial_params.exposure = Some(2.0);
-        preset2.params = preset2.partial_params.materialize();
 
         engine.layer_preset(&preset1);
         engine.layer_preset(&preset2);
@@ -1017,7 +1013,6 @@ mod tests {
 
         let mut preset = crate::preset::Preset::default();
         preset.partial_params.exposure = Some(0.5);
-        preset.params = preset.partial_params.materialize();
 
         engine.apply_preset(&preset);
         assert_eq!(engine.params().exposure, 0.5);

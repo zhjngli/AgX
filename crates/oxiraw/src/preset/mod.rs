@@ -87,20 +87,24 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
 ///
 /// `partial_params` preserves which fields were explicitly set (`Some`)
 /// vs absent (`None`), enabling preset layering and composability.
-/// `params` is the materialized version with defaults filled in.
+/// Call `params()` to get concrete `Parameters` with defaults filled in.
 #[derive(Debug, Clone, Default)]
 pub struct Preset {
     pub metadata: PresetMetadata,
-    pub params: Parameters,
     pub partial_params: PartialParameters,
     pub lut: Option<crate::lut::Lut3D>,
 }
 
+impl Preset {
+    /// Materialize concrete Parameters from partial_params.
+    pub fn params(&self) -> Parameters {
+        self.partial_params.materialize()
+    }
+}
+
 impl PartialEq for Preset {
     fn eq(&self, other: &Self) -> bool {
-        self.metadata == other.metadata
-            && self.params == other.params
-            && self.partial_params == other.partial_params
+        self.metadata == other.metadata && self.partial_params == other.partial_params
     }
 }
 
@@ -114,10 +118,8 @@ impl Preset {
         let raw: PresetRaw =
             toml::from_str(toml_str).map_err(|e| OxirawError::Preset(e.to_string()))?;
         let partial = build_partial_params(&raw);
-        let params = partial.materialize();
         Ok(Self {
             metadata: raw.metadata,
-            params,
             partial_params: partial,
             lut: None,
         })
@@ -197,10 +199,8 @@ impl Preset {
             base_lut
         };
 
-        let params = merged_partial.materialize();
         Ok(Self {
             metadata: raw.metadata,
-            params,
             partial_params: merged_partial,
             lut,
         })
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn default_preset_is_neutral() {
         let preset = Preset::default();
-        assert_eq!(preset.params, Parameters::default());
+        assert_eq!(preset.params(), Parameters::default());
         assert_eq!(preset.metadata.name, "");
     }
 
@@ -231,7 +231,6 @@ mod tests {
         preset.metadata.name = "Test".into();
         preset.partial_params.exposure = Some(1.5);
         preset.partial_params.temperature = Some(30.0);
-        preset.params = preset.partial_params.materialize();
 
         let toml_str = preset.to_toml().unwrap();
         assert!(toml_str.contains("name = \"Test\""));
@@ -259,12 +258,12 @@ tint = 10.0
 "#;
         let preset = Preset::from_toml(toml_str).unwrap();
         assert_eq!(preset.metadata.name, "Golden Hour");
-        assert_eq!(preset.params.exposure, 0.5);
-        assert_eq!(preset.params.contrast, 15.0);
-        assert_eq!(preset.params.highlights, -30.0);
-        assert_eq!(preset.params.shadows, 25.0);
-        assert_eq!(preset.params.temperature, 6200.0);
-        assert_eq!(preset.params.tint, 10.0);
+        assert_eq!(preset.params().exposure, 0.5);
+        assert_eq!(preset.params().contrast, 15.0);
+        assert_eq!(preset.params().highlights, -30.0);
+        assert_eq!(preset.params().shadows, 25.0);
+        assert_eq!(preset.params().temperature, 6200.0);
+        assert_eq!(preset.params().tint, 10.0);
     }
 
     #[test]
@@ -275,7 +274,6 @@ tint = 10.0
         preset.partial_params.contrast = Some(-10.0);
         preset.partial_params.temperature = Some(50.0);
         preset.partial_params.tint = Some(-5.0);
-        preset.params = preset.partial_params.materialize();
 
         let toml_str = preset.to_toml().unwrap();
         let parsed = Preset::from_toml(&toml_str).unwrap();
@@ -292,10 +290,10 @@ name = "Minimal"
 exposure = 1.0
 "#;
         let preset = Preset::from_toml(toml_str).unwrap();
-        assert_eq!(preset.params.exposure, 1.0);
-        assert_eq!(preset.params.contrast, 0.0);
-        assert_eq!(preset.params.highlights, 0.0);
-        assert_eq!(preset.params.temperature, 0.0);
+        assert_eq!(preset.params().exposure, 1.0);
+        assert_eq!(preset.params().contrast, 0.0);
+        assert_eq!(preset.params().highlights, 0.0);
+        assert_eq!(preset.params().temperature, 0.0);
     }
 
     #[test]
@@ -312,7 +310,6 @@ exposure = 1.0
         preset.metadata.name = "File Test".into();
         preset.partial_params.exposure = Some(1.5);
         preset.partial_params.contrast = Some(20.0);
-        preset.params = preset.partial_params.materialize();
 
         preset.save_to_file(&temp_path).unwrap();
         let loaded = Preset::load_from_file(&temp_path).unwrap();
@@ -356,7 +353,7 @@ LUT_3D_SIZE 2
         std::fs::write(&preset_path, &toml_content).unwrap();
 
         let preset = Preset::load_from_file(&preset_path).unwrap();
-        assert_eq!(preset.params.exposure, 0.5);
+        assert_eq!(preset.params().exposure, 0.5);
         assert!(preset.lut.is_some());
         assert_eq!(preset.lut.as_ref().unwrap().size, 2);
 
@@ -392,17 +389,17 @@ LUT_3D_SIZE 2
             luminance: Some(20.0),
         });
         preset.partial_params.hsl = Some(hsl);
-        preset.params = preset.partial_params.materialize();
+
         let toml_str = preset.to_toml().unwrap();
         let parsed = Preset::from_toml(&toml_str).unwrap();
-        assert_eq!(preset.params.hsl, parsed.params.hsl);
+        assert_eq!(preset.params().hsl, parsed.params().hsl);
     }
 
     #[test]
     fn preset_missing_hsl_defaults_to_zero() {
         let toml_str = "[metadata]\nname = \"No HSL\"\n\n[tone]\nexposure = 1.0\n";
         let preset = Preset::from_toml(toml_str).unwrap();
-        assert!(preset.params.hsl.is_default());
+        assert!(preset.params().hsl.is_default());
     }
 
     #[test]
@@ -415,9 +412,9 @@ name = "Partial HSL"
 hue = 10.0
 "#;
         let preset = Preset::from_toml(toml_str).unwrap();
-        assert_eq!(preset.params.hsl.red.hue, 10.0);
-        assert_eq!(preset.params.hsl.red.saturation, 0.0);
-        assert!(preset.params.hsl.green == crate::engine::HslChannel::default());
+        assert_eq!(preset.params().hsl.red.hue, 10.0);
+        assert_eq!(preset.params().hsl.red.saturation, 0.0);
+        assert!(preset.params().hsl.green == crate::engine::HslChannel::default());
     }
 
     #[test]
@@ -505,9 +502,9 @@ temperature = 30.0
 tint = -5.0
 "#;
         let preset = Preset::from_toml(toml_str).unwrap();
-        assert_eq!(preset.params.exposure, 1.0);
-        assert_eq!(preset.params.contrast, 20.0);
-        assert_eq!(preset.params.temperature, 30.0);
+        assert_eq!(preset.params().exposure, 1.0);
+        assert_eq!(preset.params().contrast, 20.0);
+        assert_eq!(preset.params().temperature, 30.0);
     }
 
     #[test]
@@ -522,8 +519,8 @@ exposure = 1.0
         let preset = Preset::from_toml(toml_str).unwrap();
         assert_eq!(preset.partial_params.exposure, Some(1.0));
         assert_eq!(preset.partial_params.contrast, None);
-        assert_eq!(preset.params.exposure, 1.0);
-        assert_eq!(preset.params.contrast, 0.0);
+        assert_eq!(preset.params().exposure, 1.0);
+        assert_eq!(preset.params().contrast, 0.0);
     }
 
     // --- Preset inheritance tests ---
@@ -565,8 +562,8 @@ contrast = 50.0
 
         let preset = Preset::load_from_file(&child_path).unwrap();
         assert_eq!(preset.metadata.name, "Child");
-        assert_eq!(preset.params.exposure, 1.0);
-        assert_eq!(preset.params.contrast, 50.0);
+        assert_eq!(preset.params().exposure, 1.0);
+        assert_eq!(preset.params().contrast, 50.0);
 
         let _ = std::fs::remove_file(&base_path);
         let _ = std::fs::remove_file(&child_path);
@@ -626,9 +623,9 @@ highlights = 10.0
         .unwrap();
 
         let preset = Preset::load_from_file(&child).unwrap();
-        assert_eq!(preset.params.exposure, 1.0);
-        assert_eq!(preset.params.contrast, 30.0);
-        assert_eq!(preset.params.highlights, 10.0);
+        assert_eq!(preset.params().exposure, 1.0);
+        assert_eq!(preset.params().contrast, 30.0);
+        assert_eq!(preset.params().highlights, 10.0);
 
         let _ = std::fs::remove_file(&grandparent);
         let _ = std::fs::remove_file(&parent);

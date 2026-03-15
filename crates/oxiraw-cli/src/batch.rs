@@ -93,19 +93,21 @@ pub fn resolve_output_path(
 }
 
 /// Result of processing a single image in a batch.
-#[allow(dead_code)]
 pub struct BatchResult {
     pub input: PathBuf,
+    #[allow(dead_code)]
     pub output: PathBuf,
     pub outcome: Result<Duration, String>,
 }
 
 /// Summary of a batch run.
-#[allow(dead_code)]
 pub struct BatchSummary {
+    #[allow(dead_code)]
     pub total: usize,
+    #[allow(dead_code)]
     pub succeeded: usize,
     pub failed: Vec<(PathBuf, String)>,
+    #[allow(dead_code)]
     pub elapsed: Duration,
 }
 
@@ -163,19 +165,19 @@ fn num_cpus() -> usize {
         .unwrap_or(1)
 }
 
-/// Process a single image with a preset (used by batch-apply).
-fn process_apply_single(
+/// Process a single image: decode, configure engine via closure, render, encode.
+fn process_single(
     input: &Path,
     output: &Path,
-    preset: &oxiraw::Preset,
     quality: u8,
     format: Option<oxiraw::encode::OutputFormat>,
+    configure: impl FnOnce(&mut oxiraw::Engine),
 ) -> Result<Duration, String> {
     let start = Instant::now();
     let metadata = oxiraw::metadata::extract_metadata(input);
     let linear = oxiraw::decode::decode(input).map_err(|e| e.to_string())?;
     let mut engine = oxiraw::Engine::new(linear);
-    engine.apply_preset(preset);
+    configure(&mut engine);
     let rendered = engine.render();
     let opts = oxiraw::encode::EncodeOptions {
         jpeg_quality: quality,
@@ -191,24 +193,27 @@ fn process_apply_single(
     Ok(start.elapsed())
 }
 
-/// Run batch-apply: apply a preset to all images in a directory, in parallel.
-#[allow(clippy::too_many_arguments)]
-pub fn run_batch_apply(
-    input_dir: &Path,
-    preset_path: &Path,
-    output_dir: &Path,
+/// Options shared by all batch operations.
+struct BatchOpts<'a> {
+    input_dir: &'a Path,
+    output_dir: &'a Path,
     recursive: bool,
-    quality: u8,
-    format: Option<oxiraw::encode::OutputFormat>,
-    suffix: Option<&str>,
+    format_ext: Option<&'static str>,
+    suffix: Option<&'a str>,
     jobs: usize,
     skip_errors: bool,
-) -> BatchSummary {
+}
+
+/// Generic batch processing: discover images, process in parallel, summarize.
+fn run_batch<F>(opts: &BatchOpts<'_>, process: F) -> BatchSummary
+where
+    F: Fn(&Path, &Path) -> Result<Duration, String> + Sync,
+{
     let batch_start = Instant::now();
 
-    let images = discover_images(input_dir, recursive);
+    let images = discover_images(opts.input_dir, opts.recursive);
     if images.is_empty() {
-        eprintln!("No image files found in {}", input_dir.display());
+        eprintln!("No image files found in {}", opts.input_dir.display());
         return BatchSummary {
             total: 0,
             succeeded: 0,
@@ -216,30 +221,16 @@ pub fn run_batch_apply(
             elapsed: batch_start.elapsed(),
         };
     }
-
-    let preset = match oxiraw::Preset::load_from_file(preset_path) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("Failed to load preset: {e}");
-            return BatchSummary {
-                total: images.len(),
-                succeeded: 0,
-                failed: images
-                    .iter()
-                    .map(|p| (p.clone(), format!("preset load failed: {e}")))
-                    .collect(),
-                elapsed: batch_start.elapsed(),
-            };
-        }
-    };
-
-    let format_ext = format.map(|f| f.extension());
     let total = images.len();
     let counter = AtomicUsize::new(0);
     let should_stop = AtomicBool::new(false);
 
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(if jobs == 0 { num_cpus() } else { jobs })
+        .num_threads(if opts.jobs == 0 {
+            num_cpus()
+        } else {
+            opts.jobs
+        })
         .build()
         .expect("failed to create thread pool");
 
@@ -250,7 +241,7 @@ pub fn run_batch_apply(
         images
             .par_iter()
             .map(|input| {
-                if !skip_errors && should_stop.load(Ordering::Relaxed) {
+                if !opts.skip_errors && should_stop.load(Ordering::Relaxed) {
                     return BatchResult {
                         input: input.clone(),
                         output: PathBuf::new(),
@@ -258,10 +249,16 @@ pub fn run_batch_apply(
                     };
                 }
 
-                let output = resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
-                let outcome = process_apply_single(input, &output, &preset, quality, format);
+                let output = resolve_output_path(
+                    input,
+                    opts.input_dir,
+                    opts.output_dir,
+                    opts.suffix,
+                    opts.format_ext,
+                );
+                let outcome = process(input, &output);
 
-                if outcome.is_err() && !skip_errors {
+                if outcome.is_err() && !opts.skip_errors {
                     should_stop.store(true, Ordering::Relaxed);
                 }
 
@@ -278,36 +275,50 @@ pub fn run_batch_apply(
     summarize(&results, batch_start.elapsed())
 }
 
-/// Process a single image with inline parameters (used by batch-edit).
-fn process_edit_single(
-    input: &Path,
-    output: &Path,
-    params: &oxiraw::Parameters,
-    lut: Option<&oxiraw::Lut3D>,
+/// Run batch-apply: apply a preset to all images in a directory, in parallel.
+#[allow(clippy::too_many_arguments)]
+pub fn run_batch_apply(
+    input_dir: &Path,
+    preset_path: &Path,
+    output_dir: &Path,
+    recursive: bool,
     quality: u8,
     format: Option<oxiraw::encode::OutputFormat>,
-) -> Result<Duration, String> {
-    let start = Instant::now();
-    let metadata = oxiraw::metadata::extract_metadata(input);
-    let linear = oxiraw::decode::decode(input).map_err(|e| e.to_string())?;
-    let mut engine = oxiraw::Engine::new(linear);
-    engine.set_params(params.clone());
-    if let Some(l) = lut {
-        engine.set_lut(Some(l.clone()));
-    }
-    let rendered = engine.render();
-    let opts = oxiraw::encode::EncodeOptions {
-        jpeg_quality: quality,
-        format,
+    suffix: Option<&str>,
+    jobs: usize,
+    skip_errors: bool,
+) -> BatchSummary {
+    let preset = match oxiraw::Preset::load_from_file(preset_path) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Failed to load preset: {e}");
+            let images = discover_images(input_dir, recursive);
+            return BatchSummary {
+                total: images.len(),
+                succeeded: 0,
+                failed: images
+                    .iter()
+                    .map(|p| (p.clone(), format!("preset load failed: {e}")))
+                    .collect(),
+                elapsed: Duration::ZERO,
+            };
+        }
     };
 
-    if let Some(parent) = output.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())
-        .map_err(|e| e.to_string())?;
-    Ok(start.elapsed())
+    let opts = BatchOpts {
+        input_dir,
+        output_dir,
+        recursive,
+        format_ext: format.map(|f| f.extension()),
+        suffix,
+        jobs,
+        skip_errors,
+    };
+    run_batch(&opts, |input, output| {
+        process_single(input, output, quality, format, |engine| {
+            engine.apply_preset(&preset);
+        })
+    })
 }
 
 /// Run batch-edit: apply inline parameters to all images in a directory, in parallel.
@@ -324,62 +335,23 @@ pub fn run_batch_edit(
     jobs: usize,
     skip_errors: bool,
 ) -> BatchSummary {
-    let batch_start = Instant::now();
-
-    let images = discover_images(input_dir, recursive);
-    if images.is_empty() {
-        eprintln!("No image files found in {}", input_dir.display());
-        return BatchSummary {
-            total: 0,
-            succeeded: 0,
-            failed: Vec::new(),
-            elapsed: batch_start.elapsed(),
-        };
-    }
-
-    let format_ext = format.map(|f| f.extension());
-    let total = images.len();
-    let counter = AtomicUsize::new(0);
-    let should_stop = AtomicBool::new(false);
-
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(if jobs == 0 { num_cpus() } else { jobs })
-        .build()
-        .expect("failed to create thread pool");
-
-    let num_threads = pool.current_num_threads();
-    eprintln!("Processing {total} images with {num_threads} workers...");
-
-    let results: Vec<BatchResult> = pool.install(|| {
-        images
-            .par_iter()
-            .map(|input| {
-                if !skip_errors && should_stop.load(Ordering::Relaxed) {
-                    return BatchResult {
-                        input: input.clone(),
-                        output: PathBuf::new(),
-                        outcome: Err("skipped (earlier error in fail-fast mode)".to_string()),
-                    };
-                }
-
-                let output = resolve_output_path(input, input_dir, output_dir, suffix, format_ext);
-                let outcome = process_edit_single(input, &output, params, lut, quality, format);
-
-                if outcome.is_err() && !skip_errors {
-                    should_stop.store(true, Ordering::Relaxed);
-                }
-
-                report_progress(&counter, total, input, &outcome);
-                BatchResult {
-                    input: input.clone(),
-                    output,
-                    outcome,
-                }
-            })
-            .collect()
-    });
-
-    summarize(&results, batch_start.elapsed())
+    let opts = BatchOpts {
+        input_dir,
+        output_dir,
+        recursive,
+        format_ext: format.map(|f| f.extension()),
+        suffix,
+        jobs,
+        skip_errors,
+    };
+    run_batch(&opts, |input, output| {
+        process_single(input, output, quality, format, |engine| {
+            engine.set_params(params.clone());
+            if let Some(l) = lut {
+                engine.set_lut(Some(l.clone()));
+            }
+        })
+    })
 }
 
 #[cfg(test)]
