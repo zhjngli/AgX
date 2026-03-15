@@ -106,23 +106,15 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | Date       | Document                                                                         |
 |------------|----------------------------------------------------------------------------------|
 | 2026-02-14 | [Architecture Design](docs/plans/2026-02-14-architecture-design.md)              |
-| 2026-02-15 | [MVP Implementation](docs/plans/2026-02-15-mvp-implementation.md)                |
 | 2026-02-16 | [LUT Support Design](docs/plans/2026-02-16-lut-support-design.md)                |
-| 2026-02-16 | [LUT Implementation](docs/plans/2026-02-16-lut-implementation.md)                |
 | 2026-02-16 | [Raw Format Support Design](docs/plans/2026-02-16-raw-format-support-design.md)  |
-| 2026-02-16 | [Raw Format Implementation](docs/plans/2026-02-16-raw-format-implementation.md)  |
 | 2026-02-17 | [Image Quality & Metadata Design](docs/plans/2026-02-17-image-quality-metadata-design.md)       |
-| 2026-02-17 | [Image Quality & Metadata Implementation](docs/plans/2026-02-17-image-quality-metadata-implementation.md) |
 | 2026-03-04 | [Harness Engineering Design](docs/plans/2026-03-04-harness-engineering-design.md)                |
-| 2026-03-04 | [Harness Engineering Implementation](docs/plans/2026-03-04-harness-engineering-implementation.md)|
 | 2026-03-05 | [Developer Loop Design](docs/plans/2026-03-05-developer-loop-design.md)                          |
-| 2026-03-05 | [Developer Loop Implementation](docs/plans/2026-03-05-developer-loop-implementation.md)          |
 | 2026-03-05 | [HSL Adjustments Design](docs/plans/2026-03-05-hsl-adjustments-design.md)                        |
-| 2026-03-05 | [HSL Adjustments Implementation](docs/plans/2026-03-05-hsl-adjustments-implementation.md)        |
 | 2026-03-07 | [Batch Processing Design](docs/plans/2026-03-07-batch-processing-design.md)                      |
 | 2026-03-07 | [Preset Composability Design](docs/plans/2026-03-07-preset-composability-design.md)              |
-| 2026-03-07 | [Preset Composability Implementation](docs/plans/2026-03-07-preset-composability-implementation.md) |
-| 2026-03-12 | [Batch Processing Implementation](docs/plans/2026-03-12-batch-processing-implementation.md)      |
+| 2026-03-15 | [Rename to AgX Design](docs/plans/2026-03-15-rename-to-agx-design.md)                            |
 
 ### Ideas
 
