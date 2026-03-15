@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn decode_png_to_linear_f32() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_decode.png");
+        let temp_path = std::env::temp_dir().join("agx_test_decode.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn decode_routes_png_to_standard() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_unified.png");
+        let temp_path = std::env::temp_dir().join("agx_test_unified.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();

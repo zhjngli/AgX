@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn encode_saves_file() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_encode.png");
+        let temp_path = std::env::temp_dir().join("agx_test_encode.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(2, 2, Rgb([0.5f32, 0.5, 0.5]));
         encode_to_file(&linear, &temp_path).unwrap();
         assert!(temp_path.exists());
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn encode_jpeg_with_quality_produces_file() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_quality.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_quality.jpg");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 95,
@@ -341,8 +341,8 @@ mod tests {
     fn encode_jpeg_quality_affects_file_size() {
         let linear: Rgb32FImage = ImageBuffer::from_pixel(64, 64, Rgb([0.5f32, 0.3, 0.1]));
 
-        let path_low = std::env::temp_dir().join("oxiraw_test_q50.jpg");
-        let path_high = std::env::temp_dir().join("oxiraw_test_q95.jpg");
+        let path_low = std::env::temp_dir().join("agx_test_q50.jpg");
+        let path_high = std::env::temp_dir().join("agx_test_q95.jpg");
 
         let opts_low = EncodeOptions {
             jpeg_quality: 50,
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn encode_png_format() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_fmt.png");
+        let temp_path = std::env::temp_dir().join("agx_test_fmt.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn encode_tiff_format() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_fmt.tiff");
+        let temp_path = std::env::temp_dir().join("agx_test_fmt.tiff");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -399,7 +399,7 @@ mod tests {
 
     #[test]
     fn encode_format_override_appends_extension() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_override.png");
+        let temp_path = std::env::temp_dir().join("agx_test_override.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -408,7 +408,7 @@ mod tests {
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert_eq!(
             final_path,
-            std::env::temp_dir().join("oxiraw_test_override.png.jpeg")
+            std::env::temp_dir().join("agx_test_override.png.jpeg")
         );
         assert!(final_path.exists());
         let _ = std::fs::remove_file(&final_path);
@@ -427,7 +427,7 @@ mod tests {
             icc_profile: None,
         };
 
-        let temp_path = std::env::temp_dir().join("oxiraw_test_meta_rt.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_meta_rt.jpg");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -447,7 +447,7 @@ mod tests {
 
     #[test]
     fn encode_without_metadata_still_works() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_no_meta.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_no_meta.jpg");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions::default();
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);

@@ -194,7 +194,7 @@ not a number
 
     #[test]
     fn load_cube_file() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test.cube");
+        let temp_path = std::env::temp_dir().join("agx_test.cube");
         let cube_text = "\
 LUT_3D_SIZE 2
 0.0 0.0 0.0
