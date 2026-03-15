@@ -25,7 +25,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 Follow this cycle for features and significant changes. See [`docs/contributing/developer-workflow.md`](docs/contributing/developer-workflow.md) for detailed guidance.
 
 ### 1. Design (if needed)
-Write a design doc in `docs/plans/` when the change adds/modifies modules, changes dependencies, or touches 3+ files. Skip for bug fixes, single-file changes, and doc updates.
+Write a design doc in `docs/plans/` when the change adds/modifies modules, changes dependencies, or touches 3+ files. Skip for bug fixes, single-file changes, and doc updates. Implementation plans go in `docs/plans/impl/` (gitignored, local-only).
 
 ### 2. Implement
 Work on a feature branch (`feat/`, `fix/`, `refactor/`). Write tests alongside code. Follow module contracts in per-module READMEs. Commit incrementally.
@@ -50,6 +50,6 @@ Before merging, verify:
 ## Key Docs
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) -- module layering, dependency rules, invariants
-- [`docs/plans/`](docs/plans/) -- design and implementation plans
+- [`docs/plans/`](docs/plans/) -- design docs (committed); `docs/plans/impl/` -- implementation plans (local-only, gitignored)
 - [`docs/ideas/`](docs/ideas/) -- future feature ideas
 - [`docs/contributing/`](docs/contributing/) -- developer workflow, evolving architecture
