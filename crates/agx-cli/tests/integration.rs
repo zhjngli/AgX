@@ -288,12 +288,12 @@ fn cli_edit_with_format_override() {
 
 /// Test that the CLI can process a raw file.
 /// This test is ignored by default since it requires a sample raw file.
-/// To run: place a .dng file at /tmp/oxiraw_test_sample.dng and run:
-///   cargo test -p oxiraw-cli -- --ignored cli_edit_raw_file
+/// To run: place a .dng file at /tmp/agx_test_sample.dng and run:
+///   cargo test -p agx-cli -- --ignored cli_edit_raw_file
 #[test]
 #[ignore]
 fn cli_edit_raw_file() {
-    let input = std::path::PathBuf::from("/tmp/oxiraw_test_sample.dng");
+    let input = std::path::PathBuf::from("/tmp/agx_test_sample.dng");
     if !input.exists() {
         eprintln!("Skipping: no sample raw file at {}", input.display());
         return;

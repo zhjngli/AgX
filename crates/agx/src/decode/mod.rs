@@ -133,12 +133,12 @@ mod tests {
     }
 
     /// Test decode() with a real raw file. Ignored by default.
-    /// To run: place a .dng file at /tmp/oxiraw_test_sample.dng and run:
-    ///   cargo test -p oxiraw --features raw -- --ignored decode_real_raw_file
+    /// To run: place a .dng file at /tmp/agx_test_sample.dng and run:
+    ///   cargo test -p agx --features raw -- --ignored decode_real_raw_file
     #[test]
     #[ignore]
     fn decode_real_raw_file() {
-        let path = std::path::Path::new("/tmp/oxiraw_test_sample.dng");
+        let path = std::path::Path::new("/tmp/agx_test_sample.dng");
         if !path.exists() {
             eprintln!("Skipping: no sample raw file at {}", path.display());
             return;

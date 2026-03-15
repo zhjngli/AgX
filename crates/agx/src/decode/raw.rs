@@ -229,7 +229,7 @@ impl Drop for ProcessedImage {
 ///
 /// LibRaw handles the full processing pipeline: file parsing, unpacking,
 /// demosaicing, color conversion, and white balance. The output is sRGB
-/// which we convert to linear sRGB f32 for the oxiraw engine.
+/// which we convert to linear sRGB f32 for the AgX engine.
 ///
 /// # Supported formats
 ///

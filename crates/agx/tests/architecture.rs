@@ -155,7 +155,7 @@ fn format_violations(module_name: &str, forbidden: &[&str], violations: &[Violat
     msg
 }
 
-/// Return the path to the `src/` directory of the oxiraw crate.
+/// Return the path to the `src/` directory of the agx crate.
 fn src_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")
 }

@@ -13,7 +13,7 @@ pub mod cube;
 /// # Color Space
 ///
 /// LUTs are color-space-dependent. Most creative `.cube` LUTs expect sRGB
-/// gamma input in the 0.0–1.0 range. The oxiraw engine applies the LUT in
+/// gamma input in the 0.0–1.0 range. The AgX engine applies the LUT in
 /// sRGB gamma space after tone adjustments.
 #[derive(Debug, Clone)]
 pub struct Lut3D {
