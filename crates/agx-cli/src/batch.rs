@@ -14,7 +14,7 @@ fn is_image_file(path: &Path) -> bool {
         .extension()
         .and_then(|ext| ext.to_str())
         .is_some_and(|ext| STANDARD_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()));
-    has_standard_ext || oxiraw::decode::is_raw_extension(path)
+    has_standard_ext || agx::decode::is_raw_extension(path)
 }
 
 /// Scan `dir` for image files, optionally recursing into subdirectories.
@@ -65,7 +65,7 @@ pub fn resolve_output_path(
     // 2. Determine extension: explicit format > raw-default "jpg" > original.
     let ext = if let Some(fmt) = format_ext {
         fmt.to_string()
-    } else if oxiraw::decode::is_raw_extension(input) {
+    } else if agx::decode::is_raw_extension(input) {
         "jpg".to_string()
     } else {
         input
@@ -170,16 +170,16 @@ fn process_single(
     input: &Path,
     output: &Path,
     quality: u8,
-    format: Option<oxiraw::encode::OutputFormat>,
-    configure: impl FnOnce(&mut oxiraw::Engine),
+    format: Option<agx::encode::OutputFormat>,
+    configure: impl FnOnce(&mut agx::Engine),
 ) -> Result<Duration, String> {
     let start = Instant::now();
-    let metadata = oxiraw::metadata::extract_metadata(input);
-    let linear = oxiraw::decode::decode(input).map_err(|e| e.to_string())?;
-    let mut engine = oxiraw::Engine::new(linear);
+    let metadata = agx::metadata::extract_metadata(input);
+    let linear = agx::decode::decode(input).map_err(|e| e.to_string())?;
+    let mut engine = agx::Engine::new(linear);
     configure(&mut engine);
     let rendered = engine.render();
-    let opts = oxiraw::encode::EncodeOptions {
+    let opts = agx::encode::EncodeOptions {
         jpeg_quality: quality,
         format,
     };
@@ -188,7 +188,7 @@ fn process_single(
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())
+    agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())
         .map_err(|e| e.to_string())?;
     Ok(start.elapsed())
 }
@@ -283,12 +283,12 @@ pub fn run_batch_apply(
     output_dir: &Path,
     recursive: bool,
     quality: u8,
-    format: Option<oxiraw::encode::OutputFormat>,
+    format: Option<agx::encode::OutputFormat>,
     suffix: Option<&str>,
     jobs: usize,
     skip_errors: bool,
 ) -> BatchSummary {
-    let preset = match oxiraw::Preset::load_from_file(preset_path) {
+    let preset = match agx::Preset::load_from_file(preset_path) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("Failed to load preset: {e}");
@@ -327,10 +327,10 @@ pub fn run_batch_edit(
     input_dir: &Path,
     output_dir: &Path,
     recursive: bool,
-    params: &oxiraw::Parameters,
-    lut: Option<&oxiraw::Lut3D>,
+    params: &agx::Parameters,
+    lut: Option<&agx::Lut3D>,
     quality: u8,
-    format: Option<oxiraw::encode::OutputFormat>,
+    format: Option<agx::encode::OutputFormat>,
     suffix: Option<&str>,
     jobs: usize,
     skip_errors: bool,
@@ -549,7 +549,7 @@ mod tests {
 
         write_test_png(&input_dir.join("photo.png"));
 
-        let params = oxiraw::Parameters::default();
+        let params = agx::Parameters::default();
 
         let summary = run_batch_edit(
             &input_dir,
