@@ -129,7 +129,7 @@ mod tests {
     fn extract_metadata_from_jpeg_with_no_exif() {
         use image::{ImageBuffer, Rgb};
 
-        let temp_path = std::env::temp_dir().join("oxiraw_test_no_exif.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_no_exif.jpg");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(4, 4, Rgb([128u8, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -152,7 +152,7 @@ mod tests {
     fn extract_metadata_from_png() {
         use image::{ImageBuffer, Rgb};
 
-        let temp_path = std::env::temp_dir().join("oxiraw_test_meta.png");
+        let temp_path = std::env::temp_dir().join("agx_test_meta.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(4, 4, Rgb([128u8, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -175,7 +175,7 @@ mod raw_metadata_tests {
 
     #[test]
     fn extract_metadata_raw_tiff_non_tiff_file_returns_none() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_not_tiff_raw.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_not_tiff_raw.jpg");
         let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
             image::ImageBuffer::from_pixel(4, 4, image::Rgb([128u8, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -187,7 +187,7 @@ mod raw_metadata_tests {
 
     #[test]
     fn extract_metadata_falls_through_to_none_for_unknown() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_unknown.bmp");
+        let temp_path = std::env::temp_dir().join("agx_test_unknown.bmp");
         let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
             image::ImageBuffer::from_pixel(4, 4, image::Rgb([128u8, 128, 128]));
         img.save(&temp_path).unwrap();

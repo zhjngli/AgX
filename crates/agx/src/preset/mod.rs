@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{Parameters, PartialHslChannels, PartialParameters};
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 /// Preset metadata (name, version, author).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -116,7 +116,7 @@ impl Preset {
     /// with LUT references.
     pub fn from_toml(toml_str: &str) -> Result<Self> {
         let raw: PresetRaw =
-            toml::from_str(toml_str).map_err(|e| OxirawError::Preset(e.to_string()))?;
+            toml::from_str(toml_str).map_err(|e| AgxError::Preset(e.to_string()))?;
         let partial = build_partial_params(&raw);
         Ok(Self {
             metadata: raw.metadata,
@@ -146,7 +146,7 @@ impl Preset {
             lut: LutSection::default(),
             hsl: self.partial_params.hsl.clone(),
         };
-        toml::to_string_pretty(&raw).map_err(|e| OxirawError::Preset(e.to_string()))
+        toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
 
     /// Load a preset from a TOML file.
@@ -166,9 +166,9 @@ impl Preset {
         path: &std::path::Path,
         visited: &mut std::collections::HashSet<std::path::PathBuf>,
     ) -> Result<Self> {
-        let canonical = path.canonicalize().map_err(OxirawError::Io)?;
+        let canonical = path.canonicalize().map_err(AgxError::Io)?;
         if !visited.insert(canonical.clone()) {
-            return Err(OxirawError::Preset(format!(
+            return Err(AgxError::Preset(format!(
                 "circular extends: {} already visited",
                 canonical.display()
             )));
@@ -176,7 +176,7 @@ impl Preset {
 
         let content = std::fs::read_to_string(path)?;
         let raw: PresetRaw =
-            toml::from_str(&content).map_err(|e| OxirawError::Preset(e.to_string()))?;
+            toml::from_str(&content).map_err(|e| AgxError::Preset(e.to_string()))?;
 
         let base_dir = path.parent().unwrap_or(std::path::Path::new("."));
         let this_partial = build_partial_params(&raw);
@@ -304,7 +304,7 @@ exposure = 1.0
 
     #[test]
     fn file_save_and_load_roundtrip() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_preset.toml");
+        let temp_path = std::env::temp_dir().join("agx_test_preset.toml");
 
         let mut preset = Preset::default();
         preset.metadata.name = "File Test".into();
@@ -327,8 +327,8 @@ exposure = 1.0
     #[test]
     fn preset_with_lut_path_loads_lut() {
         let temp_dir = std::env::temp_dir();
-        let cube_path = temp_dir.join("oxiraw_preset_test.cube");
-        let preset_path = temp_dir.join("oxiraw_preset_test.toml");
+        let cube_path = temp_dir.join("agx_preset_test.cube");
+        let preset_path = temp_dir.join("agx_preset_test.toml");
 
         std::fs::write(
             &cube_path,
@@ -420,7 +420,7 @@ hue = 10.0
     #[test]
     fn preset_with_missing_lut_file_returns_error() {
         let temp_dir = std::env::temp_dir();
-        let preset_path = temp_dir.join("oxiraw_missing_lut_test.toml");
+        let preset_path = temp_dir.join("agx_missing_lut_test.toml");
         std::fs::write(
             &preset_path,
             "[metadata]\nname = \"Bad\"\n\n[lut]\npath = \"nonexistent.cube\"\n",
@@ -528,8 +528,8 @@ exposure = 1.0
     #[test]
     fn preset_extends_single_level() {
         let temp_dir = std::env::temp_dir();
-        let base_path = temp_dir.join("oxiraw_extends_base.toml");
-        let child_path = temp_dir.join("oxiraw_extends_child.toml");
+        let base_path = temp_dir.join("agx_extends_base.toml");
+        let child_path = temp_dir.join("agx_extends_child.toml");
 
         std::fs::write(
             &base_path,
@@ -572,9 +572,9 @@ contrast = 50.0
     #[test]
     fn preset_extends_multi_level() {
         let temp_dir = std::env::temp_dir();
-        let grandparent = temp_dir.join("oxiraw_extends_gp.toml");
-        let parent = temp_dir.join("oxiraw_extends_parent.toml");
-        let child = temp_dir.join("oxiraw_extends_child2.toml");
+        let grandparent = temp_dir.join("agx_extends_gp.toml");
+        let parent = temp_dir.join("agx_extends_parent.toml");
+        let child = temp_dir.join("agx_extends_child2.toml");
 
         std::fs::write(
             &grandparent,
@@ -635,8 +635,8 @@ highlights = 10.0
     #[test]
     fn preset_extends_cycle_detection() {
         let temp_dir = std::env::temp_dir();
-        let a_path = temp_dir.join("oxiraw_cycle_a.toml");
-        let b_path = temp_dir.join("oxiraw_cycle_b.toml");
+        let a_path = temp_dir.join("agx_cycle_a.toml");
+        let b_path = temp_dir.join("agx_cycle_b.toml");
 
         std::fs::write(
             &a_path,

@@ -1,5 +1,5 @@
 use super::Lut3D;
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 /// Parse a `.cube` format string into a `Lut3D`.
 ///
@@ -41,7 +41,7 @@ pub fn parse_cube(text: &str) -> Result<Lut3D> {
 
         if let Some(rest) = line.strip_prefix("LUT_3D_SIZE") {
             size = Some(rest.trim().parse::<usize>().map_err(|_| {
-                OxirawError::Lut(format!("line {}: invalid LUT_3D_SIZE", line_num + 1))
+                AgxError::Lut(format!("line {}: invalid LUT_3D_SIZE", line_num + 1))
             })?);
             continue;
         }
@@ -71,11 +71,11 @@ pub fn parse_cube(text: &str) -> Result<Lut3D> {
         table.push(rgb);
     }
 
-    let size = size.ok_or_else(|| OxirawError::Lut("missing LUT_3D_SIZE".into()))?;
+    let size = size.ok_or_else(|| AgxError::Lut("missing LUT_3D_SIZE".into()))?;
     let expected = size * size * size;
 
     if table.len() != expected {
-        return Err(OxirawError::Lut(format!(
+        return Err(AgxError::Lut(format!(
             "expected {} entries for size {}, got {}",
             expected,
             size,
@@ -95,28 +95,28 @@ pub fn parse_cube(text: &str) -> Result<Lut3D> {
 fn parse_rgb_line(line: &str, line_num: usize) -> Result<[f32; 3]> {
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.len() != 3 {
-        return Err(OxirawError::Lut(format!(
+        return Err(AgxError::Lut(format!(
             "line {}: expected 3 values, got {}",
             line_num + 1,
             parts.len()
         )));
     }
     let r = parts[0].parse::<f32>().map_err(|_| {
-        OxirawError::Lut(format!(
+        AgxError::Lut(format!(
             "line {}: invalid float '{}'",
             line_num + 1,
             parts[0]
         ))
     })?;
     let g = parts[1].parse::<f32>().map_err(|_| {
-        OxirawError::Lut(format!(
+        AgxError::Lut(format!(
             "line {}: invalid float '{}'",
             line_num + 1,
             parts[1]
         ))
     })?;
     let b = parts[2].parse::<f32>().map_err(|_| {
-        OxirawError::Lut(format!(
+        AgxError::Lut(format!(
             "line {}: invalid float '{}'",
             line_num + 1,
             parts[2]

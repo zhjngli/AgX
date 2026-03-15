@@ -126,14 +126,14 @@ pub fn encode_to_file_with_options(
             let mut buf = Vec::new();
             let encoder = JpegEncoder::new_with_quality(&mut buf, options.jpeg_quality);
             rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
             buf
         }
         OutputFormat::Png => {
             let mut buf = Vec::new();
             let encoder = PngEncoder::new(&mut buf);
             rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
             buf
         }
         OutputFormat::Tiff => {
@@ -141,7 +141,7 @@ pub fn encode_to_file_with_options(
             let cursor = Cursor::new(&mut buf);
             let encoder = TiffEncoder::new(cursor);
             rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
             buf
         }
     };
@@ -153,8 +153,7 @@ pub fn encode_to_file_with_options(
         buf
     };
 
-    std::fs::write(&final_path, &buf)
-        .map_err(|e| crate::error::OxirawError::Encode(e.to_string()))?;
+    std::fs::write(&final_path, &buf).map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
 
     // For TIFF output, inject metadata via little_exif after writing
     if format == OutputFormat::Tiff {
@@ -185,9 +184,8 @@ fn inject_metadata(
 
     match format {
         OutputFormat::Jpeg => {
-            let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into()).map_err(|e| {
-                crate::error::OxirawError::Encode(format!("metadata injection: {e}"))
-            })?;
+            let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
             if let Some(exif) = &metadata.exif {
                 jpeg.set_exif(Some(exif.clone().into()));
             }
@@ -197,13 +195,12 @@ fn inject_metadata(
             let mut out = Vec::new();
             jpeg.encoder()
                 .write_to(&mut out)
-                .map_err(|e| crate::error::OxirawError::Encode(format!("metadata write: {e}")))?;
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
             Ok(out)
         }
         OutputFormat::Png => {
-            let mut png = img_parts::png::Png::from_bytes(buf.into()).map_err(|e| {
-                crate::error::OxirawError::Encode(format!("metadata injection: {e}"))
-            })?;
+            let mut png = img_parts::png::Png::from_bytes(buf.into())
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
             if let Some(exif) = &metadata.exif {
                 png.set_exif(Some(exif.clone().into()));
             }
@@ -213,7 +210,7 @@ fn inject_metadata(
             let mut out = Vec::new();
             png.encoder()
                 .write_to(&mut out)
-                .map_err(|e| crate::error::OxirawError::Encode(format!("metadata write: {e}")))?;
+                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
             Ok(out)
         }
         OutputFormat::Tiff => Ok(buf), // Handled separately via inject_metadata_tiff
@@ -252,7 +249,7 @@ mod tests {
 
     #[test]
     fn encode_saves_file() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_encode.png");
+        let temp_path = std::env::temp_dir().join("agx_test_encode.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(2, 2, Rgb([0.5f32, 0.5, 0.5]));
         encode_to_file(&linear, &temp_path).unwrap();
         assert!(temp_path.exists());
@@ -324,7 +321,7 @@ mod tests {
 
     #[test]
     fn encode_jpeg_with_quality_produces_file() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_quality.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_quality.jpg");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 95,
@@ -341,8 +338,8 @@ mod tests {
     fn encode_jpeg_quality_affects_file_size() {
         let linear: Rgb32FImage = ImageBuffer::from_pixel(64, 64, Rgb([0.5f32, 0.3, 0.1]));
 
-        let path_low = std::env::temp_dir().join("oxiraw_test_q50.jpg");
-        let path_high = std::env::temp_dir().join("oxiraw_test_q95.jpg");
+        let path_low = std::env::temp_dir().join("agx_test_q50.jpg");
+        let path_high = std::env::temp_dir().join("agx_test_q95.jpg");
 
         let opts_low = EncodeOptions {
             jpeg_quality: 50,
@@ -369,7 +366,7 @@ mod tests {
 
     #[test]
     fn encode_png_format() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_fmt.png");
+        let temp_path = std::env::temp_dir().join("agx_test_fmt.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -384,7 +381,7 @@ mod tests {
 
     #[test]
     fn encode_tiff_format() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_fmt.tiff");
+        let temp_path = std::env::temp_dir().join("agx_test_fmt.tiff");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -399,7 +396,7 @@ mod tests {
 
     #[test]
     fn encode_format_override_appends_extension() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_override.png");
+        let temp_path = std::env::temp_dir().join("agx_test_override.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -408,7 +405,7 @@ mod tests {
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert_eq!(
             final_path,
-            std::env::temp_dir().join("oxiraw_test_override.png.jpeg")
+            std::env::temp_dir().join("agx_test_override.png.jpeg")
         );
         assert!(final_path.exists());
         let _ = std::fs::remove_file(&final_path);
@@ -427,7 +424,7 @@ mod tests {
             icc_profile: None,
         };
 
-        let temp_path = std::env::temp_dir().join("oxiraw_test_meta_rt.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_meta_rt.jpg");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions {
             jpeg_quality: 92,
@@ -447,7 +444,7 @@ mod tests {
 
     #[test]
     fn encode_without_metadata_still_works() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_no_meta.jpg");
+        let temp_path = std::env::temp_dir().join("agx_test_no_meta.jpg");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
         let opts = EncodeOptions::default();
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);

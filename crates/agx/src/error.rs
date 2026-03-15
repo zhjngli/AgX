@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum OxirawError {
+pub enum AgxError {
     #[error("Decode error: {0}")]
     Decode(String),
     #[error("Encode error: {0}")]
@@ -16,7 +16,7 @@ pub enum OxirawError {
     Io(#[from] std::io::Error),
 }
 
-pub type Result<T> = std::result::Result<T, OxirawError>;
+pub type Result<T> = std::result::Result<T, AgxError>;
 
 #[cfg(test)]
 mod tests {
@@ -24,32 +24,32 @@ mod tests {
 
     #[test]
     fn error_display_decode() {
-        let err = OxirawError::Decode("bad file".into());
+        let err = AgxError::Decode("bad file".into());
         assert_eq!(err.to_string(), "Decode error: bad file");
     }
 
     #[test]
     fn error_display_encode() {
-        let err = OxirawError::Encode("write failed".into());
+        let err = AgxError::Encode("write failed".into());
         assert_eq!(err.to_string(), "Encode error: write failed");
     }
 
     #[test]
     fn error_display_preset() {
-        let err = OxirawError::Preset("parse failed".into());
+        let err = AgxError::Preset("parse failed".into());
         assert_eq!(err.to_string(), "Preset error: parse failed");
     }
 
     #[test]
     fn error_display_lut() {
-        let err = OxirawError::Lut("invalid size".into());
+        let err = AgxError::Lut("invalid size".into());
         assert_eq!(err.to_string(), "LUT error: invalid size");
     }
 
     #[test]
     fn error_from_io() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "missing");
-        let err: OxirawError = io_err.into();
-        assert!(matches!(err, OxirawError::Io(_)));
+        let err: AgxError = io_err.into();
+        assert!(matches!(err, AgxError::Io(_)));
     }
 }

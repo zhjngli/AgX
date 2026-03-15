@@ -4,7 +4,7 @@ pub mod raw;
 use image::{Rgb, Rgb32FImage};
 use palette::{LinSrgb, Srgb};
 
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 /// Known raw file extensions supported via LibRaw.
 const RAW_EXTENSIONS: &[&str] = &[
@@ -33,7 +33,7 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
         }
         #[cfg(not(feature = "raw"))]
         {
-            return Err(OxirawError::Decode(
+            return Err(AgxError::Decode(
                 "raw format support requires the 'raw' feature flag".into(),
             ));
         }
@@ -47,9 +47,9 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
 /// to linear sRGB for internal processing.
 pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let img = image::ImageReader::open(path)
-        .map_err(OxirawError::Io)?
+        .map_err(AgxError::Io)?
         .decode()
-        .map_err(OxirawError::Image)?;
+        .map_err(AgxError::Image)?;
     let srgb_f32 = img.into_rgb32f();
     let (w, h) = srgb_f32.dimensions();
     let linear = Rgb32FImage::from_fn(w, h, |x, y| {
@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn decode_png_to_linear_f32() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_decode.png");
+        let temp_path = std::env::temp_dir().join("agx_test_decode.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn decode_routes_png_to_standard() {
-        let temp_path = std::env::temp_dir().join("oxiraw_test_unified.png");
+        let temp_path = std::env::temp_dir().join("agx_test_unified.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -133,12 +133,12 @@ mod tests {
     }
 
     /// Test decode() with a real raw file. Ignored by default.
-    /// To run: place a .dng file at /tmp/oxiraw_test_sample.dng and run:
-    ///   cargo test -p oxiraw --features raw -- --ignored decode_real_raw_file
+    /// To run: place a .dng file at /tmp/agx_test_sample.dng and run:
+    ///   cargo test -p agx --features raw -- --ignored decode_real_raw_file
     #[test]
     #[ignore]
     fn decode_real_raw_file() {
-        let path = std::path::Path::new("/tmp/oxiraw_test_sample.dng");
+        let path = std::path::Path::new("/tmp/agx_test_sample.dng");
         if !path.exists() {
             eprintln!("Skipping: no sample raw file at {}", path.display());
             return;

@@ -1,6 +1,6 @@
 # Evolving the Architecture
 
-This document describes when and how to change the module layering rules enforced by `crates/oxiraw/tests/architecture.rs`. Read `ARCHITECTURE.md` first for the current rules.
+This document describes when and how to change the module layering rules enforced by `crates/agx/tests/architecture.rs`. Read `ARCHITECTURE.md` first for the current rules.
 
 ## When to Change the Architecture
 
@@ -43,7 +43,7 @@ When a genuine architecture change is needed, follow these steps in order:
 
 5. **Update affected module READMEs.** Each module's `README.md` documents its public API, dependencies, and negative constraints. Update any that are affected by the boundary change.
 
-6. **Update the structural test.** Modify `crates/oxiraw/tests/architecture.rs` to reflect the new rules. Add or remove forbidden imports as needed. Update the test function name and doc comment to match.
+6. **Update the structural test.** Modify `crates/agx/tests/architecture.rs` to reflect the new rules. Add or remove forbidden imports as needed. Update the test function name and doc comment to match.
 
 7. **Implement the feature.** With the rules updated, write the code that requires the new dependency.
 

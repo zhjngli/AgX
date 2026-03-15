@@ -1,6 +1,6 @@
 # Developer Workflow
 
-This document describes the full development cycle for oxiraw. Follow these steps when implementing features, fixing bugs, or making structural changes. The summary version lives in `CLAUDE.md`; this document has the detail.
+This document describes the full development cycle for agx. Follow these steps when implementing features, fixing bugs, or making structural changes. The summary version lives in `CLAUDE.md`; this document has the detail.
 
 ## 1. Design
 
@@ -81,9 +81,9 @@ Run `scripts/verify.sh` before considering work done. The script runs:
 | Check | Command | What it catches |
 |-------|---------|-----------------|
 | Format | `cargo fmt --check` | Inconsistent formatting |
-| Lint | `cargo clippy -p oxiraw -p oxiraw-cli -- -D warnings` | Code quality issues, unused imports, type errors |
-| Library tests | `cargo test -p oxiraw` | Unit test failures, architecture violations |
-| CLI tests | `cargo test -p oxiraw-cli` | Integration test failures |
+| Lint | `cargo clippy -p agx -p agx-cli -- -D warnings` | Code quality issues, unused imports, type errors |
+| Library tests | `cargo test -p agx` | Unit test failures, architecture violations |
+| CLI tests | `cargo test -p agx-cli` | Integration test failures |
 | Doc links | Custom check | Broken links in ARCHITECTURE.md |
 
 The script exits on first failure with a message about what went wrong.

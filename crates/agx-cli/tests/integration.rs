@@ -1,7 +1,7 @@
 use std::process::Command;
 
 fn cli_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_oxiraw-cli"))
+    Command::new(env!("CARGO_BIN_EXE_agx-cli"))
 }
 
 fn create_test_png(path: &std::path::Path) {
@@ -13,9 +13,9 @@ fn create_test_png(path: &std::path::Path) {
 #[test]
 fn cli_apply_produces_output_file() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_apply_in.png");
-    let preset_path = temp_dir.join("oxiraw_cli_apply.toml");
-    let output = temp_dir.join("oxiraw_cli_apply_out.png");
+    let input = temp_dir.join("agx_cli_apply_in.png");
+    let preset_path = temp_dir.join("agx_cli_apply.toml");
+    let output = temp_dir.join("agx_cli_apply_out.png");
 
     create_test_png(&input);
     std::fs::write(
@@ -65,8 +65,8 @@ exposure = 1.0
 #[test]
 fn cli_edit_with_inline_params() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_edit_in.png");
-    let output = temp_dir.join("oxiraw_cli_edit_out.png");
+    let input = temp_dir.join("agx_cli_edit_in.png");
+    let output = temp_dir.join("agx_cli_edit_out.png");
 
     create_test_png(&input);
 
@@ -135,9 +135,9 @@ fn create_identity_cube(path: &std::path::Path) {
 #[test]
 fn cli_edit_with_lut() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_lut_in.png");
-    let lut_path = temp_dir.join("oxiraw_cli_test.cube");
-    let output = temp_dir.join("oxiraw_cli_lut_out.png");
+    let input = temp_dir.join("agx_cli_lut_in.png");
+    let lut_path = temp_dir.join("agx_cli_test.cube");
+    let output = temp_dir.join("agx_cli_lut_out.png");
 
     create_test_png(&input);
     create_identity_cube(&lut_path);
@@ -166,10 +166,10 @@ fn cli_edit_with_lut() {
 #[test]
 fn cli_apply_preset_with_lut() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_preset_lut_in.png");
-    let lut_path = temp_dir.join("oxiraw_cli_preset_lut.cube");
-    let preset_path = temp_dir.join("oxiraw_cli_preset_lut.toml");
-    let output = temp_dir.join("oxiraw_cli_preset_lut_out.png");
+    let input = temp_dir.join("agx_cli_preset_lut_in.png");
+    let lut_path = temp_dir.join("agx_cli_preset_lut.cube");
+    let preset_path = temp_dir.join("agx_cli_preset_lut.toml");
+    let output = temp_dir.join("agx_cli_preset_lut_out.png");
 
     create_test_png(&input);
     create_identity_cube(&lut_path);
@@ -214,9 +214,9 @@ fn create_test_png_large(path: &std::path::Path) {
 #[test]
 fn cli_edit_with_quality() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_quality_in.png");
-    let output_low = temp_dir.join("oxiraw_cli_q50.jpg");
-    let output_high = temp_dir.join("oxiraw_cli_q95.jpg");
+    let input = temp_dir.join("agx_cli_quality_in.png");
+    let output_low = temp_dir.join("agx_cli_q50.jpg");
+    let output_high = temp_dir.join("agx_cli_q95.jpg");
 
     create_test_png_large(&input);
 
@@ -260,8 +260,8 @@ fn cli_edit_with_quality() {
 #[test]
 fn cli_edit_with_format_override() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_fmt_in.png");
-    let output = temp_dir.join("oxiraw_cli_fmt_out.png");
+    let input = temp_dir.join("agx_cli_fmt_in.png");
+    let output = temp_dir.join("agx_cli_fmt_out.png");
 
     create_test_png(&input);
 
@@ -279,7 +279,7 @@ fn cli_edit_with_format_override() {
         .expect("failed to run CLI");
     assert!(status.success());
 
-    let expected = temp_dir.join("oxiraw_cli_fmt_out.png.jpeg");
+    let expected = temp_dir.join("agx_cli_fmt_out.png.jpeg");
     assert!(expected.exists(), "Should have appended .jpeg extension");
 
     let _ = std::fs::remove_file(&input);
@@ -288,18 +288,18 @@ fn cli_edit_with_format_override() {
 
 /// Test that the CLI can process a raw file.
 /// This test is ignored by default since it requires a sample raw file.
-/// To run: place a .dng file at /tmp/oxiraw_test_sample.dng and run:
-///   cargo test -p oxiraw-cli -- --ignored cli_edit_raw_file
+/// To run: place a .dng file at /tmp/agx_test_sample.dng and run:
+///   cargo test -p agx-cli -- --ignored cli_edit_raw_file
 #[test]
 #[ignore]
 fn cli_edit_raw_file() {
-    let input = std::path::PathBuf::from("/tmp/oxiraw_test_sample.dng");
+    let input = std::path::PathBuf::from("/tmp/agx_test_sample.dng");
     if !input.exists() {
         eprintln!("Skipping: no sample raw file at {}", input.display());
         return;
     }
 
-    let output = std::env::temp_dir().join("oxiraw_cli_raw_out.jpg");
+    let output = std::env::temp_dir().join("agx_cli_raw_out.jpg");
 
     let status = cli_bin()
         .args([
@@ -327,8 +327,8 @@ fn cli_edit_raw_file() {
 #[test]
 fn cli_edit_with_hsl_flags() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_hsl_in.png");
-    let output = temp_dir.join("oxiraw_cli_hsl_out.png");
+    let input = temp_dir.join("agx_cli_hsl_in.png");
+    let output = temp_dir.join("agx_cli_hsl_out.png");
 
     // Create a solid red image so HSL red-saturation changes are visible.
     let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
@@ -505,10 +505,10 @@ fn cli_batch_apply_empty_dir_succeeds() {
 #[test]
 fn cli_apply_multiple_presets() {
     let temp_dir = std::env::temp_dir();
-    let input = temp_dir.join("oxiraw_cli_multi_in.png");
-    let output = temp_dir.join("oxiraw_cli_multi_out.png");
-    let preset1 = temp_dir.join("oxiraw_cli_multi_p1.toml");
-    let preset2 = temp_dir.join("oxiraw_cli_multi_p2.toml");
+    let input = temp_dir.join("agx_cli_multi_in.png");
+    let output = temp_dir.join("agx_cli_multi_out.png");
+    let preset1 = temp_dir.join("agx_cli_multi_p1.toml");
+    let preset2 = temp_dir.join("agx_cli_multi_p2.toml");
 
     create_test_png(&input);
 

@@ -1,12 +1,12 @@
 [package]
-name = "oxiraw-cli"
+name = "agx-cli"
 version = "0.1.0"
 edition = "2021"
-description = "CLI for the oxiraw photo editing library"
+description = "CLI for the agx photo editing library"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-oxiraw = { path = "../oxiraw", features = ["raw"] }
+agx = { path = "../agx", features = ["raw"] }
 clap = { version = "4", features = ["derive"] }
 rayon = "1"
 

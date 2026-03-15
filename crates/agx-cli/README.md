@@ -1,11 +1,11 @@
-# oxiraw-cli
+# agx-cli
 
 ## Purpose
-Thin CLI wrapper that exposes the oxiraw library's functionality as command-line subcommands.
+Thin CLI wrapper that exposes the agx library's functionality as command-line subcommands.
 
 ## Public API (CLI interface)
-- `oxiraw apply --input <path> --preset <path> --output <path> [--quality N] [--format fmt]` -- apply a TOML preset to an image
-- `oxiraw edit --input <path> --output <path> [--exposure N] [--contrast N] [--highlights N] [--shadows N] [--whites N] [--blacks N] [--temperature N] [--tint N] [--lut path] [--quality N] [--format fmt]` -- edit with inline parameters
+- `agx apply --input <path> --preset <path> --output <path> [--quality N] [--format fmt]` -- apply a TOML preset to an image
+- `agx edit --input <path> --output <path> [--exposure N] [--contrast N] [--highlights N] [--shadows N] [--whites N] [--blacks N] [--temperature N] [--tint N] [--lut path] [--quality N] [--format fmt]` -- edit with inline parameters
 
 Both subcommands extract metadata from the input, decode, process, render, and encode with metadata preservation.
 
@@ -21,8 +21,8 @@ To add a new subcommand:
 3. Wire it in the `match cli.command` block in `main()`.
 
 ## Does NOT
-- Contain image processing logic -- delegates everything to the oxiraw library.
-- Define its own error types -- uses `oxiraw::Result` and `oxiraw::OxirawError`.
+- Contain image processing logic -- delegates everything to the agx library.
+- Define its own error types -- uses `agx::Result` and `agx::AgxError`.
 
 ## Key Decisions
 - **Two subcommands, not flags.** `apply` (preset-driven) and `edit` (parameter-driven) are separate workflows with distinct argument sets, avoiding confusion.

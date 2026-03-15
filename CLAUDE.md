@@ -1,12 +1,12 @@
-# Oxiraw
+# AgX
 
 Open-source photo editing library + CLI in Rust with a portable, human-readable preset format.
 
 ## Workspace Layout
 
 Cargo workspace with two crates:
-- `crates/oxiraw/` -- core library (decode, engine, adjustments, presets, encode)
-- `crates/oxiraw-cli/` -- thin CLI wrapper
+- `crates/agx/` -- core library (decode, engine, adjustments, presets, encode)
+- `crates/agx-cli/` -- thin CLI wrapper
 
 ## Architecture
 
@@ -18,7 +18,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 - `thiserror` for error types
 - `serde` for all serializable types
 - Tests live alongside source in standard Rust `#[cfg(test)]` modules
-- Structural tests in `crates/oxiraw/tests/architecture.rs` enforce module dependency rules; see "When a Structural Test Fails" in `ARCHITECTURE.md`
+- Structural tests in `crates/agx/tests/architecture.rs` enforce module dependency rules; see "When a Structural Test Fails" in `ARCHITECTURE.md`
 
 ## Developer Workflow
 

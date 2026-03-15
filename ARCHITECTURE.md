@@ -1,8 +1,8 @@
-# Oxiraw Architecture
+# AgX Architecture
 
 Read this file before making structural changes to the codebase.
 
-Oxiraw is an open-source photo editing library and CLI in Rust. The architecture follows an always-re-render-from-original model with declarative presets.
+AgX is an open-source photo editing library and CLI in Rust. The architecture follows an always-re-render-from-original model with declarative presets.
 
 ## Module Dependency Graph
 
@@ -40,13 +40,13 @@ Oxiraw is an open-source photo editing library and CLI in Rust. The architecture
           └──────┬───────┘
                  │
           ┌──────────────┐
-          │  oxiraw-cli  │   (consumer — depends on library only)
+          │   agx-cli    │   (consumer — depends on library only)
           └──────────────┘
 ```
 
 ## Dependency Rules
 
-These rules are enforced by `crates/oxiraw/tests/architecture.rs`.
+These rules are enforced by `crates/agx/tests/architecture.rs`.
 
 | Module     | MUST NOT import from                              | May import from                                          |
 |------------|---------------------------------------------------|----------------------------------------------------------|
@@ -57,7 +57,7 @@ These rules are enforced by `crates/oxiraw/tests/architecture.rs`.
 | `encode`   | engine, preset, adjust, lut, decode                | error, metadata (`ImageMetadata`)                        |
 | `preset`   | decode, encode, metadata                           | engine (`Parameters`), lut (`Lut3D`), error              |
 | `engine`   | no restrictions within library                     | adjust, lut, preset, error                               |
-| oxiraw-cli | —                                                  | oxiraw (library API only)                                |
+| agx-cli    | —                                                  | agx (library API only)                                   |
 
 ## Negative Constraints
 
@@ -70,7 +70,7 @@ What does NOT exist in each module -- violations of these constraints indicate a
 - **encode**: No decoding. No adjustments. No preset logic. Receives final pixels and metadata, writes output.
 - **preset**: No I/O beyond TOML file reading. No pixel math. Does not execute adjustments -- it only declares parameter values.
 - **engine**: No direct file I/O for decoding/encoding (delegates to decode/encode modules). Does not define adjustment algorithms (delegates to adjust module).
-- **oxiraw-cli**: No image processing logic. Thin wrapper that parses CLI arguments and calls library API.
+- **agx-cli**: No image processing logic. Thin wrapper that parses CLI arguments and calls library API.
 
 ## Core Invariants
 
@@ -90,14 +90,14 @@ Each module has (or will have) a README.md documenting its public API, internal 
 
 | Module     | README                                               |
 |------------|------------------------------------------------------|
-| adjust     | [`crates/oxiraw/src/adjust/README.md`](crates/oxiraw/src/adjust/README.md)     |
-| lut        | [`crates/oxiraw/src/lut/README.md`](crates/oxiraw/src/lut/README.md)           |
-| decode     | [`crates/oxiraw/src/decode/README.md`](crates/oxiraw/src/decode/README.md)     |
-| metadata   | [`crates/oxiraw/src/metadata/README.md`](crates/oxiraw/src/metadata/README.md) |
-| encode     | [`crates/oxiraw/src/encode/README.md`](crates/oxiraw/src/encode/README.md)     |
-| preset     | [`crates/oxiraw/src/preset/README.md`](crates/oxiraw/src/preset/README.md)     |
-| engine     | [`crates/oxiraw/src/engine/README.md`](crates/oxiraw/src/engine/README.md)     |
-| oxiraw-cli | [`crates/oxiraw-cli/README.md`](crates/oxiraw-cli/README.md)                   |
+| adjust     | [`crates/agx/src/adjust/README.md`](crates/agx/src/adjust/README.md)     |
+| lut        | [`crates/agx/src/lut/README.md`](crates/agx/src/lut/README.md)           |
+| decode     | [`crates/agx/src/decode/README.md`](crates/agx/src/decode/README.md)     |
+| metadata   | [`crates/agx/src/metadata/README.md`](crates/agx/src/metadata/README.md) |
+| encode     | [`crates/agx/src/encode/README.md`](crates/agx/src/encode/README.md)     |
+| preset     | [`crates/agx/src/preset/README.md`](crates/agx/src/preset/README.md)     |
+| engine     | [`crates/agx/src/engine/README.md`](crates/agx/src/engine/README.md)     |
+| agx-cli    | [`crates/agx-cli/README.md`](crates/agx-cli/README.md)                   |
 
 ## Design Docs
 
@@ -132,7 +132,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 
 ## When a Structural Test Fails
 
-The architectural tests in `crates/oxiraw/tests/architecture.rs` enforce the dependency rules above. When a test fails, follow this protocol:
+The architectural tests in `crates/agx/tests/architecture.rs` enforce the dependency rules above. When a test fails, follow this protocol:
 
 1. **Read the assertion message.** It will tell you exactly which module imported from a forbidden dependency and which line caused the violation.
 

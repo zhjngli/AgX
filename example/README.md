@@ -1,6 +1,6 @@
 # Example
 
-Sample images, presets, and LUTs for trying out oxiraw.
+Sample images, presets, and LUTs for trying out agx.
 
 ## Images
 
@@ -45,7 +45,7 @@ Pre-generated output images in `outputs/`, each pairing a source image with a pr
 Apply a preset:
 
 ```bash
-cargo run -p oxiraw-cli -- apply \
+cargo run -p agx-cli -- apply \
   -i example/images/moody-forest.jpg \
   -p example/presets/golden-hour.toml \
   -o /tmp/forest-golden.jpg
@@ -54,7 +54,7 @@ cargo run -p oxiraw-cli -- apply \
 Edit with inline parameters:
 
 ```bash
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i example/images/mountain-landscape.jpg \
   -o /tmp/mountain-bright.jpg \
   --exposure 1.5 --shadows 40 --blacks 20
@@ -63,7 +63,7 @@ cargo run -p oxiraw-cli -- edit \
 Apply a LUT:
 
 ```bash
-cargo run -p oxiraw-cli -- edit \
+cargo run -p agx-cli -- edit \
   -i example/images/city-skyline.jpg \
   -o /tmp/city-lut.jpg \
   --lut example/luts/identity.cube
@@ -76,7 +76,7 @@ for img in example/images/*.jpg; do
   img_name=$(basename "$img" .jpg)
   for preset in example/presets/*.toml; do
     preset_name=$(basename "$preset" .toml)
-    cargo run -p oxiraw-cli -- apply \
+    cargo run -p agx-cli -- apply \
       -i "$img" -p "$preset" \
       -o "/tmp/${img_name}-${preset_name}.jpg"
   done

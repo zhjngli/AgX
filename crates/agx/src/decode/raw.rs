@@ -9,7 +9,7 @@ use std::path::Path;
 use image::{Rgb, Rgb32FImage};
 use palette::{LinSrgb, Srgb};
 
-use crate::error::{OxirawError, Result};
+use crate::error::{AgxError, Result};
 
 // --- FFI declarations ---
 
@@ -45,15 +45,15 @@ extern "C" {
     fn libraw_close(data: *mut libraw_data_t);
     fn libraw_strerror(err: c_int) -> *const c_char;
 
-    fn oxiraw_get_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
-    fn oxiraw_get_model(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
-    fn oxiraw_get_iso(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_shutter(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_aperture(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_focal_len(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_timestamp(data: *mut libraw_data_t) -> i64;
-    fn oxiraw_get_lens(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
-    fn oxiraw_get_lens_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_model(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_iso(data: *mut libraw_data_t) -> f32;
+    fn agx_get_shutter(data: *mut libraw_data_t) -> f32;
+    fn agx_get_aperture(data: *mut libraw_data_t) -> f32;
+    fn agx_get_focal_len(data: *mut libraw_data_t) -> f32;
+    fn agx_get_timestamp(data: *mut libraw_data_t) -> i64;
+    fn agx_get_lens(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_lens_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
 }
 
 // For this first version, we accept LibRaw's defaults:
@@ -78,7 +78,7 @@ fn check_libraw(err: c_int) -> Result<()> {
     if err == 0 {
         Ok(())
     } else {
-        Err(OxirawError::Decode(format!(
+        Err(AgxError::Decode(format!(
             "LibRaw: {}",
             libraw_error_msg(err)
         )))
@@ -96,7 +96,7 @@ impl LibRawProcessor {
     fn new() -> Result<Self> {
         let ptr = unsafe { libraw_init(0) };
         if ptr.is_null() {
-            return Err(OxirawError::Decode("LibRaw: failed to initialize".into()));
+            return Err(AgxError::Decode("LibRaw: failed to initialize".into()));
         }
         Ok(Self { ptr })
     }
@@ -104,9 +104,9 @@ impl LibRawProcessor {
     fn open_file(&self, path: &Path) -> Result<()> {
         let c_path = CString::new(
             path.to_str()
-                .ok_or_else(|| OxirawError::Decode("invalid file path encoding".into()))?,
+                .ok_or_else(|| AgxError::Decode("invalid file path encoding".into()))?,
         )
-        .map_err(|_| OxirawError::Decode("file path contains null byte".into()))?;
+        .map_err(|_| AgxError::Decode("file path contains null byte".into()))?;
         check_libraw(unsafe { libraw_open_file(self.ptr, c_path.as_ptr()) })
     }
 
@@ -122,7 +122,7 @@ impl LibRawProcessor {
         let mut errc: c_int = 0;
         let ptr = unsafe { libraw_dcraw_make_mem_image(self.ptr, &mut errc) };
         if ptr.is_null() {
-            return Err(OxirawError::Decode(format!(
+            return Err(AgxError::Decode(format!(
                 "LibRaw: failed to create memory image: {}",
                 libraw_error_msg(errc)
             )));
@@ -132,44 +132,44 @@ impl LibRawProcessor {
 
     fn get_make(&self) -> String {
         let mut buf = [0u8; 128];
-        unsafe { oxiraw_get_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
+        unsafe { agx_get_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
 
     fn get_model(&self) -> String {
         let mut buf = [0u8; 128];
-        unsafe { oxiraw_get_model(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
+        unsafe { agx_get_model(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
 
     fn get_iso(&self) -> f32 {
-        unsafe { oxiraw_get_iso(self.ptr) }
+        unsafe { agx_get_iso(self.ptr) }
     }
     fn get_shutter(&self) -> f32 {
-        unsafe { oxiraw_get_shutter(self.ptr) }
+        unsafe { agx_get_shutter(self.ptr) }
     }
     fn get_aperture(&self) -> f32 {
-        unsafe { oxiraw_get_aperture(self.ptr) }
+        unsafe { agx_get_aperture(self.ptr) }
     }
     fn get_focal_len(&self) -> f32 {
-        unsafe { oxiraw_get_focal_len(self.ptr) }
+        unsafe { agx_get_focal_len(self.ptr) }
     }
     fn get_timestamp(&self) -> i64 {
-        unsafe { oxiraw_get_timestamp(self.ptr) }
+        unsafe { agx_get_timestamp(self.ptr) }
     }
 
     fn get_lens(&self) -> String {
         let mut buf = [0u8; 256];
-        unsafe { oxiraw_get_lens(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
+        unsafe { agx_get_lens(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
 
     fn get_lens_make(&self) -> String {
         let mut buf = [0u8; 256];
-        unsafe { oxiraw_get_lens_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
+        unsafe { agx_get_lens_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
@@ -229,7 +229,7 @@ impl Drop for ProcessedImage {
 ///
 /// LibRaw handles the full processing pipeline: file parsing, unpacking,
 /// demosaicing, color conversion, and white balance. The output is sRGB
-/// which we convert to linear sRGB f32 for the oxiraw engine.
+/// which we convert to linear sRGB f32 for the AgX engine.
 ///
 /// # Supported formats
 ///
@@ -249,7 +249,7 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
     let bits = img.bits();
 
     if colors != 3 {
-        return Err(OxirawError::Decode(format!(
+        return Err(AgxError::Decode(format!(
             "LibRaw: expected 3 color channels, got {colors}"
         )));
     }
@@ -274,7 +274,7 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
             Rgb([lin.red, lin.green, lin.blue])
         }),
         _ => {
-            return Err(OxirawError::Decode(format!(
+            return Err(AgxError::Decode(format!(
                 "LibRaw: unsupported bit depth {bits}"
             )));
         }

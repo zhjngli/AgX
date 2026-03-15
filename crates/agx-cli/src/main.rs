@@ -2,15 +2,12 @@ use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use std::process;
 
-use oxiraw::{Engine, Preset};
+use agx::{Engine, Preset};
 
 mod batch;
 
 #[derive(Parser)]
-#[command(
-    name = "oxiraw",
-    about = "Photo editing CLI with portable TOML presets"
-)]
+#[command(name = "agx", about = "Photo editing CLI with portable TOML presets")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -28,12 +25,12 @@ struct OutputOpts {
 }
 
 impl OutputOpts {
-    fn parse_format(&self) -> oxiraw::Result<Option<oxiraw::encode::OutputFormat>> {
+    fn parse_format(&self) -> agx::Result<Option<agx::encode::OutputFormat>> {
         self.format.as_deref().map(parse_output_format).transpose()
     }
 
-    fn encode_options(&self) -> oxiraw::Result<oxiraw::encode::EncodeOptions> {
-        Ok(oxiraw::encode::EncodeOptions {
+    fn encode_options(&self) -> agx::Result<agx::encode::EncodeOptions> {
+        Ok(agx::encode::EncodeOptions {
             jpeg_quality: self.quality,
             format: self.parse_format()?,
         })
@@ -245,44 +242,44 @@ struct HslArgs {
 }
 
 impl HslArgs {
-    fn to_hsl_channels(&self) -> oxiraw::HslChannels {
-        oxiraw::HslChannels {
-            red: oxiraw::HslChannel {
+    fn to_hsl_channels(&self) -> agx::HslChannels {
+        agx::HslChannels {
+            red: agx::HslChannel {
                 hue: self.hsl_red_hue,
                 saturation: self.hsl_red_saturation,
                 luminance: self.hsl_red_luminance,
             },
-            orange: oxiraw::HslChannel {
+            orange: agx::HslChannel {
                 hue: self.hsl_orange_hue,
                 saturation: self.hsl_orange_saturation,
                 luminance: self.hsl_orange_luminance,
             },
-            yellow: oxiraw::HslChannel {
+            yellow: agx::HslChannel {
                 hue: self.hsl_yellow_hue,
                 saturation: self.hsl_yellow_saturation,
                 luminance: self.hsl_yellow_luminance,
             },
-            green: oxiraw::HslChannel {
+            green: agx::HslChannel {
                 hue: self.hsl_green_hue,
                 saturation: self.hsl_green_saturation,
                 luminance: self.hsl_green_luminance,
             },
-            aqua: oxiraw::HslChannel {
+            aqua: agx::HslChannel {
                 hue: self.hsl_aqua_hue,
                 saturation: self.hsl_aqua_saturation,
                 luminance: self.hsl_aqua_luminance,
             },
-            blue: oxiraw::HslChannel {
+            blue: agx::HslChannel {
                 hue: self.hsl_blue_hue,
                 saturation: self.hsl_blue_saturation,
                 luminance: self.hsl_blue_luminance,
             },
-            purple: oxiraw::HslChannel {
+            purple: agx::HslChannel {
                 hue: self.hsl_purple_hue,
                 saturation: self.hsl_purple_saturation,
                 luminance: self.hsl_purple_luminance,
             },
-            magenta: oxiraw::HslChannel {
+            magenta: agx::HslChannel {
                 hue: self.hsl_magenta_hue,
                 saturation: self.hsl_magenta_saturation,
                 luminance: self.hsl_magenta_luminance,
@@ -327,8 +324,8 @@ struct EditArgs {
 }
 
 impl EditArgs {
-    fn to_params(&self) -> oxiraw::Parameters {
-        oxiraw::Parameters {
+    fn to_params(&self) -> agx::Parameters {
+        agx::Parameters {
             exposure: self.exposure,
             contrast: self.contrast,
             highlights: self.highlights,
@@ -341,9 +338,9 @@ impl EditArgs {
         }
     }
 
-    fn load_lut(&self) -> oxiraw::Result<Option<oxiraw::Lut3D>> {
+    fn load_lut(&self) -> agx::Result<Option<agx::Lut3D>> {
         match &self.lut {
-            Some(lut_path) => Ok(Some(oxiraw::Lut3D::from_cube_file(lut_path)?)),
+            Some(lut_path) => Ok(Some(agx::Lut3D::from_cube_file(lut_path)?)),
             None => Ok(None),
         }
     }
@@ -455,9 +452,9 @@ fn main() {
     }
 }
 
-fn parse_output_format(s: &str) -> oxiraw::Result<oxiraw::encode::OutputFormat> {
-    oxiraw::encode::OutputFormat::from_extension(s).ok_or_else(|| {
-        oxiraw::OxirawError::Encode(format!(
+fn parse_output_format(s: &str) -> agx::Result<agx::encode::OutputFormat> {
+    agx::encode::OutputFormat::from_extension(s).ok_or_else(|| {
+        agx::AgxError::Encode(format!(
             "unsupported output format '{s}'. Use: jpeg, png, or tiff"
         ))
     })
@@ -469,9 +466,9 @@ fn run_apply(
     presets: &[PathBuf],
     output: &std::path::Path,
     output_opts: &OutputOpts,
-) -> oxiraw::Result<()> {
-    let metadata = oxiraw::metadata::extract_metadata(input);
-    let linear = oxiraw::decode::decode(input)?;
+) -> agx::Result<()> {
+    let metadata = agx::metadata::extract_metadata(input);
+    let linear = agx::decode::decode(input)?;
     let mut engine = Engine::new(linear);
 
     if !presets.is_empty() {
@@ -487,7 +484,7 @@ fn run_apply(
     let rendered = engine.render();
     let opts = output_opts.encode_options()?;
     let final_path =
-        oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
+        agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
     println!("Saved to {}", final_path.display());
     Ok(())
 }
@@ -497,9 +494,9 @@ fn run_edit(
     output: &std::path::Path,
     edit: &EditArgs,
     output_opts: &OutputOpts,
-) -> oxiraw::Result<()> {
-    let metadata = oxiraw::metadata::extract_metadata(input);
-    let linear = oxiraw::decode::decode(input)?;
+) -> agx::Result<()> {
+    let metadata = agx::metadata::extract_metadata(input);
+    let linear = agx::decode::decode(input)?;
     let mut engine = Engine::new(linear);
     engine.set_params(edit.to_params());
     if let Some(lut) = edit.load_lut()? {
@@ -508,12 +505,12 @@ fn run_edit(
     let rendered = engine.render();
     let opts = output_opts.encode_options()?;
     let final_path =
-        oxiraw::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
+        agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
     println!("Saved to {}", final_path.display());
     Ok(())
 }
 
-fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> oxiraw::Result<()> {
+fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> agx::Result<()> {
     let fmt = batch.output.parse_format()?;
     let summary = batch::run_batch_apply(
         &batch.input_dir,
@@ -532,7 +529,7 @@ fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> oxiraw::
     Ok(())
 }
 
-fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> oxiraw::Result<()> {
+fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
     let params = edit.to_params();
     let lut_data = edit.load_lut()?;
     let fmt = batch.output.parse_format()?;

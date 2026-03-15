@@ -1022,8 +1022,8 @@ mod tests {
     #[test]
     fn full_pipeline_decode_engine_encode() {
         let temp_dir = std::env::temp_dir();
-        let input = temp_dir.join("oxiraw_e2e_in.png");
-        let output = temp_dir.join("oxiraw_e2e_out.png");
+        let input = temp_dir.join("agx_e2e_in.png");
+        let output = temp_dir.join("agx_e2e_out.png");
 
         // Create sRGB 128,128,128 test image
         let img: ImageBuffer<image::Rgb<u8>, Vec<u8>> =

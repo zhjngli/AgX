@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Verification script for oxiraw.
+# Verification script for agx.
 # Run this before considering work done. Exit code 0 = all checks pass.
 #
 # Usage: ./scripts/verify.sh
@@ -34,13 +34,13 @@ run_check() {
 run_check "Format (cargo fmt)" cargo fmt --check
 
 # 2. Lint check
-run_check "Lint (cargo clippy)" cargo clippy -p oxiraw -p oxiraw-cli -- -D warnings
+run_check "Lint (cargo clippy)" cargo clippy -p agx -p agx-cli -- -D warnings
 
 # 3. Library tests (unit + architecture)
-run_check "Library tests (cargo test -p oxiraw)" cargo test -p oxiraw
+run_check "Library tests (cargo test -p agx)" cargo test -p agx
 
 # 4. CLI tests
-run_check "CLI tests (cargo test -p oxiraw-cli)" cargo test -p oxiraw-cli
+run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
 # 5. Documentation link validation
 check_doc_links() {
