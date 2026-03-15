@@ -45,15 +45,15 @@ extern "C" {
     fn libraw_close(data: *mut libraw_data_t);
     fn libraw_strerror(err: c_int) -> *const c_char;
 
-    fn oxiraw_get_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
-    fn oxiraw_get_model(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
-    fn oxiraw_get_iso(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_shutter(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_aperture(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_focal_len(data: *mut libraw_data_t) -> f32;
-    fn oxiraw_get_timestamp(data: *mut libraw_data_t) -> i64;
-    fn oxiraw_get_lens(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
-    fn oxiraw_get_lens_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_model(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_iso(data: *mut libraw_data_t) -> f32;
+    fn agx_get_shutter(data: *mut libraw_data_t) -> f32;
+    fn agx_get_aperture(data: *mut libraw_data_t) -> f32;
+    fn agx_get_focal_len(data: *mut libraw_data_t) -> f32;
+    fn agx_get_timestamp(data: *mut libraw_data_t) -> i64;
+    fn agx_get_lens(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
+    fn agx_get_lens_make(data: *mut libraw_data_t, buf: *mut c_char, buf_size: c_int);
 }
 
 // For this first version, we accept LibRaw's defaults:
@@ -132,44 +132,44 @@ impl LibRawProcessor {
 
     fn get_make(&self) -> String {
         let mut buf = [0u8; 128];
-        unsafe { oxiraw_get_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
+        unsafe { agx_get_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
 
     fn get_model(&self) -> String {
         let mut buf = [0u8; 128];
-        unsafe { oxiraw_get_model(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
+        unsafe { agx_get_model(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
 
     fn get_iso(&self) -> f32 {
-        unsafe { oxiraw_get_iso(self.ptr) }
+        unsafe { agx_get_iso(self.ptr) }
     }
     fn get_shutter(&self) -> f32 {
-        unsafe { oxiraw_get_shutter(self.ptr) }
+        unsafe { agx_get_shutter(self.ptr) }
     }
     fn get_aperture(&self) -> f32 {
-        unsafe { oxiraw_get_aperture(self.ptr) }
+        unsafe { agx_get_aperture(self.ptr) }
     }
     fn get_focal_len(&self) -> f32 {
-        unsafe { oxiraw_get_focal_len(self.ptr) }
+        unsafe { agx_get_focal_len(self.ptr) }
     }
     fn get_timestamp(&self) -> i64 {
-        unsafe { oxiraw_get_timestamp(self.ptr) }
+        unsafe { agx_get_timestamp(self.ptr) }
     }
 
     fn get_lens(&self) -> String {
         let mut buf = [0u8; 256];
-        unsafe { oxiraw_get_lens(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
+        unsafe { agx_get_lens(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }
 
     fn get_lens_make(&self) -> String {
         let mut buf = [0u8; 256];
-        unsafe { oxiraw_get_lens_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
+        unsafe { agx_get_lens_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
         let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
         cstr.to_string_lossy().into_owned()
     }

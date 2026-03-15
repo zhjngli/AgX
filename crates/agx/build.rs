@@ -23,6 +23,6 @@ fn main() {
         if let Some(ref inc) = libraw_include {
             build.include(inc);
         }
-        build.compile("oxiraw_libraw_meta");
+        build.compile("agx_libraw_meta");
     }
 }
