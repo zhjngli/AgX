@@ -1,5 +1,5 @@
 [package]
-name = "oxiraw"
+name = "agx"
 version = "0.1.0"
 edition = "2021"
 description = "An open-source photo editing library with a readable, portable preset format"
