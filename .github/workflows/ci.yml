@@ -34,7 +34,5 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install libraw
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
-      - name: Build CLI
-        run: cargo build -p agx-cli
       - name: E2E tests
-        run: cargo test -p agx-e2e
+        run: ./scripts/e2e.sh
