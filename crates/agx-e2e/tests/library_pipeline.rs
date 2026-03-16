@@ -45,7 +45,7 @@ fn average_brightness(path: &Path) -> f64 {
     total as f64 / (img.width() as f64 * img.height() as f64 * 3.0)
 }
 
-// ---- JPEG tests ----
+// ---- JPEG tests (golden comparison — deterministic across platforms) ----
 
 #[test]
 fn library_jpeg_default_params() {
@@ -72,7 +72,7 @@ fn library_jpeg_hsl_adjustments() {
     assert_golden(&output, "library_jpeg_hsl.png", 2);
 }
 
-// ---- RAW tests (require Fuji RAF fixtures) ----
+// ---- RAW tests (sanity checks only — LibRaw output varies by platform/version) ----
 
 #[test]
 fn library_raf_default_params() {
@@ -82,7 +82,6 @@ fn library_raf_default_params() {
 
     process_with_params(&input, &output, |_| {});
     assert_valid_output(&output);
-    assert_golden(&output, "library_raf_default.png", 2);
 }
 
 #[test]
@@ -108,8 +107,6 @@ fn library_raf_exposure_plus_one() {
         brightness_neutral,
         brightness_bright
     );
-
-    assert_golden(&output_bright, "library_raf_exposure_plus1.png", 2);
 }
 
 #[test]
@@ -122,7 +119,6 @@ fn library_raf_warm_white_balance() {
         engine.params_mut().temperature = 40.0;
     });
     assert_valid_output(&output);
-    assert_golden(&output, "library_raf_warm_wb.png", 2);
 }
 
 #[test]
@@ -134,7 +130,6 @@ fn library_raf_with_preset() {
 
     process_with_preset(&input, &output, &preset);
     assert_valid_output(&output);
-    assert_golden(&output, "library_raf_warm_exposure_preset.png", 2);
 }
 
 #[test]
@@ -145,7 +140,6 @@ fn library_raf_sample2() {
 
     process_with_params(&input, &output, |_| {});
     assert_valid_output(&output);
-    assert_golden(&output, "library_raf_sample2_default.png", 2);
 }
 
 #[test]
@@ -157,5 +151,4 @@ fn library_raf_high_contrast_preset() {
 
     process_with_preset(&input, &output, &preset);
     assert_valid_output(&output);
-    assert_golden(&output, "library_raf_high_contrast_preset.png", 2);
 }
