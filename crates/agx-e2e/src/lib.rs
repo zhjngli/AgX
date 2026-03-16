@@ -3,6 +3,11 @@
 
 use std::path::{Path, PathBuf};
 
+/// Max dimension (width or height) for golden files.
+/// Full-resolution camera images produce 40-50MB PNGs — downscaling to this
+/// keeps goldens at ~100-500KB while still catching processing regressions.
+const GOLDEN_MAX_DIM: u32 = 1024;
+
 /// Error returned when images don't match within tolerance.
 #[derive(Debug)]
 pub struct ComparisonError {
@@ -22,14 +27,37 @@ impl std::fmt::Display for ComparisonError {
     }
 }
 
+/// Downscale an image so its longest edge is at most `max_dim`.
+/// Returns the original image unchanged if it's already within bounds.
+fn downscale(img: image::DynamicImage, max_dim: u32) -> image::DynamicImage {
+    let (w, h) = (img.width(), img.height());
+    if w <= max_dim && h <= max_dim {
+        return img;
+    }
+    let nwidth = if w >= h {
+        max_dim
+    } else {
+        (max_dim as f64 * w as f64 / h as f64).round() as u32
+    };
+    let nheight = if h >= w {
+        max_dim
+    } else {
+        (max_dim as f64 * h as f64 / w as f64).round() as u32
+    };
+    img.resize_exact(nwidth, nheight, image::imageops::FilterType::Lanczos3)
+}
+
 /// Compare two images pixel-by-pixel with a per-channel tolerance.
 ///
-/// Returns Ok(()) if all pixels match within tolerance, or a ComparisonError
-/// describing the differences.
+/// Both images are downscaled to `GOLDEN_MAX_DIM` before comparison so that
+/// golden files stay small. Returns Ok(()) if all pixels match within tolerance.
 pub fn compare_images(actual: &Path, golden: &Path, tolerance: u8) -> Result<(), ComparisonError> {
-    let actual_img = image::open(actual)
-        .unwrap_or_else(|e| panic!("Failed to open actual image {}: {}", actual.display(), e))
-        .to_rgb8();
+    let actual_img = downscale(
+        image::open(actual)
+            .unwrap_or_else(|e| panic!("Failed to open actual image {}: {}", actual.display(), e)),
+        GOLDEN_MAX_DIM,
+    )
+    .to_rgb8();
     let golden_img = image::open(golden)
         .unwrap_or_else(|e| panic!("Failed to open golden image {}: {}", golden.display(), e))
         .to_rgb8();
@@ -92,8 +120,13 @@ pub fn should_update_golden() -> bool {
 
 /// Compare actual output against golden file, or update the golden if GOLDEN_UPDATE=1.
 ///
-/// This is the main assertion helper for e2e tests. Usage:
-/// ```ignore
+/// The actual image is downscaled to 1024px (longest edge) before saving/comparing,
+/// keeping golden files small (~100-500KB) while still catching regressions.
+///
+/// ```rust,no_run
+/// # use std::path::Path;
+/// # use agx_e2e::assert_golden;
+/// let output_path = Path::new("output.png");
 /// assert_golden(output_path, "test_name.png", 2);
 /// ```
 pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8) {
@@ -103,7 +136,11 @@ pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8) {
         if let Some(parent) = golden.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
-        std::fs::copy(actual, &golden).unwrap();
+        // Downscale before saving golden
+        let img = image::open(actual)
+            .unwrap_or_else(|e| panic!("Failed to open actual image {}: {}", actual.display(), e));
+        let scaled = downscale(img, GOLDEN_MAX_DIM);
+        scaled.save(&golden).unwrap();
         eprintln!("Updated golden: {}", golden.display());
         return;
     }

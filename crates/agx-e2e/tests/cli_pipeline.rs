@@ -37,9 +37,8 @@ fn assert_valid_output(path: &Path) {
 // ---- RAW CLI tests ----
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
 fn cli_raf_basic_edit() {
-    let input = fixture_path("raw/daylight.raf");
+    let input = fixture_path("raw/sample1.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -64,7 +63,6 @@ fn cli_raf_basic_edit() {
 // ---- JPEG CLI tests ----
 
 #[test]
-#[ignore] // Remove when JPEG fixtures are added
 fn cli_jpeg_apply_preset() {
     let input = fixture_path("jpeg/sample.jpg");
     let preset = fixture_path("presets/warm_exposure.toml");
@@ -92,7 +90,6 @@ fn cli_jpeg_apply_preset() {
 // ---- Batch CLI tests ----
 
 #[test]
-#[ignore] // Remove when fixtures are added
 fn cli_batch_edit_mixed_dir() {
     let dir = TempDir::new().unwrap();
     let input_dir = dir.path().join("input");

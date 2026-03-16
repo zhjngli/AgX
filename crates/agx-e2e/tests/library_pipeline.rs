@@ -48,7 +48,6 @@ fn average_brightness(path: &Path) -> f64 {
 // ---- JPEG tests ----
 
 #[test]
-#[ignore] // Remove when JPEG fixtures are added
 fn library_jpeg_default_params() {
     let input = fixture_path("jpeg/sample.jpg");
     let dir = TempDir::new().unwrap();
@@ -60,7 +59,6 @@ fn library_jpeg_default_params() {
 }
 
 #[test]
-#[ignore] // Remove when JPEG fixtures are added
 fn library_jpeg_hsl_adjustments() {
     let input = fixture_path("jpeg/sample.jpg");
     let dir = TempDir::new().unwrap();
@@ -77,9 +75,8 @@ fn library_jpeg_hsl_adjustments() {
 // ---- RAW tests (require Fuji RAF fixtures) ----
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
 fn library_raf_default_params() {
-    let input = fixture_path("raw/daylight.raf");
+    let input = fixture_path("raw/sample1.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -89,9 +86,8 @@ fn library_raf_default_params() {
 }
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
 fn library_raf_exposure_plus_one() {
-    let input = fixture_path("raw/daylight.raf");
+    let input = fixture_path("raw/sample1.raf");
     let dir = TempDir::new().unwrap();
     let output_neutral = dir.path().join("neutral.png");
     let output_bright = dir.path().join("bright.png");
@@ -117,9 +113,8 @@ fn library_raf_exposure_plus_one() {
 }
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
 fn library_raf_warm_white_balance() {
-    let input = fixture_path("raw/daylight.raf");
+    let input = fixture_path("raw/sample1.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -131,9 +126,8 @@ fn library_raf_warm_white_balance() {
 }
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
 fn library_raf_with_preset() {
-    let input = fixture_path("raw/daylight.raf");
+    let input = fixture_path("raw/sample1.raf");
     let preset = fixture_path("presets/warm_exposure.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
@@ -144,21 +138,19 @@ fn library_raf_with_preset() {
 }
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
-fn library_raf_indoor() {
-    let input = fixture_path("raw/indoor.raf");
+fn library_raf_sample2() {
+    let input = fixture_path("raw/sample2.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
     process_with_params(&input, &output, |_| {});
     assert_valid_output(&output);
-    assert_golden(&output, "library_raf_indoor_default.png", 2);
+    assert_golden(&output, "library_raf_sample2_default.png", 2);
 }
 
 #[test]
-#[ignore] // Remove when RAF fixtures are added
 fn library_raf_high_contrast_preset() {
-    let input = fixture_path("raw/daylight.raf");
+    let input = fixture_path("raw/sample1.raf");
     let preset = fixture_path("presets/high_contrast.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
