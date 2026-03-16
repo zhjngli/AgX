@@ -3,4 +3,5 @@ resolver = "2"
 members = [
     "crates/agx",
     "crates/agx-cli",
+    "crates/agx-e2e",
 ]
