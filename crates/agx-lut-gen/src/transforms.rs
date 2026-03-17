@@ -102,14 +102,12 @@ pub fn s_curve(x: f32, strength: f32, midpoint: f32) -> f32 {
             // Apply power curve: t^gamma pushes values toward 0 (darkens shadows)
             midpoint * t.powf(gamma)
         }
+    } else if (1.0 - midpoint).abs() < 1e-10 {
+        1.0
     } else {
-        if (1.0 - midpoint).abs() < 1e-10 {
-            1.0
-        } else {
-            let t = (x - midpoint) / (1.0 - midpoint);
-            // Mirror: 1 - (1-t)^gamma brightens highlights
-            midpoint + (1.0 - midpoint) * (1.0 - (1.0 - t).powf(gamma))
-        }
+        let t = (x - midpoint) / (1.0 - midpoint);
+        // Mirror: 1 - (1-t)^gamma brightens highlights
+        midpoint + (1.0 - midpoint) * (1.0 - (1.0 - t).powf(gamma))
     };
 
     result.clamp(0.0, 1.0)
