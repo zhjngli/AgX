@@ -146,6 +146,18 @@ Each look combines 2-4 of these transforms to build its color character.
 - Slight green channel elevation in midtones
 - Goal: muted, faded editorial look with cool undertone
 
+#### Visual validation loop
+
+LUTs and presets must not be generated blindly from math alone. Each look goes through an iterative visual validation process:
+
+1. **Generate** the initial LUT and preset from the transform design above.
+2. **Apply** the look to a representative test image (e.g., `temple_blossoms.jpg` for warm/color looks, `night_city_blur.raf` for dark/contrast looks).
+3. **Inspect** the rendered output visually. Check: does it match the intended mood? Are highlights preserved? Are shadows crushed appropriately or too aggressively? Do skin tones (if present) look natural? Is the color cast what we wanted?
+4. **Iterate** on the transform parameters if the result doesn't match the intended style. Adjust curves, shift tint values, tweak saturation scales until the output looks right.
+5. **Cross-check** against a second image to confirm the look generalizes (doesn't only work on one photo).
+
+This loop happens during implementation, not as an automated test. The goal is that by the time a look is committed, its golden files represent aesthetically intentional output — not just "the algorithm ran without crashing."
+
 #### Future improvement
 
 More complex LUT generation with measured spectral film data or empirical matching to real film stocks is out of scope. A separate design doc can define algorithms for higher-fidelity film emulation.
