@@ -1,0 +1,24 @@
+[metadata]
+name = "Nordic Fade"
+author = "agx-e2e"
+
+[tone]
+contrast = -10.0
+highlights = -20.0
+shadows = 25.0
+whites = -15.0
+blacks = 30.0
+
+[white_balance]
+temperature = -5.0
+tint = -2.0
+
+[hsl.green]
+saturation = -15.0
+luminance = 5.0
+
+[hsl.blue]
+saturation = -10.0
+
+[lut]
+path = "luts/nordic_fade.cube"

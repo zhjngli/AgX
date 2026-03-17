@@ -1,0 +1,27 @@
+[metadata]
+name = "Kodachrome 64"
+author = "agx-e2e"
+
+[tone]
+contrast = 20.0
+highlights = -5.0
+shadows = 5.0
+blacks = -10.0
+
+[white_balance]
+temperature = 5.0
+
+[hsl.red]
+saturation = 15.0
+luminance = -5.0
+
+[hsl.blue]
+saturation = 15.0
+luminance = -5.0
+
+[hsl.yellow]
+saturation = 10.0
+luminance = 5.0
+
+[lut]
+path = "luts/kodachrome_64.cube"

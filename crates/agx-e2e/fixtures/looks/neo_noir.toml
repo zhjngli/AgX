@@ -1,0 +1,23 @@
+[metadata]
+name = "Neo Noir"
+author = "agx-e2e"
+
+[tone]
+exposure = -0.3
+contrast = 35.0
+highlights = -25.0
+shadows = -15.0
+blacks = -20.0
+
+[white_balance]
+temperature = -10.0
+
+[hsl.blue]
+saturation = 10.0
+luminance = -10.0
+
+[hsl.aqua]
+saturation = 15.0
+
+[lut]
+path = "luts/neo_noir.cube"

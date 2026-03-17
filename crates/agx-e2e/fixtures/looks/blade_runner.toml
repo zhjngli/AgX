@@ -1,0 +1,28 @@
+[metadata]
+name = "Blade Runner"
+author = "agx-e2e"
+extends = "base_cinematic.toml"
+
+[tone]
+contrast = 25.0
+highlights = -20.0
+shadows = 5.0
+blacks = -10.0
+
+[white_balance]
+temperature = 12.0
+tint = -3.0
+
+[hsl.orange]
+saturation = 15.0
+luminance = 5.0
+
+[hsl.aqua]
+saturation = 20.0
+luminance = -5.0
+
+[hsl.blue]
+saturation = 15.0
+
+[lut]
+path = "luts/blade_runner.cube"
