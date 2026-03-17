@@ -2,7 +2,7 @@ mod looks;
 mod transforms;
 
 use std::fs;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
 const LUT_SIZE: usize = 33;
@@ -55,10 +55,10 @@ fn write_cube_file(
     title: &str,
     transform: fn(f32, f32, f32) -> (f32, f32, f32),
 ) {
-    let mut file = fs::File::create(path).unwrap_or_else(|e| {
+    let mut file = BufWriter::new(fs::File::create(path).unwrap_or_else(|e| {
         eprintln!("Error creating {:?}: {}", path, e);
         std::process::exit(1);
-    });
+    }));
 
     // Header
     writeln!(file, "TITLE \"{}\"", title).unwrap();

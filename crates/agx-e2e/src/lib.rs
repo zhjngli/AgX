@@ -47,6 +47,19 @@ fn downscale(img: image::DynamicImage, max_dim: u32) -> image::DynamicImage {
     img.resize_exact(nwidth, nheight, image::imageops::FilterType::Lanczos3)
 }
 
+/// Assert that an output file exists, is non-empty, and is a valid image.
+pub fn assert_valid_output(path: &Path) {
+    assert!(
+        path.exists(),
+        "Output file should exist: {}",
+        path.display()
+    );
+    let metadata = std::fs::metadata(path).unwrap();
+    assert!(metadata.len() > 0, "Output file should not be empty");
+    let img = image::open(path).expect("Output should be a valid image");
+    assert!(img.width() > 0 && img.height() > 0);
+}
+
 /// Compare two images pixel-by-pixel with a per-channel tolerance.
 ///
 /// Both images are downscaled to `GOLDEN_MAX_DIM` before comparison so that
@@ -58,9 +71,12 @@ pub fn compare_images(actual: &Path, golden: &Path, tolerance: u8) -> Result<(),
         GOLDEN_MAX_DIM,
     )
     .to_rgb8();
-    let golden_img = image::open(golden)
-        .unwrap_or_else(|e| panic!("Failed to open golden image {}: {}", golden.display(), e))
-        .to_rgb8();
+    let golden_img = downscale(
+        image::open(golden)
+            .unwrap_or_else(|e| panic!("Failed to open golden image {}: {}", golden.display(), e)),
+        GOLDEN_MAX_DIM,
+    )
+    .to_rgb8();
 
     assert_eq!(
         actual_img.dimensions(),

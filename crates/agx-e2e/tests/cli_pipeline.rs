@@ -1,22 +1,9 @@
-use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
 
-use agx_e2e::{assert_golden, fixture_path};
+use agx_e2e::{assert_golden, assert_valid_output, fixture_path};
 
 // --- Constants ---
-
-const JPEG_IMAGES: &[(&str, &str)] = &[
-    ("jpeg/temple_blossoms.jpg", "temple_blossoms"),
-    ("jpeg/night_architecture.jpg", "night_architecture"),
-];
-
-const RAW_IMAGES: &[(&str, &str)] = &[
-    ("raw/night_city_blur.raf", "night_city_blur"),
-    ("raw/sunset_river.raf", "sunset_river"),
-    ("raw/foggy_forest.raf", "foggy_forest"),
-    ("raw/dusk_cityscape.raf", "dusk_cityscape"),
-];
 
 const LOOKS: &[&str] = &[
     "portra_400",
@@ -46,25 +33,21 @@ fn cli_bin() -> Command {
     Command::new(path)
 }
 
-fn assert_valid_output(path: &Path) {
-    assert!(
-        path.exists(),
-        "Output file should exist: {}",
-        path.display()
-    );
-    let metadata = std::fs::metadata(path).unwrap();
-    assert!(metadata.len() > 0, "Output file should not be empty");
-}
-
 fn look_preset_path(look: &str) -> std::path::PathBuf {
     fixture_path(&format!("looks/{look}.toml"))
 }
 
-// --- Noop tests (no adjustments applied) ---
-
-#[test]
-fn cli_jpeg_noop_matrix() {
-    for &(image_path, image_name) in JPEG_IMAGES {
+/// Run noop + all 6 looks for a single image. This consolidates all CLI invocations
+/// for one image into a single test function, enabling Cargo to parallelize across images.
+fn run_image_matrix(
+    image_path: &str,
+    image_name: &str,
+    golden_dir: &str,
+    tolerance: u8,
+    max_diff_pct: f64,
+) {
+    // Noop (no adjustments)
+    {
         let input = fixture_path(image_path);
         let dir = TempDir::new().unwrap();
         let output = dir.path().join("output.png");
@@ -82,100 +65,96 @@ fn cli_jpeg_noop_matrix() {
 
         assert!(status.success(), "CLI edit should succeed for {image_name}");
         assert_valid_output(&output);
-        assert_golden(&output, &format!("jpeg/{image_name}_noop.png"), 2, 0.0);
+        assert_golden(
+            &output,
+            &format!("{golden_dir}/{image_name}_noop.png"),
+            tolerance,
+            max_diff_pct,
+        );
     }
-}
 
-#[test]
-fn cli_raw_noop_matrix() {
-    for &(image_path, image_name) in RAW_IMAGES {
+    // All looks
+    for look in LOOKS {
         let input = fixture_path(image_path);
+        let preset = look_preset_path(look);
         let dir = TempDir::new().unwrap();
         let output = dir.path().join("output.png");
 
         let status = cli_bin()
             .args([
-                "edit",
+                "apply",
                 "-i",
                 input.to_str().unwrap(),
+                "-p",
+                preset.to_str().unwrap(),
                 "-o",
                 output.to_str().unwrap(),
             ])
             .status()
             .expect("failed to run CLI");
 
-        assert!(status.success(), "CLI edit should succeed for {image_name}");
+        assert!(
+            status.success(),
+            "CLI apply should succeed for {image_name} with {look}"
+        );
         assert_valid_output(&output);
-        assert_golden(&output, &format!("raw/{image_name}_noop.png"), 30, 10.0);
+        assert_golden(
+            &output,
+            &format!("{golden_dir}/{image_name}_{look}.png"),
+            tolerance,
+            max_diff_pct,
+        );
     }
 }
 
-// --- JPEG x LOOK matrix ---
+// --- Per-image tests (enables parallelism: each test function runs concurrently) ---
 
 #[test]
-fn cli_jpeg_look_matrix() {
-    for &(image_path, image_name) in JPEG_IMAGES {
-        for look in LOOKS {
-            let input = fixture_path(image_path);
-            let preset = look_preset_path(look);
-            let dir = TempDir::new().unwrap();
-            let output = dir.path().join("output.png");
-
-            let status = cli_bin()
-                .args([
-                    "apply",
-                    "-i",
-                    input.to_str().unwrap(),
-                    "-p",
-                    preset.to_str().unwrap(),
-                    "-o",
-                    output.to_str().unwrap(),
-                ])
-                .status()
-                .expect("failed to run CLI");
-
-            assert!(
-                status.success(),
-                "CLI apply should succeed for {image_name} with {look}"
-            );
-            assert_valid_output(&output);
-            assert_golden(&output, &format!("jpeg/{image_name}_{look}.png"), 2, 0.0);
-        }
-    }
+fn cli_temple_blossoms() {
+    run_image_matrix(
+        "jpeg/temple_blossoms.jpg",
+        "temple_blossoms",
+        "jpeg",
+        2,
+        0.0,
+    );
 }
 
-// --- RAW x LOOK matrix ---
+#[test]
+fn cli_night_architecture() {
+    run_image_matrix(
+        "jpeg/night_architecture.jpg",
+        "night_architecture",
+        "jpeg",
+        2,
+        0.0,
+    );
+}
 
 #[test]
-fn cli_raw_look_matrix() {
-    for &(image_path, image_name) in RAW_IMAGES {
-        for look in LOOKS {
-            let input = fixture_path(image_path);
-            let preset = look_preset_path(look);
-            let dir = TempDir::new().unwrap();
-            let output = dir.path().join("output.png");
+fn cli_night_city_blur() {
+    run_image_matrix(
+        "raw/night_city_blur.raf",
+        "night_city_blur",
+        "raw",
+        30,
+        10.0,
+    );
+}
 
-            let status = cli_bin()
-                .args([
-                    "apply",
-                    "-i",
-                    input.to_str().unwrap(),
-                    "-p",
-                    preset.to_str().unwrap(),
-                    "-o",
-                    output.to_str().unwrap(),
-                ])
-                .status()
-                .expect("failed to run CLI");
+#[test]
+fn cli_sunset_river() {
+    run_image_matrix("raw/sunset_river.raf", "sunset_river", "raw", 30, 10.0);
+}
 
-            assert!(
-                status.success(),
-                "CLI apply should succeed for {image_name} with {look}"
-            );
-            assert_valid_output(&output);
-            assert_golden(&output, &format!("raw/{image_name}_{look}.png"), 30, 10.0);
-        }
-    }
+#[test]
+fn cli_foggy_forest() {
+    run_image_matrix("raw/foggy_forest.raf", "foggy_forest", "raw", 30, 10.0);
+}
+
+#[test]
+fn cli_dusk_cityscape() {
+    run_image_matrix("raw/dusk_cityscape.raf", "dusk_cityscape", "raw", 30, 10.0);
 }
 
 // --- Batch test ---

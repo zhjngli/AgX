@@ -1,7 +1,7 @@
 use std::path::Path;
 use tempfile::TempDir;
 
-use agx_e2e::fixture_path;
+use agx_e2e::{assert_valid_output, fixture_path};
 
 /// Helper: decode a file, run through engine with given params, encode to output.
 fn process_with_params(input: &Path, output: &Path, configure: impl FnOnce(&mut agx::Engine)) {
@@ -10,18 +10,6 @@ fn process_with_params(input: &Path, output: &Path, configure: impl FnOnce(&mut 
     configure(&mut engine);
     let rendered = engine.render();
     agx::encode::encode_to_file(&rendered, output).expect("encode failed");
-}
-
-fn assert_valid_output(path: &Path) {
-    assert!(
-        path.exists(),
-        "Output file should exist: {}",
-        path.display()
-    );
-    let metadata = std::fs::metadata(path).unwrap();
-    assert!(metadata.len() > 0, "Output file should not be empty");
-    let img = image::open(path).expect("Output should be a valid image");
-    assert!(img.width() > 0 && img.height() > 0);
 }
 
 // --- API smoke tests (one per concern, not a full matrix) ---

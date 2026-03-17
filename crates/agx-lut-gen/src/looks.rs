@@ -1,5 +1,15 @@
 use crate::transforms::*;
 
+/// Apply a per-channel transform to (r, g, b).
+fn map_channels(r: f32, g: f32, b: f32, f: impl Fn(f32) -> f32) -> (f32, f32, f32) {
+    (f(r), f(g), f(b))
+}
+
+/// Clamp all channels to [0, 1].
+fn clamp_rgb(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+}
+
 /// A named look: title + transform function.
 pub struct Look {
     pub name: &'static str,
@@ -40,9 +50,7 @@ pub fn all_looks() -> Vec<Look> {
 /// gentle desaturation, warm highlight gain.
 fn portra_400(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Film shoulder for soft highlight rolloff
-    let r = film_shoulder(r, 0.25);
-    let g = film_shoulder(g, 0.25);
-    let b = film_shoulder(b, 0.25);
+    let (r, g, b) = map_channels(r, g, b, |x| film_shoulder(x, 0.25));
 
     // Lift/gamma/gain: blue shadow lift, warm highlight gain
     let r = lift_gamma_gain(r, 0.02, 1.0, 1.02);
@@ -52,38 +60,34 @@ fn portra_400(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Gentle desaturation
     let (r, g, b) = scale_saturation(r, g, b, 0.88);
 
-    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+    clamp_rgb(r, g, b)
 }
 
 /// Neo Noir — aggressive S-curve, cool shadow lift, teal shadow push,
 /// heavy desaturation.
 fn neo_noir(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Aggressive S-curve for high contrast
-    let r = s_curve(r, 0.7, 0.5);
-    let g = s_curve(g, 0.7, 0.5);
-    let b = s_curve(b, 0.7, 0.5);
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.7, 0.5));
 
     // Cool shadow lift
     let r = lift_gamma_gain(r, 0.01, 1.0, 1.0);
     let g = lift_gamma_gain(g, 0.01, 1.0, 1.0);
     let b = lift_gamma_gain(b, 0.03, 1.0, 0.98);
 
-    // Teal shadow push — rotate hue in low luminance toward teal/cyan
+    // Cool shadow hue rotation
     let (r, g, b) = hue_rotate_in_lum_range(r, g, b, 30.0, 0.2, 0.4);
 
     // Heavy desaturation
     let (r, g, b) = scale_saturation(r, g, b, 0.45);
 
-    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+    clamp_rgb(r, g, b)
 }
 
 /// Blade Runner — moderate S-curve, teal shadows + warm/orange highlights,
 /// slight saturation boost.
 fn blade_runner(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Moderate S-curve
-    let r = s_curve(r, 0.4, 0.5);
-    let g = s_curve(g, 0.4, 0.5);
-    let b = s_curve(b, 0.4, 0.5);
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.4, 0.5));
 
     // Teal shadows: elevated blue and green lift
     // Warm/orange highlights: elevated red gain, reduced blue gain
@@ -94,16 +98,14 @@ fn blade_runner(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Slight saturation boost
     let (r, g, b) = scale_saturation(r, g, b, 1.05);
 
-    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+    clamp_rgb(r, g, b)
 }
 
 /// Cinema Warm — soft film shoulder, golden midtone via red->green crossfeed,
 /// warm overall shift via lift/gamma/gain.
 fn cinema_warm(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Soft film shoulder
-    let r = film_shoulder(r, 0.20);
-    let g = film_shoulder(g, 0.20);
-    let b = film_shoulder(b, 0.20);
+    let (r, g, b) = map_channels(r, g, b, |x| film_shoulder(x, 0.20));
 
     // Golden midtone via red->green crossfeed
     let (r, g, b) = crossfeed(r, g, b, 0, 1, 0.04);
@@ -113,7 +115,7 @@ fn cinema_warm(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let g = lift_gamma_gain(g, 0.01, 1.0, 1.0);
     let b = lift_gamma_gain(b, 0.0, 1.05, 0.95);
 
-    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+    clamp_rgb(r, g, b)
 }
 
 /// Kodachrome 64 — per-channel S-curves (strong red/blue, moderate green),
@@ -127,21 +129,17 @@ fn kodachrome_64(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Red->green crossfeed for warmth
     let (r, g, b) = crossfeed(r, g, b, 0, 1, 0.03);
 
-    // No shadow lift — deep blacks (identity LGG, intentionally no adjustment)
-
     // Elevated saturation
     let (r, g, b) = scale_saturation(r, g, b, 1.12);
 
-    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+    clamp_rgb(r, g, b)
 }
 
 /// Nordic Fade — lifted blacks, compressed highlights, cool hue rotation,
 /// heavy desaturation, slight green midtone elevation.
 fn nordic_fade(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Lifted blacks + compressed highlights
-    let r = lift_gamma_gain(r, 0.10, 1.0, 0.88);
-    let g = lift_gamma_gain(g, 0.10, 1.0, 0.88);
-    let b = lift_gamma_gain(b, 0.10, 1.0, 0.88);
+    let (r, g, b) = map_channels(r, g, b, |x| lift_gamma_gain(x, 0.10, 1.0, 0.88));
 
     // Slight green midtone elevation
     let g = lift_gamma_gain(g, 0.0, 0.92, 1.0);
@@ -152,7 +150,7 @@ fn nordic_fade(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Heavy desaturation
     let (r, g, b) = scale_saturation(r, g, b, 0.60);
 
-    (r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0))
+    clamp_rgb(r, g, b)
 }
 
 #[cfg(test)]

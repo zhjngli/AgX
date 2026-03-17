@@ -7,7 +7,7 @@ pub fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let min = r.min(g).min(b);
     let l = (max + min) * 0.5;
 
-    if (max - min).abs() < 1e-10 {
+    if (max - min).abs() < f32::EPSILON {
         return (0.0, 0.0, l);
     }
 
@@ -19,13 +19,13 @@ pub fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
         d / (max + min)
     };
 
-    let h = if (max - r).abs() < 1e-10 {
+    let h = if (max - r).abs() < f32::EPSILON {
         let mut h = (g - b) / d;
         if g < b {
             h += 6.0;
         }
         h
-    } else if (max - g).abs() < 1e-10 {
+    } else if (max - g).abs() < f32::EPSILON {
         (b - r) / d + 2.0
     } else {
         (r - g) / d + 4.0
@@ -40,7 +40,7 @@ pub fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 /// Input: h in [0, 360), s and l in [0, 1].
 /// Output: (r, g, b) each in [0, 1].
 pub fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
-    if s.abs() < 1e-10 {
+    if s < f32::EPSILON {
         return (l, l, l);
     }
 
@@ -84,8 +84,10 @@ fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
 /// `strength` controls the intensity: 0 = identity, higher = more contrast.
 /// Uses a gain-based sigmoid that passes through (0,0), (midpoint, midpoint), and (1,1).
 pub fn s_curve(x: f32, strength: f32, midpoint: f32) -> f32 {
-    if strength.abs() < 1e-10 {
-        return x.clamp(0.0, 1.0);
+    let x = x.clamp(0.0, 1.0);
+
+    if strength.abs() < f32::EPSILON {
+        return x;
     }
 
     // Use a power-based S-curve applied separately to each half.
@@ -95,14 +97,14 @@ pub fn s_curve(x: f32, strength: f32, midpoint: f32) -> f32 {
     let gamma = 1.0 + strength * 3.0; // strength 0.5 -> gamma 2.5
 
     let result = if x <= midpoint {
-        if midpoint.abs() < 1e-10 {
+        if midpoint.abs() < f32::EPSILON {
             0.0
         } else {
             let t = x / midpoint;
             // Apply power curve: t^gamma pushes values toward 0 (darkens shadows)
             midpoint * t.powf(gamma)
         }
-    } else if (1.0 - midpoint).abs() < 1e-10 {
+    } else if (1.0 - midpoint).abs() < f32::EPSILON {
         1.0
     } else {
         let t = (x - midpoint) / (1.0 - midpoint);
@@ -119,7 +121,7 @@ pub fn s_curve(x: f32, strength: f32, midpoint: f32) -> f32 {
 /// 0 = identity, higher = more compression.
 /// Shadows pass through mostly unchanged while highlights are softly compressed.
 pub fn film_shoulder(x: f32, shoulder: f32) -> f32 {
-    if shoulder.abs() < 1e-10 {
+    if shoulder.abs() < f32::EPSILON {
         return x.clamp(0.0, 1.0);
     }
     let x = x.clamp(0.0, 1.0);
@@ -139,8 +141,8 @@ pub fn film_shoulder(x: f32, shoulder: f32) -> f32 {
 /// - `gamma`: midtone power adjustment (applied as 1/gamma exponent)
 /// - `gain`: highlight multiplier
 ///
-/// The formula: `gain * (x + lift * (1 - x))^(1/gamma)`
-/// At x=0: output = (gain * lift^(1/gamma)), so lift raises blacks.
+/// The formula: `gain * ((1 - lift) * x + lift)^(1/gamma)`
+/// At x=0: output = `gain * lift^(1/gamma)`, so lift raises blacks.
 /// At x=1: output = gain, so gain scales the white point.
 pub fn lift_gamma_gain(x: f32, lift: f32, gamma: f32, gain: f32) -> f32 {
     // Standard LGG formula used in color grading:
@@ -148,7 +150,7 @@ pub fn lift_gamma_gain(x: f32, lift: f32, gamma: f32, gain: f32) -> f32 {
     // This ensures: at x=0 -> gain * lift^(1/gamma), at x=1 -> gain * 1.0 = gain
     let lifted = (1.0 - lift) * x + lift;
     let lifted = lifted.max(0.0); // prevent negative base for pow
-    let gamma_exp = if gamma.abs() < 1e-10 {
+    let gamma_exp = if gamma.abs() < f32::EPSILON {
         1.0
     } else {
         1.0 / gamma
@@ -192,8 +194,7 @@ pub fn hue_rotate_in_lum_range(
         0.5 * (1.0 + (t * std::f32::consts::PI).cos())
     };
 
-    let new_h = (h + rotation * blend) % 360.0;
-    let new_h = if new_h < 0.0 { new_h + 360.0 } else { new_h };
+    let new_h = (h + rotation * blend).rem_euclid(360.0);
 
     let (ro, go, bo) = hsl_to_rgb(new_h, s, l);
     (ro.clamp(0.0, 1.0), go.clamp(0.0, 1.0), bo.clamp(0.0, 1.0))
