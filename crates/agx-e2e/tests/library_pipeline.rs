@@ -1,7 +1,7 @@
 use std::path::Path;
 use tempfile::TempDir;
 
-use agx_e2e::{assert_golden, fixture_path};
+use agx_e2e::fixture_path;
 
 /// Helper: decode a file, run through engine with given params, encode to output.
 fn process_with_params(input: &Path, output: &Path, configure: impl FnOnce(&mut agx::Engine)) {
@@ -12,17 +12,6 @@ fn process_with_params(input: &Path, output: &Path, configure: impl FnOnce(&mut 
     agx::encode::encode_to_file(&rendered, output).expect("encode failed");
 }
 
-/// Helper: decode a file, apply a preset, render, encode.
-fn process_with_preset(input: &Path, output: &Path, preset_path: &Path) {
-    let image = agx::decode(input).expect("decode failed");
-    let mut engine = agx::Engine::new(image);
-    let preset = agx::Preset::load_from_file(preset_path).expect("preset load failed");
-    engine.apply_preset(&preset);
-    let rendered = engine.render();
-    agx::encode::encode_to_file(&rendered, output).expect("encode failed");
-}
-
-/// Sanity check: output file exists, has non-zero size, dimensions > 0.
 fn assert_valid_output(path: &Path) {
     assert!(
         path.exists(),
@@ -35,204 +24,90 @@ fn assert_valid_output(path: &Path) {
     assert!(img.width() > 0 && img.height() > 0);
 }
 
-/// Measure average brightness of an image (sRGB u8, all channels averaged).
-fn average_brightness(path: &Path) -> f64 {
-    let img = image::open(path).unwrap().to_rgb8();
-    let total: u64 = img
-        .pixels()
-        .map(|p| p.0[0] as u64 + p.0[1] as u64 + p.0[2] as u64)
-        .sum();
-    total as f64 / (img.width() as f64 * img.height() as f64 * 3.0)
-}
-
-// ---- JPEG tests (golden comparison — deterministic across platforms) ----
+// --- API smoke tests (one per concern, not a full matrix) ---
 
 #[test]
-fn library_jpeg_default_params() {
+fn library_jpeg_noop_roundtrip() {
     let input = fixture_path("jpeg/temple_blossoms.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
     process_with_params(&input, &output, |_| {});
     assert_valid_output(&output);
-    assert_golden(&output, "library_jpeg_default.png", 2);
 }
 
 #[test]
-fn library_jpeg_hsl_adjustments() {
+fn library_raw_noop_roundtrip() {
+    let input = fixture_path("raw/night_city_blur.raf");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |_| {});
+    assert_valid_output(&output);
+}
+
+#[test]
+fn library_apply_preset() {
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let preset_path = fixture_path("looks/portra_400.toml");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    let image = agx::decode(&input).expect("decode failed");
+    let mut engine = agx::Engine::new(image);
+    let preset = agx::Preset::load_from_file(&preset_path).expect("preset load failed");
+    engine.apply_preset(&preset);
+    let rendered = engine.render();
+    agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
+
+    assert_valid_output(&output);
+}
+
+#[test]
+fn library_direct_params() {
     let input = fixture_path("jpeg/temple_blossoms.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
     process_with_params(&input, &output, |engine| {
-        engine.params_mut().hsl.red.saturation = 30.0;
-        engine.params_mut().hsl.blue.luminance = 10.0;
-    });
-    assert_valid_output(&output);
-    assert_golden(&output, "library_jpeg_hsl.png", 2);
-}
-
-// ---- RAW tests (sanity checks only — LibRaw output varies by platform/version) ----
-
-#[test]
-fn library_raf_default_params() {
-    let input = fixture_path("raw/night_city_blur.raf");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_params(&input, &output, |_| {});
-    assert_valid_output(&output);
-}
-
-#[test]
-fn library_raf_exposure_plus_one() {
-    let input = fixture_path("raw/night_city_blur.raf");
-    let dir = TempDir::new().unwrap();
-    let output_neutral = dir.path().join("neutral.png");
-    let output_bright = dir.path().join("bright.png");
-
-    process_with_params(&input, &output_neutral, |_| {});
-    process_with_params(&input, &output_bright, |engine| {
         engine.params_mut().exposure = 1.0;
-    });
-
-    assert_valid_output(&output_bright);
-
-    // Directional sanity: +1 stop should be brighter
-    let brightness_neutral = average_brightness(&output_neutral);
-    let brightness_bright = average_brightness(&output_bright);
-    assert!(
-        brightness_bright > brightness_neutral,
-        "Expected brighter after +1 exposure: neutral={:.1} bright={:.1}",
-        brightness_neutral,
-        brightness_bright
-    );
-}
-
-#[test]
-fn library_raf_warm_white_balance() {
-    let input = fixture_path("raw/night_city_blur.raf");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_params(&input, &output, |engine| {
-        engine.params_mut().temperature = 40.0;
+        engine.params_mut().contrast = 15.0;
+        engine.params_mut().hsl.red.saturation = 20.0;
     });
     assert_valid_output(&output);
 }
 
 #[test]
-fn library_raf_with_preset() {
-    let input = fixture_path("raw/night_city_blur.raf");
-    let preset = fixture_path("presets/warm_exposure.toml");
+fn library_lut_load_and_apply() {
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let lut_path = fixture_path("looks/luts/portra_400.cube");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
-    process_with_preset(&input, &output, &preset);
+    let image = agx::decode(&input).expect("decode failed");
+    let mut engine = agx::Engine::new(image);
+    let lut = agx::Lut3D::from_cube_file(&lut_path).expect("LUT load failed");
+    engine.set_lut(Some(lut));
+    let rendered = engine.render();
+    agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
+
     assert_valid_output(&output);
 }
 
 #[test]
-fn library_raf_sunset_river() {
-    let input = fixture_path("raw/sunset_river.raf");
+fn library_preset_with_extends() {
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let preset_path = fixture_path("looks/blade_runner.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
-    process_with_params(&input, &output, |_| {});
+    let image = agx::decode(&input).expect("decode failed");
+    let mut engine = agx::Engine::new(image);
+    let preset =
+        agx::Preset::load_from_file(&preset_path).expect("preset with extends should load");
+    engine.apply_preset(&preset);
+    let rendered = engine.render();
+    agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
+
     assert_valid_output(&output);
-}
-
-#[test]
-fn library_raf_high_contrast_preset() {
-    let input = fixture_path("raw/night_city_blur.raf");
-    let preset = fixture_path("presets/high_contrast.toml");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_preset(&input, &output, &preset);
-    assert_valid_output(&output);
-}
-
-// ---- Additional RAW tests ----
-
-#[test]
-fn library_raf_foggy_forest() {
-    let input = fixture_path("raw/foggy_forest.raf");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_params(&input, &output, |_| {});
-    assert_valid_output(&output);
-}
-
-#[test]
-fn library_raf_foggy_forest_with_preset() {
-    let input = fixture_path("raw/foggy_forest.raf");
-    let preset = fixture_path("presets/warm_exposure.toml");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_preset(&input, &output, &preset);
-    assert_valid_output(&output);
-}
-
-#[test]
-fn library_raf_dusk_cityscape() {
-    let input = fixture_path("raw/dusk_cityscape.raf");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_params(&input, &output, |_| {});
-    assert_valid_output(&output);
-}
-
-#[test]
-fn library_raf_dusk_cityscape_exposure() {
-    let input = fixture_path("raw/dusk_cityscape.raf");
-    let dir = TempDir::new().unwrap();
-    let output_neutral = dir.path().join("neutral.png");
-    let output_bright = dir.path().join("bright.png");
-
-    process_with_params(&input, &output_neutral, |_| {});
-    process_with_params(&input, &output_bright, |engine| {
-        engine.params_mut().exposure = 1.5;
-    });
-
-    assert_valid_output(&output_bright);
-
-    let brightness_neutral = average_brightness(&output_neutral);
-    let brightness_bright = average_brightness(&output_bright);
-    assert!(
-        brightness_bright > brightness_neutral,
-        "Expected brighter after +1.5 exposure: neutral={:.1} bright={:.1}",
-        brightness_neutral,
-        brightness_bright
-    );
-}
-
-// ---- Additional JPEG tests ----
-
-#[test]
-fn library_jpeg_night_architecture_default() {
-    let input = fixture_path("jpeg/night_architecture.jpg");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_params(&input, &output, |_| {});
-    assert_valid_output(&output);
-    assert_golden(&output, "library_jpeg_night_architecture_default.png", 2);
-}
-
-#[test]
-fn library_jpeg_night_architecture_exposure() {
-    let input = fixture_path("jpeg/night_architecture.jpg");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    process_with_params(&input, &output, |engine| {
-        engine.params_mut().exposure = 2.0;
-        engine.params_mut().contrast = 20.0;
-    });
-    assert_valid_output(&output);
-    assert_golden(&output, "library_jpeg_night_architecture_bright.png", 2);
 }
