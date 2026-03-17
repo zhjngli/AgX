@@ -49,7 +49,7 @@ fn average_brightness(path: &Path) -> f64 {
 
 #[test]
 fn library_jpeg_default_params() {
-    let input = fixture_path("jpeg/sample.jpg");
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -60,7 +60,7 @@ fn library_jpeg_default_params() {
 
 #[test]
 fn library_jpeg_hsl_adjustments() {
-    let input = fixture_path("jpeg/sample.jpg");
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -76,7 +76,7 @@ fn library_jpeg_hsl_adjustments() {
 
 #[test]
 fn library_raf_default_params() {
-    let input = fixture_path("raw/sample1.raf");
+    let input = fixture_path("raw/night_city_blur.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -86,7 +86,7 @@ fn library_raf_default_params() {
 
 #[test]
 fn library_raf_exposure_plus_one() {
-    let input = fixture_path("raw/sample1.raf");
+    let input = fixture_path("raw/night_city_blur.raf");
     let dir = TempDir::new().unwrap();
     let output_neutral = dir.path().join("neutral.png");
     let output_bright = dir.path().join("bright.png");
@@ -111,7 +111,7 @@ fn library_raf_exposure_plus_one() {
 
 #[test]
 fn library_raf_warm_white_balance() {
-    let input = fixture_path("raw/sample1.raf");
+    let input = fixture_path("raw/night_city_blur.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -123,7 +123,7 @@ fn library_raf_warm_white_balance() {
 
 #[test]
 fn library_raf_with_preset() {
-    let input = fixture_path("raw/sample1.raf");
+    let input = fixture_path("raw/night_city_blur.raf");
     let preset = fixture_path("presets/warm_exposure.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
@@ -133,8 +133,8 @@ fn library_raf_with_preset() {
 }
 
 #[test]
-fn library_raf_sample2() {
-    let input = fixture_path("raw/sample2.raf");
+fn library_raf_sunset_river() {
+    let input = fixture_path("raw/sunset_river.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -144,11 +144,95 @@ fn library_raf_sample2() {
 
 #[test]
 fn library_raf_high_contrast_preset() {
-    let input = fixture_path("raw/sample1.raf");
+    let input = fixture_path("raw/night_city_blur.raf");
     let preset = fixture_path("presets/high_contrast.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
     process_with_preset(&input, &output, &preset);
     assert_valid_output(&output);
+}
+
+// ---- Additional RAW tests ----
+
+#[test]
+fn library_raf_foggy_forest() {
+    let input = fixture_path("raw/foggy_forest.raf");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |_| {});
+    assert_valid_output(&output);
+}
+
+#[test]
+fn library_raf_foggy_forest_with_preset() {
+    let input = fixture_path("raw/foggy_forest.raf");
+    let preset = fixture_path("presets/warm_exposure.toml");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_preset(&input, &output, &preset);
+    assert_valid_output(&output);
+}
+
+#[test]
+fn library_raf_dusk_cityscape() {
+    let input = fixture_path("raw/dusk_cityscape.raf");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |_| {});
+    assert_valid_output(&output);
+}
+
+#[test]
+fn library_raf_dusk_cityscape_exposure() {
+    let input = fixture_path("raw/dusk_cityscape.raf");
+    let dir = TempDir::new().unwrap();
+    let output_neutral = dir.path().join("neutral.png");
+    let output_bright = dir.path().join("bright.png");
+
+    process_with_params(&input, &output_neutral, |_| {});
+    process_with_params(&input, &output_bright, |engine| {
+        engine.params_mut().exposure = 1.5;
+    });
+
+    assert_valid_output(&output_bright);
+
+    let brightness_neutral = average_brightness(&output_neutral);
+    let brightness_bright = average_brightness(&output_bright);
+    assert!(
+        brightness_bright > brightness_neutral,
+        "Expected brighter after +1.5 exposure: neutral={:.1} bright={:.1}",
+        brightness_neutral,
+        brightness_bright
+    );
+}
+
+// ---- Additional JPEG tests ----
+
+#[test]
+fn library_jpeg_night_architecture_default() {
+    let input = fixture_path("jpeg/night_architecture.jpg");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |_| {});
+    assert_valid_output(&output);
+    assert_golden(&output, "library_jpeg_night_architecture_default.png", 2);
+}
+
+#[test]
+fn library_jpeg_night_architecture_exposure() {
+    let input = fixture_path("jpeg/night_architecture.jpg");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |engine| {
+        engine.params_mut().exposure = 2.0;
+        engine.params_mut().contrast = 20.0;
+    });
+    assert_valid_output(&output);
+    assert_golden(&output, "library_jpeg_night_architecture_bright.png", 2);
 }

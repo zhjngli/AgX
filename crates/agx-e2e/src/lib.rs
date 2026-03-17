@@ -115,7 +115,7 @@ pub fn golden_path(name: &str) -> PathBuf {
 
 /// Check if GOLDEN_UPDATE=1 is set, indicating golden files should be regenerated.
 pub fn should_update_golden() -> bool {
-    std::env::var("GOLDEN_UPDATE").map_or(false, |v| v == "1")
+    std::env::var("GOLDEN_UPDATE").is_ok_and(|v| v == "1")
 }
 
 /// Compare actual output against golden file, or update the golden if GOLDEN_UPDATE=1.

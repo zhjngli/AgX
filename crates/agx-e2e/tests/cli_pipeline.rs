@@ -38,7 +38,7 @@ fn assert_valid_output(path: &Path) {
 
 #[test]
 fn cli_raf_basic_edit() {
-    let input = fixture_path("raw/sample1.raf");
+    let input = fixture_path("raw/night_city_blur.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -63,7 +63,7 @@ fn cli_raf_basic_edit() {
 
 #[test]
 fn cli_jpeg_apply_preset() {
-    let input = fixture_path("jpeg/sample.jpg");
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
     let preset = fixture_path("presets/warm_exposure.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
@@ -86,6 +86,82 @@ fn cli_jpeg_apply_preset() {
     assert_golden(&output, "cli_jpeg_apply_preset.png", 2);
 }
 
+// ---- Additional JPEG CLI tests ----
+
+#[test]
+fn cli_jpeg_edit_night_architecture() {
+    let input = fixture_path("jpeg/night_architecture.jpg");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--exposure",
+            "1.5",
+            "--contrast",
+            "15",
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "CLI edit should succeed");
+    assert_valid_output(&output);
+}
+
+// ---- Additional RAW CLI tests ----
+
+#[test]
+fn cli_raf_foggy_forest_edit() {
+    let input = fixture_path("raw/foggy_forest.raf");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+            "--exposure",
+            "0.5",
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "CLI edit should succeed");
+    assert_valid_output(&output);
+}
+
+#[test]
+fn cli_raf_dusk_cityscape_with_preset() {
+    let input = fixture_path("raw/dusk_cityscape.raf");
+    let preset = fixture_path("presets/warm_exposure.toml");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    let status = cli_bin()
+        .args([
+            "apply",
+            "-i",
+            input.to_str().unwrap(),
+            "-p",
+            preset.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .expect("failed to run CLI");
+
+    assert!(status.success(), "CLI apply should succeed");
+    assert_valid_output(&output);
+}
+
 // ---- Batch CLI tests ----
 
 #[test]
@@ -96,8 +172,8 @@ fn cli_batch_edit_mixed_dir() {
     std::fs::create_dir(&input_dir).unwrap();
 
     // Copy fixture files into input dir
-    let jpeg_src = fixture_path("jpeg/sample.jpg");
-    std::fs::copy(&jpeg_src, input_dir.join("sample.jpg")).unwrap();
+    let jpeg_src = fixture_path("jpeg/temple_blossoms.jpg");
+    std::fs::copy(&jpeg_src, input_dir.join("temple_blossoms.jpg")).unwrap();
 
     let status = cli_bin()
         .args([
@@ -116,7 +192,7 @@ fn cli_batch_edit_mixed_dir() {
 
     assert!(status.success(), "batch-edit should succeed");
     assert!(
-        output_dir.join("sample.jpg").exists(),
+        output_dir.join("temple_blossoms.jpg").exists(),
         "Output file should exist"
     );
 }
