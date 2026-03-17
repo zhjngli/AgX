@@ -123,13 +123,19 @@ pub fn should_update_golden() -> bool {
 /// The actual image is downscaled to 1024px (longest edge) before saving/comparing,
 /// keeping golden files small (~100-500KB) while still catching regressions.
 ///
+/// `max_diff_pct` controls how many pixels may exceed `tolerance` before failing.
+/// Use 0.0 for strict comparison (any diff fails), or a positive value to allow
+/// a percentage of pixels to differ (useful for RAW files where LibRaw output
+/// varies across platforms).
+///
 /// ```rust,no_run
 /// # use std::path::Path;
 /// # use agx_e2e::assert_golden;
 /// let output_path = Path::new("output.png");
-/// assert_golden(output_path, "test_name.png", 2);
+/// assert_golden(output_path, "test_name.png", 2, 0.0);   // JPEG: strict
+/// assert_golden(output_path, "raw_test.png", 30, 10.0);   // RAW: permissive
 /// ```
-pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8) {
+pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8, max_diff_pct: f64) {
     let golden = golden_path(golden_name);
 
     if should_update_golden() {
@@ -153,9 +159,16 @@ pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8) {
     }
 
     if let Err(e) = compare_images(actual, &golden, tolerance) {
-        panic!(
-            "Golden comparison failed for '{}':\n  {}\nRun with GOLDEN_UPDATE=1 to update.",
-            golden_name, e
-        );
+        if max_diff_pct > 0.0 && e.diff_percentage <= max_diff_pct {
+            eprintln!(
+                "Golden '{}': {:.2}% pixels differ (within {:.1}% threshold), max channel diff: {}",
+                golden_name, e.diff_percentage, max_diff_pct, e.max_channel_diff
+            );
+        } else {
+            panic!(
+                "Golden comparison failed for '{}':\n  {}\n  Max allowed diff: {:.1}%\nRun with GOLDEN_UPDATE=1 to update.",
+                golden_name, e, max_diff_pct
+            );
+        }
     }
 }
