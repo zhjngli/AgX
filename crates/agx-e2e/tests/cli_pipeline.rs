@@ -4,9 +4,32 @@ use tempfile::TempDir;
 
 use agx_e2e::{assert_golden, fixture_path};
 
+// --- Constants ---
+
+const JPEG_IMAGES: &[(&str, &str)] = &[
+    ("jpeg/temple_blossoms.jpg", "temple_blossoms"),
+    ("jpeg/night_architecture.jpg", "night_architecture"),
+];
+
+const RAW_IMAGES: &[(&str, &str)] = &[
+    ("raw/night_city_blur.raf", "night_city_blur"),
+    ("raw/sunset_river.raf", "sunset_river"),
+    ("raw/foggy_forest.raf", "foggy_forest"),
+    ("raw/dusk_cityscape.raf", "dusk_cityscape"),
+];
+
+const LOOKS: &[&str] = &[
+    "portra_400",
+    "neo_noir",
+    "blade_runner",
+    "cinema_warm",
+    "kodachrome_64",
+    "nordic_fade",
+];
+
+// --- Helpers ---
+
 fn cli_bin() -> Command {
-    // Locate the agx-cli binary relative to the test binary.
-    // Test binary is in target/debug/deps/, CLI binary is in target/debug/.
     let mut path = std::env::current_exe()
         .unwrap()
         .parent()
@@ -23,7 +46,6 @@ fn cli_bin() -> Command {
     Command::new(path)
 }
 
-/// Sanity check on output file.
 fn assert_valid_output(path: &Path) {
     assert!(
         path.exists(),
@@ -34,135 +56,129 @@ fn assert_valid_output(path: &Path) {
     assert!(metadata.len() > 0, "Output file should not be empty");
 }
 
-// ---- RAW CLI tests (sanity checks only — LibRaw output varies by platform) ----
-
-#[test]
-fn cli_raf_basic_edit() {
-    let input = fixture_path("raw/night_city_blur.raf");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    let status = cli_bin()
-        .args([
-            "edit",
-            "-i",
-            input.to_str().unwrap(),
-            "-o",
-            output.to_str().unwrap(),
-            "--exposure",
-            "1.0",
-        ])
-        .status()
-        .expect("failed to run CLI");
-
-    assert!(status.success(), "CLI edit should succeed");
-    assert_valid_output(&output);
+fn look_preset_path(look: &str) -> std::path::PathBuf {
+    fixture_path(&format!("looks/{look}.toml"))
 }
 
-// ---- JPEG CLI tests ----
+// --- Noop tests (no adjustments applied) ---
 
 #[test]
-fn cli_jpeg_apply_preset() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
-    let preset = fixture_path("presets/warm_exposure.toml");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
+fn cli_jpeg_noop_matrix() {
+    for &(image_path, image_name) in JPEG_IMAGES {
+        let input = fixture_path(image_path);
+        let dir = TempDir::new().unwrap();
+        let output = dir.path().join("output.png");
 
-    let status = cli_bin()
-        .args([
-            "apply",
-            "-i",
-            input.to_str().unwrap(),
-            "-p",
-            preset.to_str().unwrap(),
-            "-o",
-            output.to_str().unwrap(),
-        ])
-        .status()
-        .expect("failed to run CLI");
+        let status = cli_bin()
+            .args([
+                "edit",
+                "-i",
+                input.to_str().unwrap(),
+                "-o",
+                output.to_str().unwrap(),
+            ])
+            .status()
+            .expect("failed to run CLI");
 
-    assert!(status.success(), "CLI apply should succeed");
-    assert_valid_output(&output);
-    assert_golden(&output, "cli_jpeg_apply_preset.png", 2);
-}
-
-// ---- Additional JPEG CLI tests ----
-
-#[test]
-fn cli_jpeg_edit_night_architecture() {
-    let input = fixture_path("jpeg/night_architecture.jpg");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    let status = cli_bin()
-        .args([
-            "edit",
-            "-i",
-            input.to_str().unwrap(),
-            "-o",
-            output.to_str().unwrap(),
-            "--exposure",
-            "1.5",
-            "--contrast",
-            "15",
-        ])
-        .status()
-        .expect("failed to run CLI");
-
-    assert!(status.success(), "CLI edit should succeed");
-    assert_valid_output(&output);
-}
-
-// ---- Additional RAW CLI tests ----
-
-#[test]
-fn cli_raf_foggy_forest_edit() {
-    let input = fixture_path("raw/foggy_forest.raf");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
-
-    let status = cli_bin()
-        .args([
-            "edit",
-            "-i",
-            input.to_str().unwrap(),
-            "-o",
-            output.to_str().unwrap(),
-            "--exposure",
-            "0.5",
-        ])
-        .status()
-        .expect("failed to run CLI");
-
-    assert!(status.success(), "CLI edit should succeed");
-    assert_valid_output(&output);
+        assert!(status.success(), "CLI edit should succeed for {image_name}");
+        assert_valid_output(&output);
+        assert_golden(&output, &format!("jpeg/{image_name}_noop.png"), 2, 0.0);
+    }
 }
 
 #[test]
-fn cli_raf_dusk_cityscape_with_preset() {
-    let input = fixture_path("raw/dusk_cityscape.raf");
-    let preset = fixture_path("presets/warm_exposure.toml");
-    let dir = TempDir::new().unwrap();
-    let output = dir.path().join("output.png");
+fn cli_raw_noop_matrix() {
+    for &(image_path, image_name) in RAW_IMAGES {
+        let input = fixture_path(image_path);
+        let dir = TempDir::new().unwrap();
+        let output = dir.path().join("output.png");
 
-    let status = cli_bin()
-        .args([
-            "apply",
-            "-i",
-            input.to_str().unwrap(),
-            "-p",
-            preset.to_str().unwrap(),
-            "-o",
-            output.to_str().unwrap(),
-        ])
-        .status()
-        .expect("failed to run CLI");
+        let status = cli_bin()
+            .args([
+                "edit",
+                "-i",
+                input.to_str().unwrap(),
+                "-o",
+                output.to_str().unwrap(),
+            ])
+            .status()
+            .expect("failed to run CLI");
 
-    assert!(status.success(), "CLI apply should succeed");
-    assert_valid_output(&output);
+        assert!(status.success(), "CLI edit should succeed for {image_name}");
+        assert_valid_output(&output);
+        assert_golden(&output, &format!("raw/{image_name}_noop.png"), 30, 10.0);
+    }
 }
 
-// ---- Batch CLI tests ----
+// --- JPEG x LOOK matrix ---
+
+#[test]
+fn cli_jpeg_look_matrix() {
+    for &(image_path, image_name) in JPEG_IMAGES {
+        for look in LOOKS {
+            let input = fixture_path(image_path);
+            let preset = look_preset_path(look);
+            let dir = TempDir::new().unwrap();
+            let output = dir.path().join("output.png");
+
+            let status = cli_bin()
+                .args([
+                    "apply",
+                    "-i",
+                    input.to_str().unwrap(),
+                    "-p",
+                    preset.to_str().unwrap(),
+                    "-o",
+                    output.to_str().unwrap(),
+                ])
+                .status()
+                .expect("failed to run CLI");
+
+            assert!(
+                status.success(),
+                "CLI apply should succeed for {image_name} with {look}"
+            );
+            assert_valid_output(&output);
+            assert_golden(&output, &format!("jpeg/{image_name}_{look}.png"), 2, 0.0);
+        }
+    }
+}
+
+// --- RAW x LOOK matrix ---
+
+#[test]
+fn cli_raw_look_matrix() {
+    for &(image_path, image_name) in RAW_IMAGES {
+        for look in LOOKS {
+            let input = fixture_path(image_path);
+            let preset = look_preset_path(look);
+            let dir = TempDir::new().unwrap();
+            let output = dir.path().join("output.png");
+
+            let status = cli_bin()
+                .args([
+                    "apply",
+                    "-i",
+                    input.to_str().unwrap(),
+                    "-p",
+                    preset.to_str().unwrap(),
+                    "-o",
+                    output.to_str().unwrap(),
+                ])
+                .status()
+                .expect("failed to run CLI");
+
+            assert!(
+                status.success(),
+                "CLI apply should succeed for {image_name} with {look}"
+            );
+            assert_valid_output(&output);
+            assert_golden(&output, &format!("raw/{image_name}_{look}.png"), 30, 10.0);
+        }
+    }
+}
+
+// --- Batch test ---
 
 #[test]
 fn cli_batch_edit_mixed_dir() {
@@ -171,7 +187,6 @@ fn cli_batch_edit_mixed_dir() {
     let output_dir = dir.path().join("output");
     std::fs::create_dir(&input_dir).unwrap();
 
-    // Copy fixture files into input dir
     let jpeg_src = fixture_path("jpeg/temple_blossoms.jpg");
     std::fs::copy(&jpeg_src, input_dir.join("temple_blossoms.jpg")).unwrap();
 
@@ -197,7 +212,7 @@ fn cli_batch_edit_mixed_dir() {
     );
 }
 
-// ---- Error cases ----
+// --- Error cases ---
 
 #[test]
 fn cli_corrupt_file_fails_gracefully() {
@@ -205,7 +220,6 @@ fn cli_corrupt_file_fails_gracefully() {
     let corrupt = dir.path().join("corrupt.raf");
     let output = dir.path().join("output.png");
 
-    // Write garbage data with a RAW extension
     std::fs::write(&corrupt, b"this is not a real RAF file").unwrap();
 
     let result = cli_bin()
