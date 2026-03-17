@@ -1,6 +1,6 @@
 # Ideas Backlog
 
-Future features and ideas for oxiraw. Nothing here is committed — pick an idea file to explore.
+Future features and ideas for AgX. Nothing here is committed — pick an idea file to explore.
 
 | File | Category | Summary |
 |------|----------|---------|
@@ -17,6 +17,7 @@ Future features and ideas for oxiraw. Nothing here is committed — pick an idea
 | [pluggable-pipeline.md](pluggable-pipeline.md) | Pipeline | Stage-based render pipeline with caching and color-space awareness |
 | [color-management.md](color-management.md) | Color | Wide gamut, ICC profiles, per-camera color matrices |
 | [processing-parity.md](processing-parity.md) | Advanced | Understanding and reducing rendering differences vs other editors |
+| [heic-support.md](heic-support.md) | Decode | HEIC/HEIF format decoding support |
 | [ecosystem-interop.md](ecosystem-interop.md) | Ecosystem | XMP/costyle/pp3 import/export and sidecar files |
 | [platform-and-distribution.md](platform-and-distribution.md) | Performance | REST API, GPU, WASM, batch processing, preset marketplace |
 | [ui.md](ui.md) | UI | Desktop and web UI, histogram, before/after, undo/redo |
