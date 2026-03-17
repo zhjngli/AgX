@@ -1,9 +1,0 @@
-[metadata]
-name = "High Contrast"
-version = "1.0"
-author = "e2e-test"
-
-[tone]
-contrast = 50.0
-highlights = -20.0
-shadows = 20.0
