@@ -823,7 +823,7 @@ mod tests {
         let engine = Engine::new(img);
         // HSL defaults to all zeros, so render should be identity
         let orig = engine.original().get_pixel(0, 0);
-        let rend = engine.render().get_pixel(0, 0).clone();
+        let rend = *engine.render().get_pixel(0, 0);
         for i in 0..3 {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-4,
@@ -906,23 +906,27 @@ mod tests {
 
     #[test]
     fn partial_hsl_channels_merge_channel_level() {
-        let mut base = super::PartialHslChannels::default();
-        base.red = Some(super::PartialHslChannel {
-            hue: Some(10.0),
-            saturation: None,
-            luminance: None,
-        });
-        let mut overlay = super::PartialHslChannels::default();
-        overlay.red = Some(super::PartialHslChannel {
-            hue: None,
-            saturation: Some(20.0),
-            luminance: None,
-        });
-        overlay.green = Some(super::PartialHslChannel {
-            hue: Some(5.0),
-            saturation: None,
-            luminance: None,
-        });
+        let base = super::PartialHslChannels {
+            red: Some(super::PartialHslChannel {
+                hue: Some(10.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
+        };
+        let overlay = super::PartialHslChannels {
+            red: Some(super::PartialHslChannel {
+                hue: None,
+                saturation: Some(20.0),
+                luminance: None,
+            }),
+            green: Some(super::PartialHslChannel {
+                hue: Some(5.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
+        };
         let merged = base.merge(&overlay);
         assert_eq!(merged.red.as_ref().unwrap().hue, Some(10.0));
         assert_eq!(merged.red.as_ref().unwrap().saturation, Some(20.0));
@@ -945,12 +949,14 @@ mod tests {
 
     #[test]
     fn partial_hsl_channels_materialize() {
-        let mut partial = super::PartialHslChannels::default();
-        partial.red = Some(super::PartialHslChannel {
-            hue: Some(15.0),
-            saturation: None,
-            luminance: None,
-        });
+        let partial = super::PartialHslChannels {
+            red: Some(super::PartialHslChannel {
+                hue: Some(15.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
+        };
         let concrete = partial.materialize();
         assert_eq!(concrete.red.hue, 15.0);
         assert_eq!(concrete.red.saturation, 0.0);
@@ -1018,14 +1024,15 @@ mod tests {
             exposure: Some(1.0),
             ..Default::default()
         };
-        let mut hsl = super::PartialHslChannels::default();
-        hsl.red = Some(super::PartialHslChannel {
-            hue: Some(10.0),
-            saturation: None,
-            luminance: None,
-        });
         let overlay = super::PartialParameters {
-            hsl: Some(hsl),
+            hsl: Some(super::PartialHslChannels {
+                red: Some(super::PartialHslChannel {
+                    hue: Some(10.0),
+                    saturation: None,
+                    luminance: None,
+                }),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let merged = base.merge(&overlay);
@@ -1061,13 +1068,14 @@ mod tests {
         engine.params_mut().hsl.red.hue = 15.0;
 
         let mut preset = crate::preset::Preset::default();
-        let mut partial_hsl = PartialHslChannels::default();
-        partial_hsl.green = Some(PartialHslChannel {
-            hue: Some(10.0),
-            saturation: None,
-            luminance: None,
+        preset.partial_params.hsl = Some(PartialHslChannels {
+            green: Some(PartialHslChannel {
+                hue: Some(10.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
         });
-        preset.partial_params.hsl = Some(partial_hsl);
 
         engine.layer_preset(&preset);
         assert_eq!(engine.params().hsl.red.hue, 15.0);

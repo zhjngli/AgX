@@ -376,23 +376,24 @@ LUT_3D_SIZE 2
     fn preset_hsl_roundtrip() {
         use crate::engine::{PartialHslChannel, PartialHslChannels};
         let mut preset = Preset::default();
-        let mut hsl = PartialHslChannels::default();
-        hsl.red = Some(PartialHslChannel {
-            hue: Some(15.0),
-            saturation: None,
-            luminance: None,
+        preset.partial_params.hsl = Some(PartialHslChannels {
+            red: Some(PartialHslChannel {
+                hue: Some(15.0),
+                saturation: None,
+                luminance: None,
+            }),
+            green: Some(PartialHslChannel {
+                hue: None,
+                saturation: Some(-30.0),
+                luminance: None,
+            }),
+            blue: Some(PartialHslChannel {
+                hue: None,
+                saturation: None,
+                luminance: Some(20.0),
+            }),
+            ..Default::default()
         });
-        hsl.green = Some(PartialHslChannel {
-            hue: None,
-            saturation: Some(-30.0),
-            luminance: None,
-        });
-        hsl.blue = Some(PartialHslChannel {
-            hue: None,
-            saturation: None,
-            luminance: Some(20.0),
-        });
-        preset.partial_params.hsl = Some(hsl);
 
         let toml_str = preset.to_toml().unwrap();
         let parsed = Preset::from_toml(&toml_str).unwrap();

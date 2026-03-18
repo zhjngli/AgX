@@ -449,6 +449,6 @@ mod tests {
         let opts = EncodeOptions::default();
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
-        let _ = std::fs::remove_file(&result.unwrap());
+        let _ = std::fs::remove_file(result.unwrap());
     }
 }
