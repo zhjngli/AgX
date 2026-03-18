@@ -37,14 +37,17 @@ fn cli_bin() -> Command {
     // Prefer release binary (much faster for image processing)
     let release = target_dir.join("release").join("agx-cli");
     let debug = target_dir.join("debug").join("agx-cli");
-    let path = if release.exists() { release } else { debug };
-
-    assert!(
-        path.exists(),
-        "agx-cli binary not found at {} or {}. Run `cargo build --release -p agx-cli` first.",
-        release.display(),
-        debug.display(),
-    );
+    let path = if release.exists() {
+        release
+    } else if debug.exists() {
+        debug
+    } else {
+        panic!(
+            "agx-cli binary not found. Checked:\n  {}\n  {}\nRun `cargo build --release -p agx-cli` first.",
+            target_dir.join("release/agx-cli").display(),
+            target_dir.join("debug/agx-cli").display(),
+        )
+    };
     Command::new(path)
 }
 
