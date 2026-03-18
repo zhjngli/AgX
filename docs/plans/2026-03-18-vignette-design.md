@@ -23,7 +23,7 @@ Two parameters:
 
 **Elliptical (default):** The falloff ellipse matches the image's aspect ratio. All four edges darken evenly. Normalized distance: `d² = (dx/half_w)² + (dy/half_h)²`. This is the standard default in most editors.
 
-**Circular:** The falloff is a circle whose radius equals half the image's long edge. On a non-square image, the short edges are closer to the circle boundary and darken more than the long edges. Corners darken the most. This simulates real lens image circle vignetting — the lens projects a circular image circle onto the rectangular sensor, and the circle radius is determined by the long edge coverage.
+**Circular:** The falloff is a circle whose radius equals half the image's long edge. Normalized distance: `d² = (dx/R)² + (dy/R)²` where `R = max(half_w, half_h)`. On a non-square image, the short edges are closer to the circle boundary and darken more than the long edges. Corners darken the most. This simulates real lens image circle vignetting — the lens projects a circular image circle onto the rectangular sensor, and the circle radius is determined by the long edge coverage.
 
 ### Falloff curve
 
@@ -71,17 +71,18 @@ engine.params_mut().vignette.shape = VignetteShape::Circular;
 ### New types
 
 ```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VignetteShape {
+    #[default]
     Elliptical,
     Circular,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VignetteParams {
-    pub amount: f32,
-    pub shape: VignetteShape,
+    pub amount: f32,        // default 0.0
+    pub shape: VignetteShape, // default Elliptical
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -98,9 +99,14 @@ pub struct PartialVignetteParams {
 | File | Change |
 |------|--------|
 | `crates/agx/src/adjust/mod.rs` | Add `apply_vignette(r, g, b, amount, shape, x, y, w, h) -> (f32, f32, f32)` and `VignetteShape` enum |
-| `crates/agx/src/engine/mod.rs` | Add `VignetteParams` to `Parameters`, `PartialVignetteParams` to `PartialParameters`, call vignette in render loop after LUT |
-| `crates/agx/src/preset/mod.rs` | Add `[vignette]` section to `PresetRaw`, map to partial params |
+| `crates/agx/src/engine/mod.rs` | Add `VignetteParams` to `Parameters`, `PartialVignetteParams` to `PartialParameters` with `merge()`/`materialize()`/`From` impls, call vignette in render loop after LUT |
+| `crates/agx/src/preset/mod.rs` | Add `vignette: Option<PartialVignetteParams>` to `PresetRaw`, propagate in `build_partial_params` |
+| `crates/agx/src/lib.rs` | Re-export `VignetteParams`, `PartialVignetteParams`, `VignetteShape` |
 | `crates/agx-cli/src/main.rs` | Add `--vignette-amount` and `--vignette-shape` flags |
+
+### Preset composability
+
+`PartialVignetteParams` follows the same pattern as other partial types: `merge()` overlays non-None fields, `materialize()` fills in defaults, and `From<&VignetteParams>` wraps all fields in `Some`. `PartialParameters::merge()` and `PartialParameters::materialize()` are updated to handle the new `vignette` field. No runtime validation of `amount` range — values outside -100..+100 produce extrapolated results, consistent with other adjustments.
 
 ### Pipeline position
 
@@ -122,7 +128,7 @@ Early-out: skip entirely when `amount == 0.0`.
 - `vignette_corner_darkened` — negative amount darkens corner pixels
 - `vignette_corner_brightened` — positive amount brightens corner pixels
 - `vignette_circular_top_bottom_darker_than_sides` — on a 3:2 image, circular mode darkens short edges more than long edges
-- `vignette_elliptical_edges_even` — elliptical mode darkens all edges evenly
+- `vignette_elliptical_edges_even` — on a 3:2 image, compare vignette factor at midpoints of all four edges (top, bottom, left, right) and assert they are equal
 
 ### E2E tests
 
