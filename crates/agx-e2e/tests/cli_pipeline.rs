@@ -5,7 +5,18 @@ use agx_e2e::{assert_golden, assert_valid_output, fixture_path};
 
 // --- Constants ---
 
-const LOOKS: &[&str] = &[
+const COLOR_LOOKS: &[&str] = &[
+    "portra_400",
+    "neo_noir",
+    "blade_runner",
+    "cinema_warm",
+    "kodachrome_64",
+    "nordic_fade",
+];
+
+const BW_LOOKS: &[&str] = &["bw_high_contrast", "bw_street", "bw_lofi"];
+
+const ALL_LOOKS: &[&str] = &[
     "portra_400",
     "neo_noir",
     "blade_runner",
@@ -40,7 +51,7 @@ fn look_preset_path(look: &str) -> std::path::PathBuf {
     fixture_path(&format!("looks/{look}.toml"))
 }
 
-/// Run noop + all 6 looks for a single image. This consolidates all CLI invocations
+/// Run noop + specified looks for a single image. This consolidates all CLI invocations
 /// for one image into a single test function, enabling Cargo to parallelize across images.
 fn run_image_matrix(
     image_path: &str,
@@ -48,6 +59,7 @@ fn run_image_matrix(
     golden_dir: &str,
     tolerance: u8,
     max_diff_pct: f64,
+    looks: &[&str],
 ) {
     // Noop (no adjustments)
     {
@@ -76,8 +88,8 @@ fn run_image_matrix(
         );
     }
 
-    // All looks
-    for look in LOOKS {
+    // Apply each look
+    for look in looks {
         let input = fixture_path(image_path);
         let preset = look_preset_path(look);
         let dir = TempDir::new().unwrap();
@@ -112,6 +124,8 @@ fn run_image_matrix(
 
 // --- Per-image tests (enables parallelism: each test function runs concurrently) ---
 
+// --- Color images: noop + all looks (color + B&W conversion) ---
+
 #[test]
 fn cli_temple_blossoms() {
     run_image_matrix(
@@ -120,17 +134,7 @@ fn cli_temple_blossoms() {
         "jpeg",
         2,
         0.0,
-    );
-}
-
-#[test]
-fn cli_night_architecture() {
-    run_image_matrix(
-        "jpeg/night_architecture.jpg",
-        "night_architecture",
-        "jpeg",
-        2,
-        0.0,
+        ALL_LOOKS,
     );
 }
 
@@ -142,22 +146,58 @@ fn cli_night_city_blur() {
         "raw",
         30,
         10.0,
+        ALL_LOOKS,
     );
 }
 
 #[test]
 fn cli_sunset_river() {
-    run_image_matrix("raw/sunset_river.raf", "sunset_river", "raw", 30, 10.0);
+    run_image_matrix(
+        "raw/sunset_river.raf",
+        "sunset_river",
+        "raw",
+        30,
+        10.0,
+        ALL_LOOKS,
+    );
 }
 
 #[test]
 fn cli_foggy_forest() {
-    run_image_matrix("raw/foggy_forest.raf", "foggy_forest", "raw", 30, 10.0);
+    run_image_matrix(
+        "raw/foggy_forest.raf",
+        "foggy_forest",
+        "raw",
+        30,
+        10.0,
+        ALL_LOOKS,
+    );
 }
 
 #[test]
 fn cli_dusk_cityscape() {
-    run_image_matrix("raw/dusk_cityscape.raf", "dusk_cityscape", "raw", 30, 10.0);
+    run_image_matrix(
+        "raw/dusk_cityscape.raf",
+        "dusk_cityscape",
+        "raw",
+        30,
+        10.0,
+        ALL_LOOKS,
+    );
+}
+
+// --- B&W images: noop + B&W looks only (color looks are meaningless on B&W) ---
+
+#[test]
+fn cli_night_architecture() {
+    run_image_matrix(
+        "jpeg/night_architecture.jpg",
+        "night_architecture",
+        "jpeg",
+        2,
+        0.0,
+        BW_LOOKS,
+    );
 }
 
 // --- Batch test ---
