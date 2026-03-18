@@ -32,6 +32,10 @@ Skip the design doc for:
 - **Negative constraint changes**: Anything a module must now do or stop doing
 - **Testing strategy**: How you'll verify it works
 
+### Picking up an idea
+
+When starting work on a feature from the ideas backlog (`docs/ideas/`), remove the idea file as part of the feature branch. The idea doc captures the initial brainstorm; the design doc in `docs/plans/` captures the actual decisions.
+
 ## 2. Implement
 
 ### Branch naming

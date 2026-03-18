@@ -2,7 +2,7 @@
 
 An open-source photo editing library and CLI written in Rust, with a portable, human-readable preset format.
 
-**AgX** takes its name from silver halide (AgX) — the light-sensitive chemical compound at the heart of analog film. Ag is silver, X is a halide. A nod to photography's chemical roots, with a wink at oxidation and Rust.
+**AgX** is the chemical notation for silver halide — the light-sensitive compound in photographic film. Ag is silver, X is a halide (chlorine, bromine, or iodine). When light hits silver halide crystals, they undergo a chemical reduction that forms the latent image.
 
 ## Features
 
@@ -20,59 +20,40 @@ An open-source photo editing library and CLI written in Rust, with a portable, h
 
 ## Sample Images
 
-Three source photos are included in `example/images/` along with five presets in `example/presets/`.
+These before/after pairs are from the e2e test suite — each processed through the full decode, engine render, and encode pipeline with a film-inspired look preset and 3D LUT.
 
 ### Before & After
 
-| Original | Preset | Result |
+| Original | Look | Result |
 |:--:|:--:|:--:|
-| ![mountain](example/images/mountain-landscape.jpg) | `high-contrast.toml` | ![mountain-hc](example/outputs/mountain-landscape-high-contrast.jpg) |
-| ![forest](example/images/moody-forest.jpg) | `moody-dark.toml` | ![forest-moody](example/outputs/moody-forest-moody-dark.jpg) |
-| ![city](example/images/city-skyline.jpg) | `golden-hour.toml` | ![city-golden](example/outputs/city-skyline-golden-hour.jpg) |
-
-### Presets
-
-| Preset | Style |
-|--------|-------|
-| `golden-hour.toml` | Warm, lifted shadows, pulled highlights — late afternoon look |
-| `moody-dark.toml` | Dark, contrasty, cool tones — cinematic mood |
-| `high-contrast.toml` | Punchy contrast with extended tonal range |
-| `faded-film.toml` | Low contrast, lifted blacks, warm tint — vintage film feel |
-| `cool-blue.toml` | Cool temperature shift with gentle contrast |
-
-Try them out:
-
-```bash
-cargo run -p agx-cli -- apply \
-  -i example/images/moody-forest.jpg \
-  -p example/presets/golden-hour.toml \
-  -o edited.jpg
-```
+| ![sunset](example/images/sunset_river.png) | Portra 400 | ![sunset-portra](example/outputs/sunset_river_portra_400.png) |
+| ![temple](example/images/temple_blossoms.png) | Neo Noir | ![temple-noir](example/outputs/temple_blossoms_neo_noir.png) |
+| ![architecture](example/images/night_architecture.png) | B&W High Contrast | ![architecture-bw](example/outputs/night_architecture_bw_high_contrast.png) |
 
 ## Quick Start
 
 ```bash
 # Apply a preset to an image
 cargo run -p agx-cli -- apply \
-  -i example/images/mountain-landscape.jpg \
+  -i example/images/temple_blossoms.png \
   -p example/presets/golden-hour.toml \
   -o edited.jpg
 
 # Edit with inline parameters
 cargo run -p agx-cli -- edit \
-  -i example/images/moody-forest.jpg \
+  -i example/images/sunset_river.png \
   -o edited.jpg \
   --exposure 1.0 --contrast 25 --temperature 30
 
 # Apply a .cube LUT
 cargo run -p agx-cli -- edit \
-  -i example/images/city-skyline.jpg \
+  -i example/images/temple_blossoms.png \
   -o graded.jpg \
   --lut film-emulation.cube
 
 # Combine adjustments with a LUT
 cargo run -p agx-cli -- edit \
-  -i example/images/mountain-landscape.jpg \
+  -i example/images/sunset_river.png \
   -o graded.jpg \
   --exposure 0.5 --contrast 10 --lut film-emulation.cube
 
@@ -240,10 +221,6 @@ The CLI enables raw support by default. To use the library without raw support (
 [dependencies]
 agx = "0.1"
 ```
-
-## Image Credits
-
-Sample photos from [Unsplash](https://unsplash.com) (free to use under the [Unsplash License](https://unsplash.com/license)).
 
 ## License
 

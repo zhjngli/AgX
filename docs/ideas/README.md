@@ -1,14 +1,6 @@
 # Ideas Backlog
 
-Future features and ideas for AgX. Nothing here is committed — pick an idea file to explore.
-
-## Completed
-
-| Feature | PR |
-|---------|----|
-| HSL Adjustments | [#3](https://github.com/zhjngli/AgX/pull/3) |
-| Preset Composability | [#5](https://github.com/zhjngli/AgX/pull/5) |
-| Batch Processing | [#6](https://github.com/zhjngli/AgX/pull/6) |
+Future features and ideas for AgX. Nothing here is committed — pick an idea file to explore. When an idea is picked up for implementation, remove its file from this directory.
 
 ## Editing — Per-Pixel Features
 
