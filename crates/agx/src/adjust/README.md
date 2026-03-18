@@ -22,6 +22,10 @@ All tone functions operate on a single channel and return a clamped `f32`.
 - `apply_hsl(r, g, b, hue_shifts, saturation_shifts, luminance_shifts, weight_fn)` -- per-channel HSL adjustment in sRGB gamma space
 - `WeightFn` -- type alias for pluggable weight functions: `fn(f32, f32) -> f32`
 
+### Vignette
+- `VignetteShape` -- enum: `Elliptical` (default, aspect-matched) or `Circular` (image-circle)
+- `apply_vignette(r, g, b, amount, shape, x, y, w, h)` -- position-dependent edge darkening/brightening using power-curve falloff (sRGB gamma space)
+
 ## Extension Guide
 1. Add a new `pub fn apply_foo(value: f32, amount: f32) -> f32` here.
 2. Add a `foo` field to `Parameters` in `engine/mod.rs`.

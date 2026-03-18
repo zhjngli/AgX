@@ -15,7 +15,7 @@ Serialize and deserialize declarative photo-editing presets as TOML files. Suppo
 To add a new adjustment parameter:
 1. Add the field to `Parameters` in `engine/mod.rs`.
 2. Add the corresponding `Option<f32>` field to `PartialParameters` in `engine/mod.rs`.
-3. Add the field to the appropriate section struct (`ToneSection`, `WhiteBalanceSection`, or a new section) as `Option<f32>`.
+3. Add the field to the appropriate section struct (`ToneSection`, `WhiteBalanceSection`, `VignetteSection`, or a new section) as `Option<f32>`.
 4. Map the field in `build_partial_params()` and update `from_toml` / `to_toml`.
 
 ### Preset inheritance

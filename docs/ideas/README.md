@@ -12,7 +12,6 @@ These operate on each pixel independently, fit into the current single-pass engi
 |------|---------|
 | [tone-curves.md](tone-curves.md) | Parametric and point curves for precise tonal control |
 | [color-grading.md](color-grading.md) | 3-way color wheels for shadow/midtone/highlight grading |
-| [vignette.md](vignette.md) | Edge darkening/brightening — position-dependent but still per-pixel |
 
 ## Editing — Neighborhood Operations
 
