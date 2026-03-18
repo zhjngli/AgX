@@ -2,7 +2,16 @@
 
 An open-source photo editing library and CLI written in Rust, with a portable, human-readable preset format.
 
-**AgX** is the chemical notation for silver halide — the light-sensitive compound in photographic film. Ag is silver, X is a halide (chlorine, bromine, or iodine). When light hits silver halide crystals, they undergo a chemical reduction that forms the latent image.
+**AgX** is the chemical notation for silver halide — the light-sensitive compound in photographic film. Ag is silver, X is a halide. Silver halide crystals capture light and undergo oxidation-reduction to form the latent image — the invisible precursor to every photograph ever developed in a darkroom. A photo editing library written in Rust, named after the chemistry that started it all.
+
+## Philosophy
+
+AgX is a **preset-first** photo editing tool. The goal is not to replace Lightroom or Capture One — it's to make photo editing accessible through composable, shareable, human-readable presets.
+
+- **Presets as recipes**: A preset is a complete editing recipe — tone, white balance, HSL, LUT — in a single TOML file. Presets can extend other presets, override selectively, and compose into layered looks.
+- **Batch-oriented**: Apply a look to an entire shoot in one command. The CLI and library API are designed for processing many images quickly, not pixel-level retouching.
+- **Shareable by design**: Presets are plain text, version-controllable, and portable. The format is meant to be shared, forked, and remixed — the foundation for a preset marketplace.
+- **CLI and API first**: AgX is a library and a command-line tool. UI may come later, but the core value lives in the editing engine and preset format.
 
 ## Features
 
