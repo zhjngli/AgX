@@ -19,6 +19,7 @@ Future features and ideas for AgX. Nothing here is committed — pick an idea fi
 | [processing-parity.md](processing-parity.md) | Advanced | Understanding and reducing rendering differences vs other editors |
 | [heic-support.md](heic-support.md) | Decode | HEIC/HEIF format decoding support |
 | [ecosystem-interop.md](ecosystem-interop.md) | Ecosystem | XMP/costyle/pp3 import/export and sidecar files |
+| [multi-preset-cli.md](multi-preset-cli.md) | Performance | Decode once, apply N presets per CLI invocation |
 | [platform-and-distribution.md](platform-and-distribution.md) | Performance | REST API, GPU, WASM, batch processing, preset marketplace |
 | [ui.md](ui.md) | UI | Desktop and web UI, histogram, before/after, undo/redo |
 | [advanced-research.md](advanced-research.md) | Advanced | AI editing, HDR merge, panorama, focus stacking, tethered shooting |
