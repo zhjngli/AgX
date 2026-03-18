@@ -32,6 +32,10 @@ Skip the design doc for:
 - **Negative constraint changes**: Anything a module must now do or stop doing
 - **Testing strategy**: How you'll verify it works
 
+### Picking up an idea
+
+When starting work on a feature from the ideas backlog (`docs/ideas/`), remove the idea file as part of the feature branch. The idea doc captures the initial brainstorm; the design doc in `docs/plans/` captures the actual decisions.
+
 ## 2. Implement
 
 ### Branch naming
@@ -87,6 +91,12 @@ Run `scripts/verify.sh` before considering work done. The script runs:
 | Doc links | Custom check | Broken links in ARCHITECTURE.md |
 
 The script exits on first failure with a message about what went wrong.
+
+### E2E tests
+
+For changes that affect editing, the rendering pipeline, presets, or LUTs, also run `scripts/e2e.sh`. This builds the CLI in release mode and runs the full golden comparison suite (54 image x look tests). See `crates/agx-e2e/README.md` for details.
+
+When adding new editing features, update the e2e test pipeline alongside the implementation: add or update look presets that exercise the feature, regenerate LUTs if applicable (via `agx-lut-gen`), and update golden files with `GOLDEN_UPDATE=1 cargo test -p agx-e2e`.
 
 ### When a check fails
 
