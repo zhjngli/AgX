@@ -88,6 +88,12 @@ Run `scripts/verify.sh` before considering work done. The script runs:
 
 The script exits on first failure with a message about what went wrong.
 
+### E2E tests
+
+For changes that affect editing, the rendering pipeline, presets, or LUTs, also run `scripts/e2e.sh`. This builds the CLI in release mode and runs the full golden comparison suite (54 image x look tests). See `crates/agx-e2e/README.md` for details.
+
+When adding new editing features, update the e2e test pipeline alongside the implementation: add or update look presets that exercise the feature, regenerate LUTs if applicable (via `agx-lut-gen`), and update golden files with `GOLDEN_UPDATE=1 cargo test -p agx-e2e`.
+
 ### When a check fails
 
 - **Format**: Run `cargo fmt` and re-run the script.

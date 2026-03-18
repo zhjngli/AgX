@@ -2,13 +2,20 @@
 
 An open-source photo editing library and CLI written in Rust, with a portable, human-readable preset format.
 
+**AgX** takes its name from silver halide (AgX) — the light-sensitive chemical compound at the heart of analog film. Ag is silver, X is a halide. A nod to photography's chemical roots, with a wink at oxidation and Rust.
+
 ## Features
 
 - **Tone adjustments**: exposure, contrast, highlights, shadows, whites, blacks
 - **White balance**: temperature and tint shifts
-- **Raw format support**: decode CR2, CR3, NEF, ARW, RAF, DNG, and 1000+ camera formats via LibRaw
+- **HSL adjustments**: per-channel hue, saturation, and luminance targeting
 - **3D LUT support**: apply `.cube` LUT files for color grading and film emulation
+- **EXIF orientation**: automatic orientation correction for standard formats (JPEG, PNG, TIFF)
+- **Preset composability**: presets can `extend` a base preset, with Option-style inheritance
+- **Raw format support**: decode CR2, CR3, NEF, ARW, RAF, DNG, and 1000+ camera formats via LibRaw
+- **Batch processing**: process entire directories with parallel execution via rayon
 - **TOML presets**: human-readable, shareable, version-controllable editing presets
+- **Metadata preservation**: EXIF and ICC profiles carried through the pipeline
 - **Library + CLI**: use as a Rust library or through the command-line interface
 
 ## Sample Images
@@ -75,6 +82,12 @@ cargo run -p agx-cli -- edit \
   -o edited.jpg \
   --exposure 0.5 --contrast 15
 
+# Batch process a directory
+cargo run -p agx-cli -- batch-edit \
+  --input-dir photos/ \
+  --output-dir edited/ \
+  --exposure 0.5 --contrast 10
+
 # Set JPEG output quality (default: 92)
 cargo run -p agx-cli -- edit \
   -i photo.jpg \
@@ -116,13 +129,23 @@ blacks = -5.0        # -100 to +100
 [white_balance]
 temperature = 40.0   # warm (+) / cool (-)
 tint = 5.0           # magenta (+) / green (-)
-```
 
-Presets can also reference a `.cube` LUT file:
+[hsl.red]
+hue = 10.0           # -180 to +180
+saturation = 15.0    # -100 to +100
+luminance = -5.0     # -100 to +100
 
-```toml
 [lut]
 path = "film-emulation.cube"   # resolved relative to the preset file
+```
+
+Presets can extend a base preset with `extends`:
+
+```toml
+extends = "base_cinematic.toml"   # inherit parameters, override selectively
+
+[tone]
+contrast = 30.0   # override base contrast
 ```
 
 Missing values default to neutral (no change). See `example/presets/` for more examples.
@@ -162,23 +185,41 @@ agx/
 ├── crates/
 │   ├── agx/             # core library
 │   │   └── src/
-│   │       ├── adjust/  # adjustment algorithms
-│   │       ├── decode/  # image decoding (sRGB → linear)
+│   │       ├── adjust/  # adjustment algorithms (per-pixel)
+│   │       ├── decode/  # image decoding (sRGB → linear) + EXIF orientation
 │   │       ├── encode/  # image encoding (linear → sRGB)
 │   │       ├── engine/  # rendering engine
 │   │       ├── lut/     # 3D LUT parsing and interpolation
-│   │       ├── preset/  # TOML preset serialization
+│   │       ├── preset/  # TOML preset serialization + composability
 │   │       └── error.rs # error types
-│   └── agx-cli/         # CLI wrapper
+│   ├── agx-cli/         # CLI wrapper (edit, apply, batch-edit)
+│   ├── agx-e2e/         # e2e test suite (golden file comparison)
+│   └── agx-lut-gen/     # dev tool for generating .cube LUT files
 ├── example/             # sample images, presets, and LUTs
-└── docs/                # design docs, plans, and references
+├── scripts/             # verify.sh, e2e.sh
+└── docs/                # design docs, ideas, and contributing guides
 ```
 
 ## Architecture
 
 The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. This makes the system order-independent from the user's perspective — presets are purely declarative parameter values, not operation sequences.
 
-All processing happens in **sRGB** color space. Exposure and white balance operate in linear sRGB; contrast, highlights, shadows, whites, blacks, and LUTs operate in sRGB gamma space. See `docs/reference/color-spaces.md` for a detailed explanation.
+All processing happens in **sRGB** color space. Exposure and white balance operate in linear sRGB; contrast, highlights, shadows, whites, blacks, HSL, and LUTs operate in sRGB gamma space. See `docs/reference/color-spaces.md` for a detailed explanation.
+
+## Testing
+
+```bash
+# Fast checks (format, clippy, unit tests, architecture tests, doc links)
+./scripts/verify.sh
+
+# Full e2e suite (builds CLI in release, runs 54 golden comparisons)
+./scripts/e2e.sh
+
+# Regenerate golden files
+GOLDEN_UPDATE=1 cargo test -p agx-e2e
+```
+
+The e2e suite tests every fixture image against 9 film-inspired look presets (6 color + 3 B&W), each combining parameter adjustments with generated 33x33x33 `.cube` LUTs. See `crates/agx-e2e/README.md` for details.
 
 ## Building with Raw Support
 
@@ -198,12 +239,6 @@ The CLI enables raw support by default. To use the library without raw support (
 # Cargo.toml — no "raw" feature, only standard formats
 [dependencies]
 agx = "0.1"
-```
-
-## Running Tests
-
-```bash
-cargo test --workspace
 ```
 
 ## Image Credits

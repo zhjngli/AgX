@@ -4,9 +4,11 @@ Open-source photo editing library + CLI in Rust with a portable, human-readable 
 
 ## Workspace Layout
 
-Cargo workspace with two crates:
+Cargo workspace with four crates:
 - `crates/agx/` -- core library (decode, engine, adjustments, presets, encode)
-- `crates/agx-cli/` -- thin CLI wrapper
+- `crates/agx-cli/` -- thin CLI wrapper (edit, apply, batch-edit)
+- `crates/agx-e2e/` -- e2e test suite (golden file comparison, 54 image x look tests)
+- `crates/agx-lut-gen/` -- dev-only tool for generating .cube LUT files
 
 ## Architecture
 
@@ -36,7 +38,7 @@ Write a design doc in `docs/plans/` when the change adds/modifies modules, chang
 Work on a feature branch (`feat/`, `fix/`, `refactor/`). Write tests alongside code. Follow module contracts in per-module READMEs. Commit incrementally.
 
 ### 3. Verify
-Run `./scripts/verify.sh`. This runs format check, clippy, all tests (unit + architecture + CLI), and doc link validation.
+Run `./scripts/verify.sh` for fast checks (format, clippy, unit tests, architecture tests, doc links). Run `./scripts/e2e.sh` for the full e2e golden comparison suite.
 
 ### 4. Document
 Update `ARCHITECTURE.md` if modules, dependencies, or invariants changed. Update affected module READMEs (public API, extension guide). Cross-link any new design docs.
@@ -44,13 +46,17 @@ Update `ARCHITECTURE.md` if modules, dependencies, or invariants changed. Update
 ### 5. Self-review
 Re-read the diff. Check: Did I implement what was asked? Did I add anything extra? Do tests verify behavior?
 
+### 6. E2E (for editing features)
+When adding new editing features (adjust/, LUT, preset parameters), also update the e2e test pipeline: look presets, LUTs (via agx-lut-gen), and golden files so the test matrix comprehensively exercises the new capability.
+
 ## Definition of Done
 
 Before merging, verify:
 1. `./scripts/verify.sh` passes
-2. `ARCHITECTURE.md` updated if modules, dependencies, or invariants changed
-3. Affected module `README.md` files updated
-4. Design doc cross-linked from `ARCHITECTURE.md` (if applicable)
+2. `./scripts/e2e.sh` passes (if editing features or pipeline changes were made)
+3. `ARCHITECTURE.md` updated if modules, dependencies, or invariants changed
+4. Affected module `README.md` files updated
+5. Design doc cross-linked from `ARCHITECTURE.md` (if applicable)
 
 ## Key Docs
 

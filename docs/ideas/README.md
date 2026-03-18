@@ -2,24 +2,56 @@
 
 Future features and ideas for AgX. Nothing here is committed — pick an idea file to explore.
 
-| File | Category | Summary |
-|------|----------|---------|
-| [tone-curves.md](tone-curves.md) | Editing | Parametric and point curves for precise tonal control |
-| [hsl-adjustments.md](hsl-adjustments.md) | Editing | Per-channel hue, saturation, luminance targeting |
-| [color-grading.md](color-grading.md) | Editing | 3-way color wheels for shadow/midtone/highlight grading |
-| [sharpening-and-detail.md](sharpening-and-detail.md) | Editing | Sharpening, clarity, texture, and noise reduction |
-| [film-and-grain.md](film-and-grain.md) | Editing | Film grain simulation and film emulation database |
-| [geometric-corrections.md](geometric-corrections.md) | Editing | Lens corrections, perspective, crop and rotation |
-| [local-adjustments.md](local-adjustments.md) | Editing | Brushes, gradients, and radial filters for per-region edits |
-| [dehaze.md](dehaze.md) | Editing | Atmospheric haze removal |
-| [preset-composability.md](preset-composability.md) | Preset | Composable, partial, and inheritable presets |
-| [preset-tooling.md](preset-tooling.md) | Preset | Schema versioning, validation, and authoring shortcuts |
-| [pluggable-pipeline.md](pluggable-pipeline.md) | Pipeline | Stage-based render pipeline with caching and color-space awareness |
-| [color-management.md](color-management.md) | Color | Wide gamut, ICC profiles, per-camera color matrices |
-| [processing-parity.md](processing-parity.md) | Advanced | Understanding and reducing rendering differences vs other editors |
-| [heic-support.md](heic-support.md) | Decode | HEIC/HEIF format decoding support |
-| [ecosystem-interop.md](ecosystem-interop.md) | Ecosystem | XMP/costyle/pp3 import/export and sidecar files |
-| [multi-preset-cli.md](multi-preset-cli.md) | Performance | Decode once, apply N presets per CLI invocation |
-| [platform-and-distribution.md](platform-and-distribution.md) | Performance | REST API, GPU, WASM, batch processing, preset marketplace |
-| [ui.md](ui.md) | UI | Desktop and web UI, histogram, before/after, undo/redo |
-| [advanced-research.md](advanced-research.md) | Advanced | AI editing, HDR merge, panorama, focus stacking, tethered shooting |
+## Completed
+
+| Feature | PR |
+|---------|----|
+| HSL Adjustments | [#3](https://github.com/zhjngli/AgX/pull/3) |
+| Preset Composability | [#5](https://github.com/zhjngli/AgX/pull/5) |
+| Batch Processing | [#6](https://github.com/zhjngli/AgX/pull/6) |
+
+## Editing — Per-Pixel Features
+
+These operate on each pixel independently and fit into the current single-pass engine with no architecture changes.
+
+| File | Summary |
+|------|---------|
+| [tone-curves.md](tone-curves.md) | Parametric and point curves for precise tonal control |
+| [color-grading.md](color-grading.md) | 3-way color wheels for shadow/midtone/highlight grading |
+| [film-and-grain.md](film-and-grain.md) | Film grain simulation (coordinate-seeded noise) and film emulation database |
+
+## Editing — Neighborhood Operations
+
+These need access to surrounding pixels and require a multi-pass approach (separate pass over the full image buffer after per-pixel adjustments). Once we have 3+ of these, formalize into a pluggable stage-based pipeline.
+
+| File | Summary |
+|------|---------|
+| [sharpening-and-detail.md](sharpening-and-detail.md) | Sharpening, clarity, texture (convolution kernels), and noise reduction |
+| [dehaze.md](dehaze.md) | Atmospheric haze removal (local region analysis) |
+| [local-adjustments.md](local-adjustments.md) | Brushes, gradients, and radial filters for per-region edits |
+| [geometric-corrections.md](geometric-corrections.md) | Lens corrections, perspective, crop and rotation |
+
+## Pipeline & Infrastructure
+
+| File | Summary |
+|------|---------|
+| [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness (build after 3+ neighborhood ops) |
+| [preset-tooling.md](preset-tooling.md) | Schema versioning, validation, and authoring shortcuts |
+| [multi-preset-cli.md](multi-preset-cli.md) | Decode once, apply N presets per CLI invocation (cuts e2e test time) |
+
+## Color & Ecosystem
+
+| File | Summary |
+|------|---------|
+| [color-management.md](color-management.md) | Wide gamut, ICC profiles, per-camera color matrices |
+| [ecosystem-interop.md](ecosystem-interop.md) | XMP/costyle/pp3 import/export and sidecar files |
+| [heic-support.md](heic-support.md) | HEIC/HEIF format decoding support |
+| [processing-parity.md](processing-parity.md) | Understanding and reducing rendering differences vs other editors |
+
+## Platform & UI
+
+| File | Summary |
+|------|---------|
+| [platform-and-distribution.md](platform-and-distribution.md) | REST API, GPU, WASM, batch processing, preset marketplace |
+| [ui.md](ui.md) | Desktop and web UI, histogram, before/after, undo/redo |
+| [advanced-research.md](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking, tethered shooting |
