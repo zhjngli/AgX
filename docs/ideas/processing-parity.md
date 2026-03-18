@@ -27,6 +27,16 @@ Future work could include:
 - User-adjustable demosaicing algorithm selection
 - A/B comparison tooling to visualize differences against reference renders
 
+## Editing Algorithm Verification
+
+Beyond raw processing, each per-pixel editing adjustment (exposure, contrast, highlights/shadows, whites/blacks, HSL, color grading, vignette, etc.) should be verified against open-source reference implementations (darktable, RawTherapee) and visually compared against Lightroom/Capture One output.
+
+This is a cross-cutting effort — analyze all editing features at once rather than per-feature:
+
+1. **Reference audit**: read darktable/RawTherapee source for each adjustment type, document the exact algorithm and compare to ours
+2. **Visual comparison**: process the same image with identical parameters in AgX vs Lightroom, diff the output
+3. **Refine**: adjust weight curves, blending math, or parameter scaling where our results diverge from expected behavior
+
 ## Related
 
 - [Color Management](color-management.md) — per-camera profiles improve starting-point accuracy
