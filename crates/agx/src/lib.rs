@@ -9,9 +9,10 @@ pub mod preset;
 
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
+pub use adjust::VignetteShape;
 pub use engine::{
     Engine, HslChannel, HslChannels, Parameters, PartialHslChannel, PartialHslChannels,
-    PartialParameters,
+    PartialParameters, PartialVignetteParams, VignetteParams,
 };
 pub use error::{AgxError, Result};
 pub use lut::Lut3D;
