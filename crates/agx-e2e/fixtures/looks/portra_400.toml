@@ -20,5 +20,8 @@ luminance = 5.0
 [hsl.red]
 saturation = -8.0
 
+[vignette]
+amount = -10.0
+
 [lut]
 path = "luts/portra_400.cube"

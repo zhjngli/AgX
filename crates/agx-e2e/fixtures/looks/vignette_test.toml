@@ -1,0 +1,7 @@
+[metadata]
+name = "Vignette Test"
+author = "agx-e2e"
+
+[vignette]
+amount = -50.0
+shape = "elliptical"
