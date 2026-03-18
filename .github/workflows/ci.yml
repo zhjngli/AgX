@@ -16,14 +16,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install libraw
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
-      - name: Format check
-        run: cargo fmt --check
-      - name: Clippy
-        run: cargo clippy -p agx -p agx-cli -- -D warnings
-      - name: Library tests
-        run: cargo test -p agx
-      - name: CLI tests
-        run: cargo test -p agx-cli
+      - name: Verify
+        run: ./scripts/verify.sh
 
   e2e-tests:
     name: E2E tests

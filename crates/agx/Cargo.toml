@@ -16,6 +16,9 @@ img-parts = "0.4"
 little_exif = "0.6"
 exif = { package = "kamadak-exif", version = "0.5" }
 
+[dev-dependencies]
+tempfile = "3"
+
 [build-dependencies]
 cc = "1"
 

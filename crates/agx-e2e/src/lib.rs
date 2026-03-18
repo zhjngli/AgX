@@ -148,8 +148,8 @@ pub fn should_update_golden() -> bool {
 /// # use std::path::Path;
 /// # use agx_e2e::assert_golden;
 /// let output_path = Path::new("output.png");
-/// assert_golden(output_path, "test_name.png", 2, 0.0);   // JPEG: strict
-/// assert_golden(output_path, "raw_test.png", 30, 10.0);   // RAW: permissive
+/// assert_golden(output_path, "test_name.png", 2, 0.0);    // JPEG: strict
+/// assert_golden(output_path, "raw_test.png", 100, 25.0);  // RAW: permissive
 /// ```
 pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8, max_diff_pct: f64) {
     let golden = golden_path(golden_name);

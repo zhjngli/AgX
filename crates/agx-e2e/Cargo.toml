@@ -12,4 +12,5 @@ image = "0.25"
 
 [dev-dependencies]
 agx = { path = "../agx", features = ["raw"] }
+agx-cli = { path = "../agx-cli" }
 tempfile = "3"

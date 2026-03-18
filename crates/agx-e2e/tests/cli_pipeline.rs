@@ -22,25 +22,18 @@ const ALL_LOOKS: &[&str] = &[
 // --- Helpers ---
 
 fn cli_bin() -> Command {
-    let target_dir = std::env::current_exe()
-        .unwrap()
-        .parent() // deps/
-        .unwrap()
-        .parent() // debug/ or release/
-        .unwrap()
-        .parent() // target/
-        .unwrap()
-        .to_path_buf();
+    // Prefer release binary (much faster for image processing).
+    // Fall back to the binary Cargo built for tests via CARGO_BIN_EXE.
+    let cargo_bin = env!("CARGO_BIN_EXE_agx-cli");
+    let release = std::path::Path::new(cargo_bin)
+        .parent()
+        .and_then(|p| p.parent()) // target/
+        .map(|p| p.join("release").join("agx-cli"));
 
-    // Prefer release binary (much faster for image processing)
-    let release = target_dir.join("release").join("agx-cli");
-    let debug = target_dir.join("debug").join("agx-cli");
-    let path = if release.exists() { release } else { debug };
+    let path = release
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| std::path::PathBuf::from(cargo_bin));
 
-    assert!(
-        path.exists(),
-        "agx-cli binary not found. Run `cargo build --release -p agx-cli` first.",
-    );
     Command::new(path)
 }
 

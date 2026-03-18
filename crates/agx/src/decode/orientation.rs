@@ -148,13 +148,12 @@ mod tests {
 
     #[test]
     fn read_orientation_returns_normal_for_png() {
-        let temp_path = std::env::temp_dir().join("agx_test_orientation.png");
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let temp_path = temp_dir.path().join("test.png");
         let img = RgbImage::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
 
         let orientation = read_orientation(&temp_path);
         assert_eq!(orientation, Orientation::Normal);
-
-        let _ = std::fs::remove_file(&temp_path);
     }
 }

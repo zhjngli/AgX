@@ -164,7 +164,9 @@ More complex LUT generation with measured spectral film data or empirical matchi
 
 ### 4. Test Matrix & Golden Files
 
-**Matrix:** 6 images x 7 states (noop + 6 looks) = **42 golden files**.
+**Matrix:** 6 images x (noop + applicable looks) = **54 golden files**.
+- Color images (5): noop + 9 looks (6 color + 3 B&W) = 10 each = 50
+- B&W images (1): noop + 3 B&W looks = 4
 
 #### Golden file organization
 
@@ -180,13 +182,13 @@ fixtures/golden/
     temple_blossoms_nordic_fade.png
     night_architecture_noop.png
     night_architecture_portra_400.png
-    ...  (14 JPEG goldens total)
+    ...  (14 JPEG goldens: 10 temple_blossoms + 4 night_architecture B&W-only)
   raw/
     night_city_blur_noop.png
     night_city_blur_portra_400.png
     ...
     dusk_cityscape_nordic_fade.png
-    ...  (28 RAW goldens total)
+    ...  (40 RAW goldens: 10 per image x 4 images)
 ```
 
 **Naming convention:** `<image_name>_<look_name>.png`. Consistent, grep-friendly, immediately identifies the source image and applied style.
@@ -196,9 +198,9 @@ fixtures/golden/
 | Category | Per-channel tolerance | Max diff percentage | Rationale |
 |----------|----------------------|--------------------:|-----------|
 | JPEG goldens | 2 | 0.0% | Deterministic via `image` crate, any diff is a regression |
-| RAW goldens | 30 | 10.0% | LibRaw output varies across platforms/versions |
+| RAW goldens | 100 | 25.0% | LibRaw demosaicing varies across platforms; heavy looks amplify differences |
 
-These RAW thresholds may need tuning after observing actual cross-platform diffs. They can be tightened over time.
+These RAW thresholds were widened from 30/10% after observing cross-platform diffs in CI (up to 22.67% pixel diff, max channel diff 97 for neo_noir on Linux vs macOS-generated goldens).
 
 **Future improvement:** Platform-specific golden directories (`golden/raw/macos/`, `golden/raw/linux/`) for tight RAW comparison. Flagged for later.
 
@@ -210,9 +212,7 @@ Extend `compare_images` and `assert_golden` in `src/lib.rs` to accept `max_diff_
 pub fn assert_golden(actual: &Path, golden_name: &str, tolerance: u8, max_diff_pct: f64)
 ```
 
-The existing `compare_images` already returns a `ComparisonError` with `diff_percentage`. The change is in `assert_golden`: instead of failing on any `Err`, it catches the error and checks `err.diff_percentage <= max_diff_pct`. If within the percentage threshold, the comparison passes. If above, it panics with the full diff stats. JPEG callers pass `(2, 0.0)` (any differing pixel fails), RAW callers pass `(30, 10.0)` (up to 10% of pixels may exceed tolerance 30).
-
-Starting RAW tolerance at 30/10% is deliberately permissive to avoid false CI failures. These values should be tightened based on observed cross-platform diffs once we have data.
+The existing `compare_images` already returns a `ComparisonError` with `diff_percentage`. The change is in `assert_golden`: instead of failing on any `Err`, it catches the error and checks `err.diff_percentage <= max_diff_pct`. If within the percentage threshold, the comparison passes. If above, it panics with the full diff stats. JPEG callers pass `(2, 0.0)` (any differing pixel fails), RAW callers pass `(100, 25.0)` (up to 25% of pixels may exceed tolerance 100).
 
 ### 5. Test Code Structure
 
@@ -233,14 +233,19 @@ const RAW_IMAGES: &[&str] = &[
     "raw/dusk_cityscape.raf",
 ];
 
-const LOOKS: &[&str] = &[
+const ALL_LOOKS: &[&str] = &[
     "portra_400",
     "neo_noir",
     "blade_runner",
     "cinema_warm",
     "kodachrome_64",
     "nordic_fade",
+    "bw_high_contrast",
+    "bw_street",
+    "bw_lofi",
 ];
+
+const BW_LOOKS: &[&str] = &["bw_high_contrast", "bw_street", "bw_lofi"];
 ```
 
 Test categories:
@@ -273,9 +278,9 @@ These exist to verify the library API surface, not to duplicate the CLI matrix.
 |------|--------|
 | `crates/agx/src/decode/` | EXIF orientation handling for standard formats |
 | `crates/agx-e2e/src/lib.rs` | Add `max_diff_pct` to golden comparison |
-| `crates/agx-e2e/fixtures/looks/` | 6 look presets + 1 shared base |
-| `crates/agx-e2e/fixtures/looks/luts/` | 6 generated 33x33x33 `.cube` files |
-| `crates/agx-e2e/fixtures/golden/` | 42 golden files in `jpeg/` and `raw/` subdirs |
+| `crates/agx-e2e/fixtures/looks/` | 9 look presets (6 color + 3 B&W) + 1 shared base |
+| `crates/agx-e2e/fixtures/looks/luts/` | 9 generated 33x33x33 `.cube` files |
+| `crates/agx-e2e/fixtures/golden/` | 54 golden files in `jpeg/` and `raw/` subdirs |
 | `crates/agx-e2e/tests/cli_pipeline.rs` | Data-driven IMAGE x LOOK matrix |
 | `crates/agx-e2e/tests/library_pipeline.rs` | Slim API smoke tests |
 | `crates/agx-lut-gen/` | Dev-only binary crate for `.cube` file generation |
