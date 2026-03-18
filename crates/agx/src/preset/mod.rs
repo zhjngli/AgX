@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{Parameters, PartialHslChannels, PartialParameters};
+use crate::engine::{Parameters, PartialHslChannels, PartialParameters, PartialVignetteParams};
 use crate::error::{AgxError, Result};
 
 /// Preset metadata (name, version, author).
@@ -63,6 +63,8 @@ struct PresetRaw {
     lut: LutSection,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     hsl: Option<PartialHslChannels>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    vignette: Option<PartialVignetteParams>,
 }
 
 /// Build a PartialParameters from a PresetRaw.
@@ -77,7 +79,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         temperature: raw.white_balance.temperature,
         tint: raw.white_balance.tint,
         hsl: raw.hsl.clone(),
-        vignette: None,
+        vignette: raw.vignette.clone(),
     }
 }
 
@@ -146,6 +148,7 @@ impl Preset {
             },
             lut: LutSection::default(),
             hsl: self.partial_params.hsl.clone(),
+            vignette: self.partial_params.vignette.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
@@ -522,6 +525,84 @@ exposure = 1.0
         assert_eq!(preset.partial_params.contrast, None);
         assert_eq!(preset.params().exposure, 1.0);
         assert_eq!(preset.params().contrast, 0.0);
+    }
+
+    // --- Vignette preset tests ---
+
+    #[test]
+    fn preset_vignette_roundtrip() {
+        let mut preset = Preset::default();
+        preset.partial_params.vignette = Some(crate::engine::PartialVignetteParams {
+            amount: Some(-30.0),
+            shape: Some(crate::adjust::VignetteShape::Circular),
+        });
+
+        let toml_str = preset.to_toml().unwrap();
+        let parsed = Preset::from_toml(&toml_str).unwrap();
+        assert_eq!(preset.params().vignette, parsed.params().vignette);
+    }
+
+    #[test]
+    fn preset_vignette_from_toml() {
+        let toml_str = r#"
+[metadata]
+name = "Vignette Test"
+
+[vignette]
+amount = -30.0
+shape = "circular"
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.params().vignette.amount, -30.0);
+        assert_eq!(
+            preset.params().vignette.shape,
+            crate::adjust::VignetteShape::Circular
+        );
+    }
+
+    #[test]
+    fn preset_vignette_default_shape() {
+        let toml_str = r#"
+[metadata]
+name = "Vignette Default Shape"
+
+[vignette]
+amount = -20.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.params().vignette.amount, -20.0);
+        assert_eq!(
+            preset.params().vignette.shape,
+            crate::adjust::VignetteShape::Elliptical
+        );
+    }
+
+    #[test]
+    fn preset_missing_vignette_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No Vignette"
+
+[tone]
+exposure = 1.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert_eq!(preset.params().vignette.amount, 0.0);
+    }
+
+    #[test]
+    fn preset_vignette_partial_only_amount() {
+        let toml_str = r#"
+[metadata]
+name = "Partial"
+
+[vignette]
+amount = -15.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let vig = preset.partial_params.vignette.as_ref().unwrap();
+        assert_eq!(vig.amount, Some(-15.0));
+        assert_eq!(vig.shape, None);
     }
 
     // --- Preset inheritance tests ---
