@@ -77,6 +77,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         temperature: raw.white_balance.temperature,
         tint: raw.white_balance.tint,
         hsl: raw.hsl.clone(),
+        vignette: None,
     }
 }
 

@@ -89,6 +89,17 @@ impl HslChannels {
     }
 }
 
+/// Vignette adjustment parameters.
+///
+/// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct VignetteParams {
+    #[serde(default)]
+    pub amount: f32,
+    #[serde(default)]
+    pub shape: crate::adjust::VignetteShape,
+}
+
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
@@ -113,6 +124,9 @@ pub struct Parameters {
     /// Per-channel HSL adjustments
     #[serde(default)]
     pub hsl: HslChannels,
+    /// Creative vignette (edge darkening/brightening)
+    #[serde(default)]
+    pub vignette: VignetteParams,
 }
 
 impl Default for Parameters {
@@ -127,6 +141,7 @@ impl Default for Parameters {
             temperature: 0.0,
             tint: 0.0,
             hsl: HslChannels::default(),
+            vignette: VignetteParams::default(),
         }
     }
 }
@@ -282,6 +297,42 @@ impl From<&HslChannels> for PartialHslChannels {
     }
 }
 
+/// Partial vignette parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialVignetteParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<crate::adjust::VignetteShape>,
+}
+
+impl PartialVignetteParams {
+    /// Merge overlay on top of self (last-write-wins).
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            amount: overlay.amount.or(self.amount),
+            shape: overlay.shape.or(self.shape),
+        }
+    }
+
+    /// Convert to concrete VignetteParams. None fields become defaults.
+    pub fn materialize(&self) -> VignetteParams {
+        VignetteParams {
+            amount: self.amount.unwrap_or(0.0),
+            shape: self.shape.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&VignetteParams> for PartialVignetteParams {
+    fn from(v: &VignetteParams) -> Self {
+        Self {
+            amount: Some(v.amount),
+            shape: Some(v.shape),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -306,6 +357,8 @@ pub struct PartialParameters {
     pub tint: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hsl: Option<PartialHslChannels>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vignette: Option<PartialVignetteParams>,
 }
 
 impl PartialParameters {
@@ -321,6 +374,12 @@ impl PartialParameters {
             temperature: other.temperature.or(self.temperature),
             tint: other.tint.or(self.tint),
             hsl: match (&self.hsl, &other.hsl) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
+            vignette: match (&self.vignette, &other.vignette) {
                 (None, None) => None,
                 (Some(b), None) => Some(b.clone()),
                 (None, Some(o)) => Some(o.clone()),
@@ -345,6 +404,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|h| h.materialize())
                 .unwrap_or_default(),
+            vignette: self
+                .vignette
+                .as_ref()
+                .map(|v| v.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -361,6 +425,7 @@ impl From<&Parameters> for PartialParameters {
             temperature: Some(params.temperature),
             tint: Some(params.tint),
             hsl: Some(PartialHslChannels::from(&params.hsl)),
+            vignette: Some(PartialVignetteParams::from(&params.vignette)),
         }
     }
 }
@@ -1002,6 +1067,66 @@ mod tests {
 
         assert_eq!(engine.params().exposure, 2.0);
         assert_eq!(engine.params().contrast, 20.0);
+    }
+
+    // --- VignetteParams tests ---
+
+    #[test]
+    fn vignette_params_default() {
+        let v = super::VignetteParams::default();
+        assert_eq!(v.amount, 0.0);
+        assert_eq!(v.shape, crate::adjust::VignetteShape::Elliptical);
+    }
+
+    #[test]
+    fn partial_vignette_params_default_is_all_none() {
+        let v = super::PartialVignetteParams::default();
+        assert_eq!(v.amount, None);
+        assert_eq!(v.shape, None);
+    }
+
+    #[test]
+    fn partial_vignette_params_merge_overlay_wins() {
+        let base = super::PartialVignetteParams {
+            amount: Some(-30.0),
+            shape: Some(crate::adjust::VignetteShape::Elliptical),
+        };
+        let overlay = super::PartialVignetteParams {
+            amount: Some(-50.0),
+            shape: None,
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.amount, Some(-50.0));
+        assert_eq!(merged.shape, Some(crate::adjust::VignetteShape::Elliptical));
+    }
+
+    #[test]
+    fn partial_vignette_params_materialize_defaults() {
+        let partial = super::PartialVignetteParams {
+            amount: Some(-30.0),
+            shape: None,
+        };
+        let concrete = partial.materialize();
+        assert_eq!(concrete.amount, -30.0);
+        assert_eq!(concrete.shape, crate::adjust::VignetteShape::Elliptical);
+    }
+
+    #[test]
+    fn partial_vignette_params_from_concrete() {
+        let concrete = super::VignetteParams {
+            amount: -30.0,
+            shape: crate::adjust::VignetteShape::Circular,
+        };
+        let partial = super::PartialVignetteParams::from(&concrete);
+        assert_eq!(partial.amount, Some(-30.0));
+        assert_eq!(partial.shape, Some(crate::adjust::VignetteShape::Circular));
+    }
+
+    #[test]
+    fn parameters_default_vignette_is_neutral() {
+        let p = Parameters::default();
+        assert_eq!(p.vignette.amount, 0.0);
+        assert_eq!(p.vignette.shape, crate::adjust::VignetteShape::Elliptical);
     }
 
     #[test]
