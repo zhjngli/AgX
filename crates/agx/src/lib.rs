@@ -7,9 +7,9 @@ pub mod lut;
 pub mod metadata;
 pub mod preset;
 
+pub use adjust::VignetteShape;
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
-pub use adjust::VignetteShape;
 pub use engine::{
     Engine, HslChannel, HslChannels, Parameters, PartialHslChannel, PartialHslChannels,
     PartialParameters, PartialVignetteParams, VignetteParams,

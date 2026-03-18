@@ -334,7 +334,9 @@ fn parse_vignette_shape(s: &str) -> Result<agx::VignetteShape, String> {
     match s {
         "elliptical" => Ok(agx::VignetteShape::Elliptical),
         "circular" => Ok(agx::VignetteShape::Circular),
-        _ => Err(format!("invalid vignette shape '{s}'. Use: elliptical or circular")),
+        _ => Err(format!(
+            "invalid vignette shape '{s}'. Use: elliptical or circular"
+        )),
     }
 }
 

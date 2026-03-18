@@ -589,10 +589,15 @@ impl Engine {
             // 10.5. Vignette (sRGB gamma space, position-dependent)
             if vignette_active {
                 let (vr, vg, vb) = adjust::apply_vignette(
-                    sr, sg, sb,
+                    sr,
+                    sg,
+                    sb,
                     self.params.vignette.amount,
                     self.params.vignette.shape,
-                    x, y, w, h,
+                    x,
+                    y,
+                    w,
+                    h,
                 );
                 sr = vr;
                 sg = vg;
@@ -1197,7 +1202,9 @@ mod tests {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-5,
                 "Channel {}: expected {}, got {}",
-                i, orig.0[i], rend.0[i]
+                i,
+                orig.0[i],
+                rend.0[i]
             );
         }
     }
