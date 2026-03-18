@@ -31,6 +31,7 @@ Some of these (sharpening, film grain) are preset-friendly — they apply unifor
 
 | File | Summary |
 |------|---------|
+| [performance.md](performance.md) | Render parallelization, buffer reduction, and other potential optimizations (needs profiling) |
 | [preset-tooling.md](preset-tooling.md) | Schema versioning, validation, and authoring shortcuts |
 | [multi-preset-cli.md](multi-preset-cli.md) | Decode once, apply N presets per CLI invocation (cuts e2e test time) |
 | [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness (build after 3+ neighborhood ops) |
