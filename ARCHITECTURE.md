@@ -119,6 +119,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-15 | [Rename to AgX Design](docs/plans/2026-03-15-rename-to-agx-design.md)                            |
 | 2026-03-15 | [E2E Tests Design](docs/plans/2026-03-15-e2e-tests-design.md)                                   |
 | 2026-03-17 | [Comprehensive E2E Overhaul Design](docs/plans/2026-03-17-comprehensive-e2e-overhaul-design.md)  |
+| 2026-03-18 | [Vignette Design](docs/plans/2026-03-18-vignette-design.md)                                      |
 
 ### Ideas
 

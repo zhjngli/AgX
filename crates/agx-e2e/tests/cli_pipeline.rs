@@ -17,6 +17,7 @@ const ALL_LOOKS: &[&str] = &[
     "bw_high_contrast",
     "bw_street",
     "bw_lofi",
+    "vignette_test",
 ];
 
 // --- Helpers ---

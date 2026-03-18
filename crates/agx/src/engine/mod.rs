@@ -89,6 +89,24 @@ impl HslChannels {
     }
 }
 
+/// Vignette adjustment parameters.
+///
+/// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct VignetteParams {
+    #[serde(default)]
+    pub amount: f32,
+    #[serde(default)]
+    pub shape: crate::adjust::VignetteShape,
+}
+
+impl VignetteParams {
+    /// Returns `true` when all fields are at their default (neutral) values.
+    pub fn is_default(&self) -> bool {
+        self.amount == 0.0 && self.shape == crate::adjust::VignetteShape::default()
+    }
+}
+
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
@@ -113,6 +131,9 @@ pub struct Parameters {
     /// Per-channel HSL adjustments
     #[serde(default)]
     pub hsl: HslChannels,
+    /// Creative vignette (edge darkening/brightening)
+    #[serde(default)]
+    pub vignette: VignetteParams,
 }
 
 impl Default for Parameters {
@@ -127,6 +148,7 @@ impl Default for Parameters {
             temperature: 0.0,
             tint: 0.0,
             hsl: HslChannels::default(),
+            vignette: VignetteParams::default(),
         }
     }
 }
@@ -282,6 +304,42 @@ impl From<&HslChannels> for PartialHslChannels {
     }
 }
 
+/// Partial vignette parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialVignetteParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<crate::adjust::VignetteShape>,
+}
+
+impl PartialVignetteParams {
+    /// Merge overlay on top of self (last-write-wins).
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            amount: overlay.amount.or(self.amount),
+            shape: overlay.shape.or(self.shape),
+        }
+    }
+
+    /// Convert to concrete VignetteParams. None fields become defaults.
+    pub fn materialize(&self) -> VignetteParams {
+        VignetteParams {
+            amount: self.amount.unwrap_or(0.0),
+            shape: self.shape.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<&VignetteParams> for PartialVignetteParams {
+    fn from(v: &VignetteParams) -> Self {
+        Self {
+            amount: Some(v.amount),
+            shape: Some(v.shape),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -306,6 +364,8 @@ pub struct PartialParameters {
     pub tint: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hsl: Option<PartialHslChannels>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vignette: Option<PartialVignetteParams>,
 }
 
 impl PartialParameters {
@@ -321,6 +381,12 @@ impl PartialParameters {
             temperature: other.temperature.or(self.temperature),
             tint: other.tint.or(self.tint),
             hsl: match (&self.hsl, &other.hsl) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
+            vignette: match (&self.vignette, &other.vignette) {
                 (None, None) => None,
                 (Some(b), None) => Some(b.clone()),
                 (None, Some(o)) => Some(o.clone()),
@@ -345,6 +411,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|h| h.materialize())
                 .unwrap_or_default(),
+            vignette: self
+                .vignette
+                .as_ref()
+                .map(|v| v.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -361,6 +432,7 @@ impl From<&Parameters> for PartialParameters {
             temperature: Some(params.temperature),
             tint: Some(params.tint),
             hsl: Some(PartialHslChannels::from(&params.hsl)),
+            vignette: Some(PartialVignetteParams::from(&params.vignette)),
         }
     }
 }
@@ -442,11 +514,20 @@ impl Engine {
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
     /// 5. HSL adjustments (sRGB gamma space)
     /// 6. LUT application (sRGB gamma space)
-    /// 7. Convert back to linear space
+    /// 7. Vignette (sRGB gamma space, position-dependent)
+    /// 8. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
         let hsl_active = !self.params.hsl.is_default();
+        let vignette_pre = (!self.params.vignette.is_default()).then(|| {
+            adjust::VignettePrecomputed::new(
+                self.params.vignette.amount,
+                self.params.vignette.shape,
+                w,
+                h,
+            )
+        });
         let hue_shifts = self.params.hsl.hue_shifts();
         let sat_shifts = self.params.hsl.saturation_shifts();
         let lum_shifts = self.params.hsl.luminance_shifts();
@@ -519,7 +600,15 @@ impl Engine {
                 sb = lb;
             }
 
-            // 11. Convert back to linear space
+            // 11. Vignette (sRGB gamma space, position-dependent)
+            if let Some(pre) = &vignette_pre {
+                let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
+                sr = vr;
+                sg = vg;
+                sb = vb;
+            }
+
+            // 12. Convert back to linear space
             let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
             Rgb([lr, lg, lb])
@@ -1004,6 +1093,66 @@ mod tests {
         assert_eq!(engine.params().contrast, 20.0);
     }
 
+    // --- VignetteParams tests ---
+
+    #[test]
+    fn vignette_params_default() {
+        let v = super::VignetteParams::default();
+        assert_eq!(v.amount, 0.0);
+        assert_eq!(v.shape, crate::adjust::VignetteShape::Elliptical);
+    }
+
+    #[test]
+    fn partial_vignette_params_default_is_all_none() {
+        let v = super::PartialVignetteParams::default();
+        assert_eq!(v.amount, None);
+        assert_eq!(v.shape, None);
+    }
+
+    #[test]
+    fn partial_vignette_params_merge_overlay_wins() {
+        let base = super::PartialVignetteParams {
+            amount: Some(-30.0),
+            shape: Some(crate::adjust::VignetteShape::Elliptical),
+        };
+        let overlay = super::PartialVignetteParams {
+            amount: Some(-50.0),
+            shape: None,
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.amount, Some(-50.0));
+        assert_eq!(merged.shape, Some(crate::adjust::VignetteShape::Elliptical));
+    }
+
+    #[test]
+    fn partial_vignette_params_materialize_defaults() {
+        let partial = super::PartialVignetteParams {
+            amount: Some(-30.0),
+            shape: None,
+        };
+        let concrete = partial.materialize();
+        assert_eq!(concrete.amount, -30.0);
+        assert_eq!(concrete.shape, crate::adjust::VignetteShape::Elliptical);
+    }
+
+    #[test]
+    fn partial_vignette_params_from_concrete() {
+        let concrete = super::VignetteParams {
+            amount: -30.0,
+            shape: crate::adjust::VignetteShape::Circular,
+        };
+        let partial = super::PartialVignetteParams::from(&concrete);
+        assert_eq!(partial.amount, Some(-30.0));
+        assert_eq!(partial.shape, Some(crate::adjust::VignetteShape::Circular));
+    }
+
+    #[test]
+    fn parameters_default_vignette_is_neutral() {
+        let p = Parameters::default();
+        assert_eq!(p.vignette.amount, 0.0);
+        assert_eq!(p.vignette.shape, crate::adjust::VignetteShape::Elliptical);
+    }
+
     #[test]
     fn apply_preset_still_does_full_replacement() {
         let img = make_test_image(0.5, 0.5, 0.5);
@@ -1017,6 +1166,51 @@ mod tests {
         engine.apply_preset(&preset);
         assert_eq!(engine.params().exposure, 0.5);
         assert_eq!(engine.params().contrast, 0.0);
+    }
+
+    #[test]
+    fn render_vignette_darkens_corners() {
+        // Use a 10x10 image so corners are clearly away from center
+        let img: Rgb32FImage = ImageBuffer::from_pixel(10, 10, Rgb([0.5, 0.5, 0.5]));
+        let mut engine = Engine::new(img);
+        engine.params_mut().vignette.amount = -50.0;
+        let rendered = engine.render();
+
+        // Center pixel should be close to original
+        let center = rendered.get_pixel(5, 5);
+        assert!(
+            (center.0[0] - 0.5).abs() < 0.05,
+            "Center should be near original, got {}",
+            center.0[0]
+        );
+
+        // Corner pixel should be darker
+        let corner = rendered.get_pixel(0, 0);
+        assert!(
+            corner.0[0] < center.0[0],
+            "Corner ({}) should be darker than center ({})",
+            corner.0[0],
+            center.0[0]
+        );
+    }
+
+    #[test]
+    fn render_vignette_zero_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let mut engine = Engine::new(img);
+        engine.params_mut().vignette.amount = 0.0;
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "Channel {}: expected {}, got {}",
+                i,
+                orig.0[i],
+                rend.0[i]
+            );
+        }
     }
 
     #[test]

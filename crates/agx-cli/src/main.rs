@@ -319,6 +319,13 @@ struct EditArgs {
     #[arg(long)]
     lut: Option<PathBuf>,
 
+    /// Vignette amount (-100 to +100). Negative darkens edges, positive brightens.
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
+    vignette_amount: f32,
+    /// Vignette shape: elliptical (default) or circular
+    #[arg(long, default_value = "elliptical")]
+    vignette_shape: agx::VignetteShape,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
@@ -335,6 +342,10 @@ impl EditArgs {
             temperature: self.temperature,
             tint: self.tint,
             hsl: self.hsl.to_hsl_channels(),
+            vignette: agx::VignetteParams {
+                amount: self.vignette_amount,
+                shape: self.vignette_shape,
+            },
         }
     }
 

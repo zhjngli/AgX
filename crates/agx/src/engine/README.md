@@ -4,8 +4,10 @@
 Hold the immutable original image and mutable parameters, and render the final output by applying all adjustments from scratch on each call.
 
 ## Public API
-- `Parameters` -- all adjustment fields (`exposure`, `contrast`, `highlights`, `shadows`, `whites`, `blacks`, `temperature`, `tint`, `hsl`)
+- `Parameters` -- all adjustment fields (`exposure`, `contrast`, `highlights`, `shadows`, `whites`, `blacks`, `temperature`, `tint`, `hsl`, `vignette`)
+- `VignetteParams` -- vignette parameters: `amount` (f32) and `shape` (`VignetteShape`)
 - `PartialParameters` -- partial parameter set with `Option<T>` fields for preset composability; `None` means "not specified"
+- `PartialVignetteParams` -- partial vignette parameters with `Option<f32>` amount and `Option<VignetteShape>` shape
 - `PartialHslChannel` / `PartialHslChannels` -- partial HSL types with `Option<f32>` fields
 - `PartialParameters::merge(&self, other)` -- last-write-wins merge of two partial parameter sets
 - `PartialParameters::materialize(&self)` -- convert to concrete `Parameters` (None → default)
@@ -23,7 +25,7 @@ To add a new adjustment:
 1. Add a field to `Parameters` (with `Default` returning the neutral value).
 2. Add the adjustment function in `adjust/mod.rs`.
 3. Insert the call at the correct position in `Engine::render()`. The pipeline order is:
-   white balance (linear) -> exposure (linear) -> sRGB conversion -> contrast -> highlights -> shadows -> whites -> blacks -> LUT -> linear conversion.
+   white balance (linear) -> exposure (linear) -> sRGB conversion -> contrast -> highlights -> shadows -> whites -> blacks -> LUT -> vignette -> linear conversion.
 
 ## Does NOT
 - Perform file I/O (decoding or encoding).

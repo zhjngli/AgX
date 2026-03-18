@@ -7,11 +7,12 @@ pub mod lut;
 pub mod metadata;
 pub mod preset;
 
+pub use adjust::{VignettePrecomputed, VignetteShape};
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
 pub use engine::{
     Engine, HslChannel, HslChannels, Parameters, PartialHslChannel, PartialHslChannels,
-    PartialParameters,
+    PartialParameters, PartialVignetteParams, VignetteParams,
 };
 pub use error::{AgxError, Result};
 pub use lut::Lut3D;
