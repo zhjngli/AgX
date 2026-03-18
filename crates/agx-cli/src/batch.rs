@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -328,7 +329,7 @@ pub fn run_batch_edit(
     output_dir: &Path,
     recursive: bool,
     params: &agx::Parameters,
-    lut: Option<&agx::Lut3D>,
+    lut: Option<Arc<agx::Lut3D>>,
     quality: u8,
     format: Option<agx::encode::OutputFormat>,
     suffix: Option<&str>,
@@ -347,8 +348,8 @@ pub fn run_batch_edit(
     run_batch(&opts, |input, output| {
         process_single(input, output, quality, format, |engine| {
             engine.set_params(params.clone());
-            if let Some(l) = lut {
-                engine.set_lut(Some(l.clone()));
+            if let Some(l) = &lut {
+                engine.set_lut(Some(Arc::clone(l)));
             }
         })
     })

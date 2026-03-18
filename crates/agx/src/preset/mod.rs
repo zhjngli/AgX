@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{Parameters, PartialHslChannels, PartialParameters, PartialVignetteParams};
@@ -95,7 +97,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
 pub struct Preset {
     pub metadata: PresetMetadata,
     pub partial_params: PartialParameters,
-    pub lut: Option<crate::lut::Lut3D>,
+    pub lut: Option<Arc<crate::lut::Lut3D>>,
 }
 
 impl Preset {
@@ -198,7 +200,7 @@ impl Preset {
         // Load this preset's LUT (overrides base LUT if present)
         let lut = if let Some(lut_path_str) = &raw.lut.path {
             let lut_path = base_dir.join(lut_path_str);
-            Some(crate::lut::Lut3D::from_cube_file(&lut_path)?)
+            Some(Arc::new(crate::lut::Lut3D::from_cube_file(&lut_path)?))
         } else {
             base_lut
         };

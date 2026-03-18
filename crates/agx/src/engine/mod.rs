@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use image::{Rgb, Rgb32FImage};
 use serde::{Deserialize, Serialize};
 
@@ -444,7 +446,7 @@ impl From<&Parameters> for PartialParameters {
 pub struct Engine {
     original: Rgb32FImage,
     params: Parameters,
-    lut: Option<crate::lut::Lut3D>,
+    lut: Option<Arc<crate::lut::Lut3D>>,
 }
 
 impl Engine {
@@ -479,11 +481,14 @@ impl Engine {
 
     /// Get a reference to the current LUT, if any.
     pub fn lut(&self) -> Option<&crate::lut::Lut3D> {
-        self.lut.as_ref()
+        self.lut.as_deref()
     }
 
     /// Set or clear the 3D LUT.
-    pub fn set_lut(&mut self, lut: Option<crate::lut::Lut3D>) {
+    ///
+    /// Accepts `Arc<Lut3D>` so the same LUT can be shared across multiple
+    /// engine instances (e.g. in batch processing) without cloning the table.
+    pub fn set_lut(&mut self, lut: Option<Arc<crate::lut::Lut3D>>) {
         self.lut = lut;
     }
 
@@ -748,7 +753,7 @@ mod tests {
             domain_max: [1.0, 1.0, 1.0],
             table,
         };
-        engine.set_lut(Some(lut));
+        engine.set_lut(Some(Arc::new(lut)));
 
         let rendered = engine.render();
         let orig = engine.original().get_pixel(0, 0);
