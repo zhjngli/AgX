@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use image::{Rgb, Rgb32FImage};
 use serde::{Deserialize, Serialize};
 
@@ -444,7 +446,7 @@ impl From<&Parameters> for PartialParameters {
 pub struct Engine {
     original: Rgb32FImage,
     params: Parameters,
-    lut: Option<crate::lut::Lut3D>,
+    lut: Option<Arc<crate::lut::Lut3D>>,
 }
 
 impl Engine {
@@ -479,11 +481,14 @@ impl Engine {
 
     /// Get a reference to the current LUT, if any.
     pub fn lut(&self) -> Option<&crate::lut::Lut3D> {
-        self.lut.as_ref()
+        self.lut.as_deref()
     }
 
     /// Set or clear the 3D LUT.
-    pub fn set_lut(&mut self, lut: Option<crate::lut::Lut3D>) {
+    ///
+    /// Accepts `Arc<Lut3D>` so the same LUT can be shared across multiple
+    /// engine instances (e.g. in batch processing) without cloning the table.
+    pub fn set_lut(&mut self, lut: Option<Arc<crate::lut::Lut3D>>) {
         self.lut = lut;
     }
 
@@ -519,6 +524,11 @@ impl Engine {
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
+        let contrast = self.params.contrast;
+        let highlights = self.params.highlights;
+        let shadows = self.params.shadows;
+        let whites = self.params.whites;
+        let blacks = self.params.blacks;
         let hsl_active = !self.params.hsl.is_default();
         let vignette_pre = (!self.params.vignette.is_default()).then(|| {
             adjust::VignettePrecomputed::new(
@@ -544,37 +554,42 @@ impl Engine {
             b = wb.2;
 
             // 2. Exposure (linear space)
-            r = adjust::apply_exposure(r, exposure_factor);
-            g = adjust::apply_exposure(g, exposure_factor);
-            b = adjust::apply_exposure(b, exposure_factor);
+            (r, g, b) =
+                adjust::apply_per_channel(r, g, b, |v| adjust::apply_exposure(v, exposure_factor));
 
             // 3. Convert to sRGB gamma space
             let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
 
             // 4. Contrast
-            sr = adjust::apply_contrast(sr, self.params.contrast);
-            sg = adjust::apply_contrast(sg, self.params.contrast);
-            sb = adjust::apply_contrast(sb, self.params.contrast);
+            if contrast != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_contrast(v, contrast));
+            }
 
             // 5. Highlights
-            sr = adjust::apply_highlights(sr, self.params.highlights);
-            sg = adjust::apply_highlights(sg, self.params.highlights);
-            sb = adjust::apply_highlights(sb, self.params.highlights);
+            if highlights != 0.0 {
+                (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                    adjust::apply_highlights(v, highlights)
+                });
+            }
 
             // 6. Shadows
-            sr = adjust::apply_shadows(sr, self.params.shadows);
-            sg = adjust::apply_shadows(sg, self.params.shadows);
-            sb = adjust::apply_shadows(sb, self.params.shadows);
+            if shadows != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_shadows(v, shadows));
+            }
 
             // 7. Whites
-            sr = adjust::apply_whites(sr, self.params.whites);
-            sg = adjust::apply_whites(sg, self.params.whites);
-            sb = adjust::apply_whites(sb, self.params.whites);
+            if whites != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_whites(v, whites));
+            }
 
             // 8. Blacks
-            sr = adjust::apply_blacks(sr, self.params.blacks);
-            sg = adjust::apply_blacks(sg, self.params.blacks);
-            sb = adjust::apply_blacks(sb, self.params.blacks);
+            if blacks != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_blacks(v, blacks));
+            }
 
             // 9. HSL adjustments (sRGB gamma space)
             if hsl_active {
@@ -738,7 +753,7 @@ mod tests {
             domain_max: [1.0, 1.0, 1.0],
             table,
         };
-        engine.set_lut(Some(lut));
+        engine.set_lut(Some(Arc::new(lut)));
 
         let rendered = engine.render();
         let orig = engine.original().get_pixel(0, 0);
@@ -823,7 +838,7 @@ mod tests {
         let engine = Engine::new(img);
         // HSL defaults to all zeros, so render should be identity
         let orig = engine.original().get_pixel(0, 0);
-        let rend = engine.render().get_pixel(0, 0).clone();
+        let rend = *engine.render().get_pixel(0, 0);
         for i in 0..3 {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-4,
@@ -906,23 +921,27 @@ mod tests {
 
     #[test]
     fn partial_hsl_channels_merge_channel_level() {
-        let mut base = super::PartialHslChannels::default();
-        base.red = Some(super::PartialHslChannel {
-            hue: Some(10.0),
-            saturation: None,
-            luminance: None,
-        });
-        let mut overlay = super::PartialHslChannels::default();
-        overlay.red = Some(super::PartialHslChannel {
-            hue: None,
-            saturation: Some(20.0),
-            luminance: None,
-        });
-        overlay.green = Some(super::PartialHslChannel {
-            hue: Some(5.0),
-            saturation: None,
-            luminance: None,
-        });
+        let base = super::PartialHslChannels {
+            red: Some(super::PartialHslChannel {
+                hue: Some(10.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
+        };
+        let overlay = super::PartialHslChannels {
+            red: Some(super::PartialHslChannel {
+                hue: None,
+                saturation: Some(20.0),
+                luminance: None,
+            }),
+            green: Some(super::PartialHslChannel {
+                hue: Some(5.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
+        };
         let merged = base.merge(&overlay);
         assert_eq!(merged.red.as_ref().unwrap().hue, Some(10.0));
         assert_eq!(merged.red.as_ref().unwrap().saturation, Some(20.0));
@@ -945,12 +964,14 @@ mod tests {
 
     #[test]
     fn partial_hsl_channels_materialize() {
-        let mut partial = super::PartialHslChannels::default();
-        partial.red = Some(super::PartialHslChannel {
-            hue: Some(15.0),
-            saturation: None,
-            luminance: None,
-        });
+        let partial = super::PartialHslChannels {
+            red: Some(super::PartialHslChannel {
+                hue: Some(15.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
+        };
         let concrete = partial.materialize();
         assert_eq!(concrete.red.hue, 15.0);
         assert_eq!(concrete.red.saturation, 0.0);
@@ -1018,14 +1039,15 @@ mod tests {
             exposure: Some(1.0),
             ..Default::default()
         };
-        let mut hsl = super::PartialHslChannels::default();
-        hsl.red = Some(super::PartialHslChannel {
-            hue: Some(10.0),
-            saturation: None,
-            luminance: None,
-        });
         let overlay = super::PartialParameters {
-            hsl: Some(hsl),
+            hsl: Some(super::PartialHslChannels {
+                red: Some(super::PartialHslChannel {
+                    hue: Some(10.0),
+                    saturation: None,
+                    luminance: None,
+                }),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let merged = base.merge(&overlay);
@@ -1061,13 +1083,14 @@ mod tests {
         engine.params_mut().hsl.red.hue = 15.0;
 
         let mut preset = crate::preset::Preset::default();
-        let mut partial_hsl = PartialHslChannels::default();
-        partial_hsl.green = Some(PartialHslChannel {
-            hue: Some(10.0),
-            saturation: None,
-            luminance: None,
+        preset.partial_params.hsl = Some(PartialHslChannels {
+            green: Some(PartialHslChannel {
+                hue: Some(10.0),
+                saturation: None,
+                luminance: None,
+            }),
+            ..Default::default()
         });
-        preset.partial_params.hsl = Some(partial_hsl);
 
         engine.layer_preset(&preset);
         assert_eq!(engine.params().hsl.red.hue, 15.0);

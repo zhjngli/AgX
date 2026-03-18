@@ -1,6 +1,14 @@
 use palette::{Hsl, IntoColor, LinSrgb, Srgb};
 use serde::{Deserialize, Serialize};
 
+// --- Channel helpers ---
+
+/// Apply a per-channel adjustment function to all three channels.
+#[inline(always)]
+pub fn apply_per_channel(r: f32, g: f32, b: f32, f: impl Fn(f32) -> f32) -> (f32, f32, f32) {
+    (f(r), f(g), f(b))
+}
+
 // --- Color space helpers ---
 
 /// Convert linear sRGB to sRGB gamma space.

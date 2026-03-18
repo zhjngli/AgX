@@ -136,7 +136,7 @@ mod tests {
 
         let meta = extract_metadata(&temp_path);
         if let Some(m) = meta {
-            assert!(m.exif.is_none() || m.exif.as_ref().unwrap().is_empty() == false);
+            assert!(m.exif.is_none() || !m.exif.as_ref().unwrap().is_empty());
         }
 
         let _ = std::fs::remove_file(&temp_path);

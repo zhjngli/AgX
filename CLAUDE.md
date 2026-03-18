@@ -21,6 +21,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 - `serde` for all serializable types
 - Tests live alongside source in standard Rust `#[cfg(test)]` modules
 - Structural tests in `crates/agx/tests/architecture.rs` enforce module dependency rules; see "When a Structural Test Fails" in `ARCHITECTURE.md`
+- Commit messages and PR titles use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`, `chore:`, `build:`. For mixed-scope PRs, use the most representative prefix.
 
 ## Plan Documents
 
@@ -38,7 +39,7 @@ Write a design doc in `docs/plans/` when the change adds/modifies modules, chang
 Work on a feature branch (`feat/`, `fix/`, `refactor/`). Write tests alongside code. Follow module contracts in per-module READMEs. Commit incrementally.
 
 ### 3. Verify
-Run `./scripts/verify.sh` for fast checks (format, clippy, unit tests, architecture tests, doc links). Run `./scripts/e2e.sh` for the full e2e golden comparison suite.
+Run `./scripts/verify.sh` for fast checks (format, clippy, unit tests, architecture tests, doc links). Run `./scripts/e2e-quick.sh` for a fast local e2e smoke test (1 JPEG matrix + error cases + library tests, ~15s). Run `./scripts/e2e.sh` for the full e2e golden comparison suite (CI or before merge).
 
 ### 4. Document
 Update `ARCHITECTURE.md` if modules, dependencies, or invariants changed. Update affected module READMEs (public API, extension guide). Cross-link any new design docs.
@@ -53,10 +54,11 @@ When adding new editing features (adjust/, LUT, preset parameters), also update 
 
 Before merging, verify:
 1. `./scripts/verify.sh` passes
-2. `./scripts/e2e.sh` passes (if editing features or pipeline changes were made)
-3. `ARCHITECTURE.md` updated if modules, dependencies, or invariants changed
-4. Affected module `README.md` files updated
-5. Design doc cross-linked from `ARCHITECTURE.md` (if applicable)
+2. `./scripts/e2e-quick.sh` passes (if editing features or pipeline changes were made)
+3. `./scripts/e2e.sh` passes in CI (full matrix)
+4. `ARCHITECTURE.md` updated if modules, dependencies, or invariants changed
+5. Affected module `README.md` files updated
+6. Design doc cross-linked from `ARCHITECTURE.md` (if applicable)
 
 ## Key Docs
 

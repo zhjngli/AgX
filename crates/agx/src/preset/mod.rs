@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{Parameters, PartialHslChannels, PartialParameters, PartialVignetteParams};
@@ -95,7 +97,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
 pub struct Preset {
     pub metadata: PresetMetadata,
     pub partial_params: PartialParameters,
-    pub lut: Option<crate::lut::Lut3D>,
+    pub lut: Option<Arc<crate::lut::Lut3D>>,
 }
 
 impl Preset {
@@ -198,7 +200,7 @@ impl Preset {
         // Load this preset's LUT (overrides base LUT if present)
         let lut = if let Some(lut_path_str) = &raw.lut.path {
             let lut_path = base_dir.join(lut_path_str);
-            Some(crate::lut::Lut3D::from_cube_file(&lut_path)?)
+            Some(Arc::new(crate::lut::Lut3D::from_cube_file(&lut_path)?))
         } else {
             base_lut
         };
@@ -376,23 +378,24 @@ LUT_3D_SIZE 2
     fn preset_hsl_roundtrip() {
         use crate::engine::{PartialHslChannel, PartialHslChannels};
         let mut preset = Preset::default();
-        let mut hsl = PartialHslChannels::default();
-        hsl.red = Some(PartialHslChannel {
-            hue: Some(15.0),
-            saturation: None,
-            luminance: None,
+        preset.partial_params.hsl = Some(PartialHslChannels {
+            red: Some(PartialHslChannel {
+                hue: Some(15.0),
+                saturation: None,
+                luminance: None,
+            }),
+            green: Some(PartialHslChannel {
+                hue: None,
+                saturation: Some(-30.0),
+                luminance: None,
+            }),
+            blue: Some(PartialHslChannel {
+                hue: None,
+                saturation: None,
+                luminance: Some(20.0),
+            }),
+            ..Default::default()
         });
-        hsl.green = Some(PartialHslChannel {
-            hue: None,
-            saturation: Some(-30.0),
-            luminance: None,
-        });
-        hsl.blue = Some(PartialHslChannel {
-            hue: None,
-            saturation: None,
-            luminance: Some(20.0),
-        });
-        preset.partial_params.hsl = Some(hsl);
 
         let toml_str = preset.to_toml().unwrap();
         let parsed = Preset::from_toml(&toml_str).unwrap();

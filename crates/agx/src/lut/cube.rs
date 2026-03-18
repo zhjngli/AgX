@@ -40,9 +40,11 @@ pub fn parse_cube(text: &str) -> Result<Lut3D> {
         }
 
         if let Some(rest) = line.strip_prefix("LUT_3D_SIZE") {
-            size = Some(rest.trim().parse::<usize>().map_err(|_| {
+            let s = rest.trim().parse::<usize>().map_err(|_| {
                 AgxError::Lut(format!("line {}: invalid LUT_3D_SIZE", line_num + 1))
-            })?);
+            })?;
+            table.reserve(s * s * s);
+            size = Some(s);
             continue;
         }
 

@@ -1,6 +1,8 @@
-use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use std::process;
+use std::sync::Arc;
+
+use clap::{Args, Parser, Subcommand};
 
 use agx::{Engine, Preset};
 
@@ -349,9 +351,9 @@ impl EditArgs {
         }
     }
 
-    fn load_lut(&self) -> agx::Result<Option<agx::Lut3D>> {
+    fn load_lut(&self) -> agx::Result<Option<Arc<agx::Lut3D>>> {
         match &self.lut {
-            Some(lut_path) => Ok(Some(agx::Lut3D::from_cube_file(lut_path)?)),
+            Some(lut_path) => Ok(Some(Arc::new(agx::Lut3D::from_cube_file(lut_path)?))),
             None => Ok(None),
         }
     }
@@ -549,7 +551,7 @@ fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
         &batch.output_dir,
         batch.recursive,
         &params,
-        lut_data.as_ref(),
+        lut_data,
         batch.output.quality,
         fmt,
         batch.suffix.as_deref(),

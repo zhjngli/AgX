@@ -64,7 +64,8 @@ For bug fixes:
 ### Commit discipline
 
 - One logical change per commit
-- Commit messages follow conventional format: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `build:`
+- Commit messages and PR titles follow conventional format: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`, `chore:`, `build:`
+- For mixed-scope PRs, use the most representative prefix (e.g. `chore:` for maintenance PRs spanning multiple types)
 - Commit after each meaningful step — don't batch unrelated changes
 
 ### Module contracts

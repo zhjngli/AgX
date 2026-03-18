@@ -153,7 +153,7 @@ pub fn encode_to_file_with_options(
         buf
     };
 
-    std::fs::write(&final_path, &buf).map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+    std::fs::write(&final_path, &buf)?;
 
     // For TIFF output, inject metadata via little_exif after writing
     if format == OutputFormat::Tiff {
@@ -449,6 +449,6 @@ mod tests {
         let opts = EncodeOptions::default();
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
-        let _ = std::fs::remove_file(&result.unwrap());
+        let _ = std::fs::remove_file(result.unwrap());
     }
 }

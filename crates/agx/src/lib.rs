@@ -7,7 +7,7 @@ pub mod lut;
 pub mod metadata;
 pub mod preset;
 
-pub use adjust::{VignettePrecomputed, VignetteShape};
+pub use adjust::VignetteShape;
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
 pub use engine::{

@@ -75,7 +75,7 @@ fn library_lut_load_and_apply() {
     let image = agx::decode(&input).expect("decode failed");
     let mut engine = agx::Engine::new(image);
     let lut = agx::Lut3D::from_cube_file(&lut_path).expect("LUT load failed");
-    engine.set_lut(Some(lut));
+    engine.set_lut(Some(std::sync::Arc::new(lut)));
     let rendered = engine.render();
     agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
 
