@@ -1,4 +1,5 @@
 use palette::{Hsl, IntoColor, LinSrgb, Srgb};
+use serde::{Deserialize, Serialize};
 
 // --- Color space helpers ---
 
@@ -205,6 +206,60 @@ pub fn apply_hsl(
     let new_hsl = Hsl::new(new_hue, new_sat, new_lum);
     let rgb: Srgb<f32> = new_hsl.into_color();
     (rgb.red, rgb.green, rgb.blue)
+}
+
+// --- Vignette (sRGB gamma space, position-dependent) ---
+
+/// Vignette falloff geometry.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VignetteShape {
+    #[default]
+    Elliptical,
+    Circular,
+}
+
+/// Apply creative vignette to an sRGB gamma pixel.
+///
+/// Darkens (negative amount) or brightens (positive amount) edges based on
+/// distance from center. Amount range: -100 to +100. 0 = no effect.
+///
+/// `x, y` = pixel coordinates, `w, h` = image dimensions.
+pub fn apply_vignette(
+    r: f32, g: f32, b: f32,
+    amount: f32,
+    shape: VignetteShape,
+    x: u32, y: u32,
+    w: u32, h: u32,
+) -> (f32, f32, f32) {
+    if amount == 0.0 {
+        return (r, g, b);
+    }
+
+    let half_w = w as f32 / 2.0;
+    let half_h = h as f32 / 2.0;
+    let dx = x as f32 - half_w;
+    let dy = y as f32 - half_h;
+
+    let d_sq = match shape {
+        VignetteShape::Elliptical => {
+            (dx / half_w).powi(2) + (dy / half_h).powi(2)
+        }
+        VignetteShape::Circular => {
+            let radius = half_w.max(half_h);
+            (dx / radius).powi(2) + (dy / radius).powi(2)
+        }
+    };
+
+    let factor = (1.0 - d_sq).clamp(0.0, 1.0).powi(2);
+    let strength = amount / 100.0;
+    let multiplier = 1.0 + strength * (1.0 - factor);
+
+    (
+        (r * multiplier).clamp(0.0, 1.0),
+        (g * multiplier).clamp(0.0, 1.0),
+        (b * multiplier).clamp(0.0, 1.0),
+    )
 }
 
 #[cfg(test)]
@@ -551,5 +606,63 @@ mod tests {
             new_sum > orig_sum,
             "Expected brighter, got sum={new_sum} vs {orig_sum}"
         );
+    }
+
+    // --- Vignette tests ---
+
+    #[test]
+    fn vignette_zero_amount_is_identity() {
+        let (r, g, b) = super::apply_vignette(0.8, 0.5, 0.3, 0.0, super::VignetteShape::Elliptical, 0, 0, 100, 100);
+        assert!((r - 0.8).abs() < 1e-6);
+        assert!((g - 0.5).abs() < 1e-6);
+        assert!((b - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn vignette_center_pixel_unchanged() {
+        // 100x100 image: half_w = 50.0. Pixel (50, 50) → dx = 0, dy = 0 → factor = 1.0 exactly.
+        let (r, g, b) = super::apply_vignette(0.8, 0.5, 0.3, -50.0, super::VignetteShape::Elliptical, 50, 50, 100, 100);
+        assert!((r - 0.8).abs() < 1e-6, "r: expected 0.8, got {r}");
+        assert!((g - 0.5).abs() < 1e-6, "g: expected 0.5, got {g}");
+        assert!((b - 0.3).abs() < 1e-6, "b: expected 0.3, got {b}");
+    }
+
+    #[test]
+    fn vignette_corner_darkened() {
+        let (r, _g, _b) = super::apply_vignette(0.8, 0.5, 0.3, -50.0, super::VignetteShape::Elliptical, 0, 0, 100, 100);
+        assert!(r < 0.8, "Corner should be darkened, got r={r}");
+    }
+
+    #[test]
+    fn vignette_corner_brightened() {
+        let (r, _g, _b) = super::apply_vignette(0.5, 0.5, 0.5, 50.0, super::VignetteShape::Elliptical, 0, 0, 100, 100);
+        assert!(r > 0.5, "Corner should be brightened, got r={r}");
+    }
+
+    #[test]
+    fn vignette_circular_top_bottom_darker_than_sides() {
+        // 3:2 wide image (300x200). Circular radius = max(150, 100) = 150.
+        // Left-center (0, 100): dx=150, dy=0 → d²=(150/150)²=1.0 → factor=0 → full effect.
+        // Top-center (150, 0): dx=0, dy=100 → d²=(100/150)²=0.444 → factor=(0.556)²=0.309.
+        // Left/right edges are further from center than top/bottom in circular mode on a wide image.
+        let (r_top, _, _) = super::apply_vignette(0.8, 0.8, 0.8, -100.0, super::VignetteShape::Circular, 150, 0, 300, 200);
+        let (r_left, _, _) = super::apply_vignette(0.8, 0.8, 0.8, -100.0, super::VignetteShape::Circular, 0, 100, 300, 200);
+        assert!(r_left < r_top, "Circular: left edge ({r_left}) should be darker than top edge ({r_top}) on wide image");
+    }
+
+    #[test]
+    fn vignette_elliptical_edges_even() {
+        // 3:2 aspect ratio image (300x200). Elliptical mode: normalized by half_w and half_h.
+        // Top-center (150, 0): d² = (0/150)² + (100/100)² = 1.0
+        // Left-center (0, 100): d² = (150/150)² + (0/100)² = 1.0
+        // Both should have the same darkening.
+        let (r_top, _, _) = super::apply_vignette(0.8, 0.8, 0.8, -50.0, super::VignetteShape::Elliptical, 150, 0, 300, 200);
+        let (r_left, _, _) = super::apply_vignette(0.8, 0.8, 0.8, -50.0, super::VignetteShape::Elliptical, 0, 100, 300, 200);
+        let (r_bottom, _, _) = super::apply_vignette(0.8, 0.8, 0.8, -50.0, super::VignetteShape::Elliptical, 150, 199, 300, 200);
+        let (r_right, _, _) = super::apply_vignette(0.8, 0.8, 0.8, -50.0, super::VignetteShape::Elliptical, 299, 100, 300, 200);
+        let eps = 0.02; // small tolerance for edge pixel asymmetry
+        assert!((r_top - r_left).abs() < eps, "Top ({r_top}) and left ({r_left}) should be equal");
+        assert!((r_top - r_bottom).abs() < eps, "Top ({r_top}) and bottom ({r_bottom}) should be equal");
+        assert!((r_top - r_right).abs() < eps, "Top ({r_top}) and right ({r_right}) should be equal");
     }
 }
