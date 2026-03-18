@@ -196,7 +196,9 @@ fn bw_street(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 
     // Warm sepia split-tone: warm shadows, neutral-warm highlights
     let (r, g, b) = split_tone(
-        r, g, b,
+        r,
+        g,
+        b,
         [0.18, 0.12, 0.08], // warm brown shadows
         [0.95, 0.92, 0.88], // slightly warm highlights
         0.25,
@@ -219,7 +221,9 @@ fn bw_lofi(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 
     // Cool blue split-tone: cool shadows, neutral highlights
     let (r, g, b) = split_tone(
-        r, g, b,
+        r,
+        g,
+        b,
         [0.10, 0.12, 0.18], // cool blue-gray shadows
         [0.88, 0.90, 0.92], // slightly cool highlights
         0.20,

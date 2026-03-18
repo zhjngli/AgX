@@ -490,7 +490,13 @@ mod tests {
         // Near-black pixel should get shadow tint (warm = elevated red)
         let (r, g, b) = split_tone(0.1, 0.1, 0.1, [0.3, 0.2, 0.1], [0.9, 0.9, 0.9], 0.3);
         // Shadow tint should push red higher than green/blue
-        assert!(r > g, "shadow should be warm-tinted: r={} g={} b={}", r, g, b);
+        assert!(
+            r > g,
+            "shadow should be warm-tinted: r={} g={} b={}",
+            r,
+            g,
+            b
+        );
     }
 
     // --- Crossfeed ---
