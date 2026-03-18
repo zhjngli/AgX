@@ -19,7 +19,7 @@ Slim API smoke tests (6 tests) covering: noop roundtrip (JPEG + RAW), preset app
 ### Golden Comparison
 
 - JPEG: strict (tolerance=2, max_diff_pct=0.0) — deterministic across platforms
-- RAW: permissive (tolerance=30, max_diff_pct=10.0) — LibRaw output varies across platforms
+- RAW: permissive (tolerance=100, max_diff_pct=25.0) — LibRaw demosaicing varies across platforms; heavy looks (e.g. neo_noir) amplify differences
 - Goldens downscaled to 1024px longest edge to keep repo size manageable
 - Regenerate with: `GOLDEN_UPDATE=1 cargo test -p agx-e2e`
 

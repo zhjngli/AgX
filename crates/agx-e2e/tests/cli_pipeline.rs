@@ -141,8 +141,8 @@ fn cli_night_city_blur() {
         "raw/night_city_blur.raf",
         "night_city_blur",
         "raw",
-        30,
-        10.0,
+        100,
+        25.0,
         ALL_LOOKS,
     );
 }
@@ -153,8 +153,8 @@ fn cli_sunset_river() {
         "raw/sunset_river.raf",
         "sunset_river",
         "raw",
-        30,
-        10.0,
+        100,
+        25.0,
         ALL_LOOKS,
     );
 }
@@ -165,8 +165,8 @@ fn cli_foggy_forest() {
         "raw/foggy_forest.raf",
         "foggy_forest",
         "raw",
-        30,
-        10.0,
+        100,
+        25.0,
         ALL_LOOKS,
     );
 }
@@ -177,8 +177,8 @@ fn cli_dusk_cityscape() {
         "raw/dusk_cityscape.raf",
         "dusk_cityscape",
         "raw",
-        30,
-        10.0,
+        100,
+        25.0,
         ALL_LOOKS,
     );
 }
