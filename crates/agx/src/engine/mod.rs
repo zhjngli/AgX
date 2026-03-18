@@ -507,11 +507,13 @@ impl Engine {
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
     /// 5. HSL adjustments (sRGB gamma space)
     /// 6. LUT application (sRGB gamma space)
-    /// 7. Convert back to linear space
+    /// 7. Vignette (sRGB gamma space, position-dependent)
+    /// 8. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
         let hsl_active = !self.params.hsl.is_default();
+        let vignette_active = self.params.vignette.amount != 0.0;
         let hue_shifts = self.params.hsl.hue_shifts();
         let sat_shifts = self.params.hsl.saturation_shifts();
         let lum_shifts = self.params.hsl.luminance_shifts();
@@ -582,6 +584,19 @@ impl Engine {
                 sr = lr;
                 sg = lg;
                 sb = lb;
+            }
+
+            // 10.5. Vignette (sRGB gamma space, position-dependent)
+            if vignette_active {
+                let (vr, vg, vb) = adjust::apply_vignette(
+                    sr, sg, sb,
+                    self.params.vignette.amount,
+                    self.params.vignette.shape,
+                    x, y, w, h,
+                );
+                sr = vr;
+                sg = vg;
+                sb = vb;
             }
 
             // 11. Convert back to linear space
@@ -1142,6 +1157,49 @@ mod tests {
         engine.apply_preset(&preset);
         assert_eq!(engine.params().exposure, 0.5);
         assert_eq!(engine.params().contrast, 0.0);
+    }
+
+    #[test]
+    fn render_vignette_darkens_corners() {
+        // Use a 10x10 image so corners are clearly away from center
+        let img: Rgb32FImage = ImageBuffer::from_pixel(10, 10, Rgb([0.5, 0.5, 0.5]));
+        let mut engine = Engine::new(img);
+        engine.params_mut().vignette.amount = -50.0;
+        let rendered = engine.render();
+
+        // Center pixel should be close to original
+        let center = rendered.get_pixel(5, 5);
+        assert!(
+            (center.0[0] - 0.5).abs() < 0.05,
+            "Center should be near original, got {}",
+            center.0[0]
+        );
+
+        // Corner pixel should be darker
+        let corner = rendered.get_pixel(0, 0);
+        assert!(
+            corner.0[0] < center.0[0],
+            "Corner ({}) should be darker than center ({})",
+            corner.0[0],
+            center.0[0]
+        );
+    }
+
+    #[test]
+    fn render_vignette_zero_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let mut engine = Engine::new(img);
+        engine.params_mut().vignette.amount = 0.0;
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "Channel {}: expected {}, got {}",
+                i, orig.0[i], rend.0[i]
+            );
+        }
     }
 
     #[test]
