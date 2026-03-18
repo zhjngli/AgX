@@ -219,12 +219,95 @@ pub enum VignetteShape {
     Circular,
 }
 
-/// Apply creative vignette to an sRGB gamma pixel.
+impl std::fmt::Display for VignetteShape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Elliptical => write!(f, "elliptical"),
+            Self::Circular => write!(f, "circular"),
+        }
+    }
+}
+
+impl std::str::FromStr for VignetteShape {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "elliptical" => Ok(Self::Elliptical),
+            "circular" => Ok(Self::Circular),
+            _ => Err(format!(
+                "invalid vignette shape '{s}'. Use: elliptical or circular"
+            )),
+        }
+    }
+}
+
+/// Precomputed loop-invariant values for vignette rendering.
+///
+/// Create once per render via [`VignettePrecomputed::new`], then call
+/// [`apply_vignette_pre`] per pixel. This avoids recomputing `half_w`,
+/// `half_h`, `strength`, and per-axis reciprocals on every pixel.
+#[derive(Debug, Clone, Copy)]
+pub struct VignettePrecomputed {
+    half_w: f32,
+    half_h: f32,
+    inv_x: f32,
+    inv_y: f32,
+    strength: f32,
+}
+
+impl VignettePrecomputed {
+    pub fn new(amount: f32, shape: VignetteShape, w: u32, h: u32) -> Self {
+        let half_w = w as f32 / 2.0;
+        let half_h = h as f32 / 2.0;
+        let (inv_x, inv_y) = match shape {
+            VignetteShape::Elliptical => (1.0 / half_w, 1.0 / half_h),
+            VignetteShape::Circular => {
+                let inv_r = 1.0 / half_w.max(half_h);
+                (inv_r, inv_r)
+            }
+        };
+        Self {
+            half_w,
+            half_h,
+            inv_x,
+            inv_y,
+            strength: amount / 100.0,
+        }
+    }
+}
+
+/// Apply creative vignette using precomputed invariants (hot path).
+///
+/// Call [`VignettePrecomputed::new`] once, then this function per pixel.
+pub fn apply_vignette_pre(
+    r: f32,
+    g: f32,
+    b: f32,
+    pre: &VignettePrecomputed,
+    x: u32,
+    y: u32,
+) -> (f32, f32, f32) {
+    let dx = (x as f32 - pre.half_w) * pre.inv_x;
+    let dy = (y as f32 - pre.half_h) * pre.inv_y;
+    let d_sq = dx * dx + dy * dy;
+
+    let base = (1.0 - d_sq).clamp(0.0, 1.0);
+    let factor = base * base;
+    let multiplier = 1.0 + pre.strength * (1.0 - factor);
+
+    (
+        (r * multiplier).clamp(0.0, 1.0),
+        (g * multiplier).clamp(0.0, 1.0),
+        (b * multiplier).clamp(0.0, 1.0),
+    )
+}
+
+/// Apply creative vignette to an sRGB gamma pixel (convenience wrapper).
 ///
 /// Darkens (negative amount) or brightens (positive amount) edges based on
 /// distance from center. Amount range: -100 to +100. 0 = no effect.
 ///
-/// `x, y` = pixel coordinates, `w, h` = image dimensions.
+/// For batch pixel processing, prefer [`VignettePrecomputed`] + [`apply_vignette_pre`].
 #[allow(clippy::too_many_arguments)]
 pub fn apply_vignette(
     r: f32,
@@ -240,28 +323,13 @@ pub fn apply_vignette(
     if amount == 0.0 {
         return (r, g, b);
     }
-
-    let half_w = w as f32 / 2.0;
-    let half_h = h as f32 / 2.0;
-    let dx = x as f32 - half_w;
-    let dy = y as f32 - half_h;
-
-    let d_sq = match shape {
-        VignetteShape::Elliptical => (dx / half_w).powi(2) + (dy / half_h).powi(2),
-        VignetteShape::Circular => {
-            let radius = half_w.max(half_h);
-            (dx / radius).powi(2) + (dy / radius).powi(2)
-        }
-    };
-
-    let factor = (1.0 - d_sq).clamp(0.0, 1.0).powi(2);
-    let strength = amount / 100.0;
-    let multiplier = 1.0 + strength * (1.0 - factor);
-
-    (
-        (r * multiplier).clamp(0.0, 1.0),
-        (g * multiplier).clamp(0.0, 1.0),
-        (b * multiplier).clamp(0.0, 1.0),
+    apply_vignette_pre(
+        r,
+        g,
+        b,
+        &VignettePrecomputed::new(amount, shape, w, h),
+        x,
+        y,
     )
 }
 

@@ -100,6 +100,13 @@ pub struct VignetteParams {
     pub shape: crate::adjust::VignetteShape,
 }
 
+impl VignetteParams {
+    /// Returns `true` when all fields are at their default (neutral) values.
+    pub fn is_default(&self) -> bool {
+        self.amount == 0.0 && self.shape == crate::adjust::VignetteShape::default()
+    }
+}
+
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
@@ -513,7 +520,14 @@ impl Engine {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
         let hsl_active = !self.params.hsl.is_default();
-        let vignette_active = self.params.vignette.amount != 0.0;
+        let vignette_pre = (!self.params.vignette.is_default()).then(|| {
+            adjust::VignettePrecomputed::new(
+                self.params.vignette.amount,
+                self.params.vignette.shape,
+                w,
+                h,
+            )
+        });
         let hue_shifts = self.params.hsl.hue_shifts();
         let sat_shifts = self.params.hsl.saturation_shifts();
         let lum_shifts = self.params.hsl.luminance_shifts();
@@ -587,18 +601,8 @@ impl Engine {
             }
 
             // 11. Vignette (sRGB gamma space, position-dependent)
-            if vignette_active {
-                let (vr, vg, vb) = adjust::apply_vignette(
-                    sr,
-                    sg,
-                    sb,
-                    self.params.vignette.amount,
-                    self.params.vignette.shape,
-                    x,
-                    y,
-                    w,
-                    h,
-                );
+            if let Some(pre) = &vignette_pre {
+                let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
                 sr = vr;
                 sg = vg;
                 sb = vb;

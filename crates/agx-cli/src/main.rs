@@ -323,21 +323,11 @@ struct EditArgs {
     #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     vignette_amount: f32,
     /// Vignette shape: elliptical (default) or circular
-    #[arg(long, value_parser = parse_vignette_shape, default_value = "elliptical")]
+    #[arg(long, default_value = "elliptical")]
     vignette_shape: agx::VignetteShape,
 
     #[command(flatten)]
     hsl: HslArgs,
-}
-
-fn parse_vignette_shape(s: &str) -> Result<agx::VignetteShape, String> {
-    match s {
-        "elliptical" => Ok(agx::VignetteShape::Elliptical),
-        "circular" => Ok(agx::VignetteShape::Circular),
-        _ => Err(format!(
-            "invalid vignette shape '{s}'. Use: elliptical or circular"
-        )),
-    }
 }
 
 impl EditArgs {
