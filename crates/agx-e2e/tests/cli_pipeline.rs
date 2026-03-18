@@ -12,6 +12,9 @@ const LOOKS: &[&str] = &[
     "cinema_warm",
     "kodachrome_64",
     "nordic_fade",
+    "bw_high_contrast",
+    "bw_street",
+    "bw_lofi",
 ];
 
 // --- Helpers ---

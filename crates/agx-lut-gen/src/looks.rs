@@ -16,7 +16,7 @@ pub struct Look {
     pub transform: fn(f32, f32, f32) -> (f32, f32, f32),
 }
 
-/// Return all 6 film-inspired looks.
+/// Return all film-inspired looks.
 pub fn all_looks() -> Vec<Look> {
     vec![
         Look {
@@ -42,6 +42,18 @@ pub fn all_looks() -> Vec<Look> {
         Look {
             name: "nordic_fade",
             transform: nordic_fade,
+        },
+        Look {
+            name: "bw_high_contrast",
+            transform: bw_high_contrast,
+        },
+        Look {
+            name: "bw_street",
+            transform: bw_street,
+        },
+        Look {
+            name: "bw_lofi",
+            transform: bw_lofi,
         },
     ]
 }
@@ -149,6 +161,69 @@ fn nordic_fade(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 
     // Heavy desaturation
     let (r, g, b) = scale_saturation(r, g, b, 0.60);
+
+    clamp_rgb(r, g, b)
+}
+
+// --- Black & White looks ---
+
+/// High Contrast B&W — strong S-curve, deep blacks, luminance desaturation.
+/// Classic darkroom high-contrast print.
+fn bw_high_contrast(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    // Strong S-curve for punchy contrast
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.6, 0.45));
+
+    // Film shoulder for natural highlight rolloff
+    let (r, g, b) = map_channels(r, g, b, |x| film_shoulder(x, 0.15));
+
+    // Full luminance desaturation
+    let (r, g, b) = desaturate_luminance(r, g, b, 1.0);
+
+    clamp_rgb(r, g, b)
+}
+
+/// Street Documentary B&W — medium contrast, warm sepia-toned highlights,
+/// slightly lifted shadows. Classic street photography / photojournalism feel.
+fn bw_street(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    // Medium S-curve
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.35, 0.5));
+
+    // Slight shadow lift for newspaper/documentary feel
+    let (r, g, b) = map_channels(r, g, b, |x| lift_gamma_gain(x, 0.03, 1.0, 1.0));
+
+    // Full luminance desaturation
+    let (r, g, b) = desaturate_luminance(r, g, b, 1.0);
+
+    // Warm sepia split-tone: warm shadows, neutral-warm highlights
+    let (r, g, b) = split_tone(
+        r, g, b,
+        [0.18, 0.12, 0.08], // warm brown shadows
+        [0.95, 0.92, 0.88], // slightly warm highlights
+        0.25,
+    );
+
+    clamp_rgb(r, g, b)
+}
+
+/// Lo-fi Documentary B&W — heavily lifted blacks, compressed dynamic range,
+/// cool blue tone. Faded surveillance/indie film aesthetic.
+fn bw_lofi(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    // Heavy black lift + compressed highlights (matte/faded look)
+    let (r, g, b) = map_channels(r, g, b, |x| lift_gamma_gain(x, 0.15, 1.0, 0.82));
+
+    // Mild S-curve to retain some midtone separation
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.2, 0.5));
+
+    // Full luminance desaturation
+    let (r, g, b) = desaturate_luminance(r, g, b, 1.0);
+
+    // Cool blue split-tone: cool shadows, neutral highlights
+    let (r, g, b) = split_tone(
+        r, g, b,
+        [0.10, 0.12, 0.18], // cool blue-gray shadows
+        [0.88, 0.90, 0.92], // slightly cool highlights
+        0.20,
+    );
 
     clamp_rgb(r, g, b)
 }

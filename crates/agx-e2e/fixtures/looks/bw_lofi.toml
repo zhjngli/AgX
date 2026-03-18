@@ -1,0 +1,12 @@
+[metadata]
+name = "B&W Lo-fi Documentary"
+author = "agx-e2e"
+
+[tone]
+exposure = -0.2
+contrast = -5.0
+highlights = -15.0
+shadows = 10.0
+
+[lut]
+path = "luts/bw_lofi.cube"

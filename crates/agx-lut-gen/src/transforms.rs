@@ -200,6 +200,46 @@ pub fn hue_rotate_in_lum_range(
     (ro.clamp(0.0, 1.0), go.clamp(0.0, 1.0), bo.clamp(0.0, 1.0))
 }
 
+/// Luminance-weighted desaturation using Rec. 709 coefficients.
+///
+/// `amount` = 0.0 is identity, 1.0 is fully monochrome.
+/// Uses perceptual luminance weights (0.2126 R, 0.7152 G, 0.0722 B)
+/// which produces more natural B&W than HSL-based desaturation.
+pub fn desaturate_luminance(r: f32, g: f32, b: f32, amount: f32) -> (f32, f32, f32) {
+    let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    let inv = 1.0 - amount;
+    (
+        (inv * r + amount * lum).clamp(0.0, 1.0),
+        (inv * g + amount * lum).clamp(0.0, 1.0),
+        (inv * b + amount * lum).clamp(0.0, 1.0),
+    )
+}
+
+/// Split-tone a monochrome or near-monochrome image.
+///
+/// Applies `shadow_rgb` tint to dark values and `highlight_rgb` tint to bright values,
+/// blended by `amount`. Designed to be applied after desaturation.
+pub fn split_tone(
+    r: f32,
+    g: f32,
+    b: f32,
+    shadow_rgb: [f32; 3],
+    highlight_rgb: [f32; 3],
+    amount: f32,
+) -> (f32, f32, f32) {
+    let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // Use luminance as the blend between shadow and highlight tint
+    let tint_r = shadow_rgb[0] * (1.0 - lum) + highlight_rgb[0] * lum;
+    let tint_g = shadow_rgb[1] * (1.0 - lum) + highlight_rgb[1] * lum;
+    let tint_b = shadow_rgb[2] * (1.0 - lum) + highlight_rgb[2] * lum;
+    let inv = 1.0 - amount;
+    (
+        (inv * r + amount * tint_r).clamp(0.0, 1.0),
+        (inv * g + amount * tint_g).clamp(0.0, 1.0),
+        (inv * b + amount * tint_b).clamp(0.0, 1.0),
+    )
+}
+
 /// Mix a fraction of one channel into another.
 ///
 /// `src` and `dst` are channel indices: 0=R, 1=G, 2=B.
@@ -407,6 +447,53 @@ mod tests {
         assert!(approx_eq(g, 0.3, 0.01));
         assert!(approx_eq(b, 0.7, 0.01));
     }
+
+    // --- Luminance desaturation ---
+
+    #[test]
+    fn desaturate_identity_at_zero() {
+        let (r, g, b) = desaturate_luminance(0.8, 0.2, 0.4, 0.0);
+        assert!(approx_eq(r, 0.8, 0.01));
+        assert!(approx_eq(g, 0.2, 0.01));
+        assert!(approx_eq(b, 0.4, 0.01));
+    }
+
+    #[test]
+    fn desaturate_full_gives_monochrome() {
+        let (r, g, b) = desaturate_luminance(1.0, 0.0, 0.0, 1.0);
+        // Pure red -> luminance = 0.2126
+        assert!(approx_eq(r, g, 0.01), "r={} g={}", r, g);
+        assert!(approx_eq(g, b, 0.01), "g={} b={}", g, b);
+        assert!(approx_eq(r, 0.2126, 0.01), "lum={}", r);
+    }
+
+    #[test]
+    fn desaturate_gray_unchanged() {
+        let (r, g, b) = desaturate_luminance(0.5, 0.5, 0.5, 1.0);
+        assert!(approx_eq(r, 0.5, 0.01));
+        assert!(approx_eq(g, 0.5, 0.01));
+        assert!(approx_eq(b, 0.5, 0.01));
+    }
+
+    // --- Split tone ---
+
+    #[test]
+    fn split_tone_identity_at_zero_amount() {
+        let (r, g, b) = split_tone(0.5, 0.5, 0.5, [0.0, 0.0, 0.0], [1.0, 1.0, 1.0], 0.0);
+        assert!(approx_eq(r, 0.5, 0.01));
+        assert!(approx_eq(g, 0.5, 0.01));
+        assert!(approx_eq(b, 0.5, 0.01));
+    }
+
+    #[test]
+    fn split_tone_dark_gets_shadow_tint() {
+        // Near-black pixel should get shadow tint (warm = elevated red)
+        let (r, g, b) = split_tone(0.1, 0.1, 0.1, [0.3, 0.2, 0.1], [0.9, 0.9, 0.9], 0.3);
+        // Shadow tint should push red higher than green/blue
+        assert!(r > g, "shadow should be warm-tinted: r={} g={} b={}", r, g, b);
+    }
+
+    // --- Crossfeed ---
 
     #[test]
     fn crossfeed_adds_fraction() {
