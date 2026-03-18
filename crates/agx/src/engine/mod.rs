@@ -519,6 +519,11 @@ impl Engine {
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
+        let contrast = self.params.contrast;
+        let highlights = self.params.highlights;
+        let shadows = self.params.shadows;
+        let whites = self.params.whites;
+        let blacks = self.params.blacks;
         let hsl_active = !self.params.hsl.is_default();
         let vignette_pre = (!self.params.vignette.is_default()).then(|| {
             adjust::VignettePrecomputed::new(
@@ -544,37 +549,42 @@ impl Engine {
             b = wb.2;
 
             // 2. Exposure (linear space)
-            r = adjust::apply_exposure(r, exposure_factor);
-            g = adjust::apply_exposure(g, exposure_factor);
-            b = adjust::apply_exposure(b, exposure_factor);
+            (r, g, b) =
+                adjust::apply_per_channel(r, g, b, |v| adjust::apply_exposure(v, exposure_factor));
 
             // 3. Convert to sRGB gamma space
             let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
 
             // 4. Contrast
-            sr = adjust::apply_contrast(sr, self.params.contrast);
-            sg = adjust::apply_contrast(sg, self.params.contrast);
-            sb = adjust::apply_contrast(sb, self.params.contrast);
+            if contrast != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_contrast(v, contrast));
+            }
 
             // 5. Highlights
-            sr = adjust::apply_highlights(sr, self.params.highlights);
-            sg = adjust::apply_highlights(sg, self.params.highlights);
-            sb = adjust::apply_highlights(sb, self.params.highlights);
+            if highlights != 0.0 {
+                (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                    adjust::apply_highlights(v, highlights)
+                });
+            }
 
             // 6. Shadows
-            sr = adjust::apply_shadows(sr, self.params.shadows);
-            sg = adjust::apply_shadows(sg, self.params.shadows);
-            sb = adjust::apply_shadows(sb, self.params.shadows);
+            if shadows != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_shadows(v, shadows));
+            }
 
             // 7. Whites
-            sr = adjust::apply_whites(sr, self.params.whites);
-            sg = adjust::apply_whites(sg, self.params.whites);
-            sb = adjust::apply_whites(sb, self.params.whites);
+            if whites != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_whites(v, whites));
+            }
 
             // 8. Blacks
-            sr = adjust::apply_blacks(sr, self.params.blacks);
-            sg = adjust::apply_blacks(sg, self.params.blacks);
-            sb = adjust::apply_blacks(sb, self.params.blacks);
+            if blacks != 0.0 {
+                (sr, sg, sb) =
+                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_blacks(v, blacks));
+            }
 
             // 9. HSL adjustments (sRGB gamma space)
             if hsl_active {

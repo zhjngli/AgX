@@ -130,20 +130,23 @@ impl LibRawProcessor {
         Ok(ProcessedImage { ptr })
     }
 
+    /// Read a NUL-terminated string field from LibRaw into an owned `String`.
+    fn get_string_field<const N: usize>(
+        &self,
+        ffi_fn: unsafe extern "C" fn(*mut libraw_data_t, *mut c_char, c_int),
+    ) -> String {
+        let mut buf = [0u8; N];
+        unsafe { ffi_fn(self.ptr, buf.as_mut_ptr() as *mut c_char, N as c_int) }
+        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
+        cstr.to_string_lossy().into_owned()
+    }
+
     fn get_make(&self) -> String {
-        let mut buf = [0u8; 128];
-        unsafe { agx_get_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
-        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
-        cstr.to_string_lossy().into_owned()
+        self.get_string_field::<128>(agx_get_make)
     }
-
     fn get_model(&self) -> String {
-        let mut buf = [0u8; 128];
-        unsafe { agx_get_model(self.ptr, buf.as_mut_ptr() as *mut c_char, 128) }
-        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
-        cstr.to_string_lossy().into_owned()
+        self.get_string_field::<128>(agx_get_model)
     }
-
     fn get_iso(&self) -> f32 {
         unsafe { agx_get_iso(self.ptr) }
     }
@@ -159,19 +162,11 @@ impl LibRawProcessor {
     fn get_timestamp(&self) -> i64 {
         unsafe { agx_get_timestamp(self.ptr) }
     }
-
     fn get_lens(&self) -> String {
-        let mut buf = [0u8; 256];
-        unsafe { agx_get_lens(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
-        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
-        cstr.to_string_lossy().into_owned()
+        self.get_string_field::<256>(agx_get_lens)
     }
-
     fn get_lens_make(&self) -> String {
-        let mut buf = [0u8; 256];
-        unsafe { agx_get_lens_make(self.ptr, buf.as_mut_ptr() as *mut c_char, 256) }
-        let cstr = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr() as *const c_char) };
-        cstr.to_string_lossy().into_owned()
+        self.get_string_field::<256>(agx_get_lens_make)
     }
 }
 
