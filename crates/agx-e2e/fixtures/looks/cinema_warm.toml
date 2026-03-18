@@ -1,0 +1,28 @@
+[metadata]
+name = "Cinema Warm"
+author = "agx-e2e"
+extends = "base_cinematic.toml"
+
+[tone]
+exposure = 0.2
+highlights = -15.0
+shadows = 15.0
+
+[white_balance]
+temperature = 15.0
+tint = 5.0
+
+[hsl.orange]
+saturation = 10.0
+luminance = 5.0
+
+[hsl.yellow]
+saturation = 5.0
+luminance = 5.0
+
+[hsl.blue]
+saturation = -10.0
+luminance = -5.0
+
+[lut]
+path = "luts/cinema_warm.cube"

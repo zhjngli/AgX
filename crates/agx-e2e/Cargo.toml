@@ -1,0 +1,15 @@
+[package]
+name = "agx-e2e"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# This is a test-only crate — it has no library consumers.
+# src/lib.rs provides comparison utilities used by the integration tests.
+
+[dependencies]
+image = "0.25"
+
+[dev-dependencies]
+agx = { path = "../agx", features = ["raw"] }
+tempfile = "3"

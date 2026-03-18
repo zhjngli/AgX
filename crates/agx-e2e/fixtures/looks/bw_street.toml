@@ -1,0 +1,10 @@
+[metadata]
+name = "B&W Street Documentary"
+author = "agx-e2e"
+
+[tone]
+contrast = 10.0
+shadows = 5.0
+
+[lut]
+path = "luts/bw_street.cube"

@@ -1,3 +1,5 @@
+mod orientation;
+
 #[cfg(feature = "raw")]
 pub mod raw;
 
@@ -50,6 +52,8 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
         .map_err(AgxError::Io)?
         .decode()
         .map_err(AgxError::Image)?;
+    let orientation = orientation::read_orientation(path);
+    let img = orientation.apply(img);
     let srgb_f32 = img.into_rgb32f();
     let (w, h) = srgb_f32.dimensions();
     let linear = Rgb32FImage::from_fn(w, h, |x, y| {

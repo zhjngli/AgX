@@ -58,6 +58,8 @@ These rules are enforced by `crates/agx/tests/architecture.rs`.
 | `preset`   | decode, encode, metadata                           | engine (`Parameters`), lut (`Lut3D`), error              |
 | `engine`   | no restrictions within library                     | adjust, lut, preset, error                               |
 | agx-cli    | —                                                  | agx (library API only)                                   |
+| agx-e2e    | —                                                  | agx, agx-cli (test-only crate, not part of the library/CLI dependency graph) |
+| agx-lut-gen| —                                                  | none (standalone build tool for generating .cube LUT files; no runtime deps) |
 
 ## Negative Constraints
 
@@ -115,6 +117,8 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-07 | [Batch Processing Design](docs/plans/2026-03-07-batch-processing-design.md)                      |
 | 2026-03-07 | [Preset Composability Design](docs/plans/2026-03-07-preset-composability-design.md)              |
 | 2026-03-15 | [Rename to AgX Design](docs/plans/2026-03-15-rename-to-agx-design.md)                            |
+| 2026-03-15 | [E2E Tests Design](docs/plans/2026-03-15-e2e-tests-design.md)                                   |
+| 2026-03-17 | [Comprehensive E2E Overhaul Design](docs/plans/2026-03-17-comprehensive-e2e-overhaul-design.md)  |
 
 ### Ideas
 

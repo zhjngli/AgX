@@ -1,0 +1,11 @@
+[metadata]
+name = "B&W High Contrast"
+author = "agx-e2e"
+
+[tone]
+contrast = 20.0
+highlights = -10.0
+blacks = -15.0
+
+[lut]
+path = "luts/bw_high_contrast.cube"
