@@ -10,8 +10,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "=== Building agx-cli ==="
-cargo build -p agx-cli
+echo "=== Building agx-cli (release) ==="
+cargo build --release -p agx-cli
 
 echo ""
 echo "=== E2E Tests (cargo test -p agx-e2e) ==="

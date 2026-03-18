@@ -6,3 +6,9 @@ members = [
     "crates/agx-e2e",
     "crates/agx-lut-gen",
 ]
+
+# Optimize test builds — e2e tests do heavy pixel processing and run
+# 5-10x slower in debug mode. The extra compile time is negligible
+# compared to the runtime savings.
+[profile.test]
+opt-level = 2

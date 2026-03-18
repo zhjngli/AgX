@@ -5,15 +5,6 @@ use agx_e2e::{assert_golden, assert_valid_output, fixture_path};
 
 // --- Constants ---
 
-const COLOR_LOOKS: &[&str] = &[
-    "portra_400",
-    "neo_noir",
-    "blade_runner",
-    "cinema_warm",
-    "kodachrome_64",
-    "nordic_fade",
-];
-
 const BW_LOOKS: &[&str] = &["bw_high_contrast", "bw_street", "bw_lofi"];
 
 const ALL_LOOKS: &[&str] = &[
@@ -31,18 +22,24 @@ const ALL_LOOKS: &[&str] = &[
 // --- Helpers ---
 
 fn cli_bin() -> Command {
-    let mut path = std::env::current_exe()
+    let target_dir = std::env::current_exe()
         .unwrap()
-        .parent()
+        .parent() // deps/
         .unwrap()
-        .parent()
+        .parent() // debug/ or release/
+        .unwrap()
+        .parent() // target/
         .unwrap()
         .to_path_buf();
-    path.push("agx-cli");
+
+    // Prefer release binary (much faster for image processing)
+    let release = target_dir.join("release").join("agx-cli");
+    let debug = target_dir.join("debug").join("agx-cli");
+    let path = if release.exists() { release } else { debug };
+
     assert!(
         path.exists(),
-        "agx-cli binary not found at {}. Run `cargo build -p agx-cli` first.",
-        path.display()
+        "agx-cli binary not found. Run `cargo build --release -p agx-cli` first.",
     );
     Command::new(path)
 }
