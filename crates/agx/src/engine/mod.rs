@@ -586,7 +586,7 @@ impl Engine {
                 sb = lb;
             }
 
-            // 10.5. Vignette (sRGB gamma space, position-dependent)
+            // 11. Vignette (sRGB gamma space, position-dependent)
             if vignette_active {
                 let (vr, vg, vb) = adjust::apply_vignette(
                     sr,
@@ -604,7 +604,7 @@ impl Engine {
                 sb = vb;
             }
 
-            // 11. Convert back to linear space
+            // 12. Convert back to linear space
             let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
             Rgb([lr, lg, lb])

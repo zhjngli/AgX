@@ -83,6 +83,18 @@ fn library_lut_load_and_apply() {
 }
 
 #[test]
+fn library_vignette_via_params() {
+    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |engine| {
+        engine.params_mut().vignette.amount = -30.0;
+    });
+    assert_valid_output(&output);
+}
+
+#[test]
 fn library_preset_with_extends() {
     let input = fixture_path("jpeg/temple_blossoms.jpg");
     let preset_path = fixture_path("looks/blade_runner.toml");
