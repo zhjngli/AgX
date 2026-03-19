@@ -20,6 +20,9 @@ const ALL_LOOKS: &[&str] = &[
     "vignette_test",
     "teal_orange",
     "cool_shadows",
+    "s_curve_contrast",
+    "faded_film",
+    "cross_process",
 ];
 
 // --- Helpers ---

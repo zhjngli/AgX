@@ -1,0 +1,6 @@
+[metadata]
+name = "Faded Film"
+author = "agx-e2e"
+
+[tone_curve.rgb]
+points = [[0.0, 0.05], [0.25, 0.2], [0.75, 0.8], [1.0, 0.95]]

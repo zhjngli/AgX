@@ -385,12 +385,61 @@ struct EditArgs {
     #[arg(long = "cg-balance", default_value_t = 0.0, allow_hyphen_values = true)]
     cg_balance: f32,
 
+    /// Tone curve — RGB master channel points (e.g. "0.0:0.0,0.25:0.15,0.75:0.85,1.0:1.0")
+    #[arg(long = "tc-rgb")]
+    tc_rgb: Option<String>,
+    /// Tone curve — Luminance channel points
+    #[arg(long = "tc-luma")]
+    tc_luma: Option<String>,
+    /// Tone curve — Red channel points
+    #[arg(long = "tc-red")]
+    tc_red: Option<String>,
+    /// Tone curve — Green channel points
+    #[arg(long = "tc-green")]
+    tc_green: Option<String>,
+    /// Tone curve — Blue channel points
+    #[arg(long = "tc-blue")]
+    tc_blue: Option<String>,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
 
+fn parse_curve_points(s: &str) -> Result<agx::ToneCurve, String> {
+    let mut points = Vec::new();
+    for pair in s.split(',') {
+        let pair = pair.trim();
+        let parts: Vec<&str> = pair.split(':').collect();
+        if parts.len() != 2 {
+            return Err(format!("invalid point '{pair}', expected x:y"));
+        }
+        let x: f32 = parts[0]
+            .trim()
+            .parse()
+            .map_err(|_| format!("invalid x value in '{pair}'"))?;
+        let y: f32 = parts[1]
+            .trim()
+            .parse()
+            .map_err(|_| format!("invalid y value in '{pair}'"))?;
+        points.push((x, y));
+    }
+    let curve = agx::ToneCurve { points };
+    curve.validate()?;
+    Ok(curve)
+}
+
 impl EditArgs {
     fn to_params(&self) -> agx::Parameters {
+        fn parse_tc(flag: &Option<String>) -> agx::ToneCurve {
+            match flag {
+                Some(s) => parse_curve_points(s).unwrap_or_else(|e| {
+                    eprintln!("Error parsing tone curve: {e}");
+                    std::process::exit(1);
+                }),
+                None => agx::ToneCurve::default(),
+            }
+        }
+
         agx::Parameters {
             exposure: self.exposure,
             contrast: self.contrast,
@@ -427,6 +476,13 @@ impl EditArgs {
                     luminance: self.cg_global_lum,
                 },
                 balance: self.cg_balance,
+            },
+            tone_curve: agx::ToneCurveParams {
+                rgb: parse_tc(&self.tc_rgb),
+                luma: parse_tc(&self.tc_luma),
+                red: parse_tc(&self.tc_red),
+                green: parse_tc(&self.tc_green),
+                blue: parse_tc(&self.tc_blue),
             },
         }
     }
