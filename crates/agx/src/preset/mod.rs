@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{
-    Parameters, PartialColorGradingParams, PartialHslChannels, PartialParameters,
-    PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
+    Parameters, PartialColorGradingParams, PartialHslChannels, PartialParameters, PartialToneCurve,
+    PartialToneCurveParams, PartialVignetteParams,
 };
 use crate::error::{AgxError, Result};
 
@@ -76,49 +76,16 @@ struct PresetRaw {
     tone_curve: Option<PartialToneCurveParams>,
 }
 
-fn validate_tone_curve_points(points: &[(f32, f32)], channel: &str) -> Result<()> {
-    if points.len() < 2 {
-        return Err(AgxError::Preset(format!(
-            "tone_curve.{channel}: need at least 2 points, got {}",
-            points.len()
-        )));
-    }
-    if (points[0].0).abs() > 1e-6 {
-        return Err(AgxError::Preset(format!(
-            "tone_curve.{channel}: first point x must be 0.0, got {}",
-            points[0].0
-        )));
-    }
-    if (points.last().unwrap().0 - 1.0).abs() > 1e-6 {
-        return Err(AgxError::Preset(format!(
-            "tone_curve.{channel}: last point x must be 1.0, got {}",
-            points.last().unwrap().0
-        )));
-    }
-    for &(x, y) in points {
-        if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
-            return Err(AgxError::Preset(format!(
-                "tone_curve.{channel}: point ({x}, {y}) out of range [0, 1]"
-            )));
-        }
-    }
-    for i in 1..points.len() {
-        if points[i].0 <= points[i - 1].0 {
-            return Err(AgxError::Preset(format!(
-                "tone_curve.{channel}: x values must be strictly increasing: {} >= {}",
-                points[i].0,
-                points[i - 1].0
-            )));
-        }
-    }
-    Ok(())
-}
-
 fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
     fn validate_channel(tc: &Option<PartialToneCurve>, name: &str) -> Result<()> {
         if let Some(ref c) = tc {
             if let Some(ref pts) = c.points {
-                validate_tone_curve_points(pts, name)?;
+                let curve = crate::adjust::ToneCurve {
+                    points: pts.clone(),
+                };
+                curve
+                    .validate()
+                    .map_err(|e| AgxError::Preset(format!("tone_curve.{name}: {e}")))?;
             }
         }
         Ok(())

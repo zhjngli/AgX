@@ -866,10 +866,10 @@ impl Engine {
 
             // 9. Tone curves (sRGB gamma space)
             if let Some(ref pre) = tone_curve_pre {
-                let result = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
-                sr = result.0;
-                sg = result.1;
-                sb = result.2;
+                let (tr, tg, tb) = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
+                sr = tr;
+                sg = tg;
+                sb = tb;
             }
 
             // 10. HSL adjustments (sRGB gamma space)

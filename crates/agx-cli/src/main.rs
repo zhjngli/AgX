@@ -405,7 +405,7 @@ struct EditArgs {
     hsl: HslArgs,
 }
 
-fn parse_curve_points(s: &str) -> Result<Vec<(f32, f32)>, String> {
+fn parse_curve_points(s: &str) -> Result<agx::ToneCurve, String> {
     let mut points = Vec::new();
     for pair in s.split(',') {
         let pair = pair.trim();
@@ -421,46 +421,21 @@ fn parse_curve_points(s: &str) -> Result<Vec<(f32, f32)>, String> {
             .trim()
             .parse()
             .map_err(|_| format!("invalid y value in '{pair}'"))?;
-        if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
-            return Err(format!("point ({x}, {y}) out of range [0, 1]"));
-        }
         points.push((x, y));
     }
-    if points.len() < 2 {
-        return Err("tone curve needs at least 2 points".to_string());
-    }
-    if (points[0].0).abs() > 1e-6 {
-        return Err(format!("first point x must be 0.0, got {}", points[0].0));
-    }
-    if (points.last().unwrap().0 - 1.0).abs() > 1e-6 {
-        return Err(format!(
-            "last point x must be 1.0, got {}",
-            points.last().unwrap().0
-        ));
-    }
-    for i in 1..points.len() {
-        if points[i].0 <= points[i - 1].0 {
-            return Err(format!(
-                "points must have strictly increasing x: {} >= {}",
-                points[i].0,
-                points[i - 1].0
-            ));
-        }
-    }
-    Ok(points)
+    let curve = agx::ToneCurve { points };
+    curve.validate()?;
+    Ok(curve)
 }
 
 impl EditArgs {
     fn to_params(&self) -> agx::Parameters {
         fn parse_tc(flag: &Option<String>) -> agx::ToneCurve {
             match flag {
-                Some(s) => {
-                    let points = parse_curve_points(s).unwrap_or_else(|e| {
-                        eprintln!("Error parsing tone curve: {e}");
-                        std::process::exit(1);
-                    });
-                    agx::ToneCurve { points }
-                }
+                Some(s) => parse_curve_points(s).unwrap_or_else(|e| {
+                    eprintln!("Error parsing tone curve: {e}");
+                    std::process::exit(1);
+                }),
                 None => agx::ToneCurve::default(),
             }
         }

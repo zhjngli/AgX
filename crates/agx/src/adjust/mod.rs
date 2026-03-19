@@ -503,9 +503,40 @@ impl Default for ToneCurve {
 
 impl ToneCurve {
     pub fn is_identity(&self) -> bool {
-        self.points.len() == 2
-            && self.points[0] == (0.0, 0.0)
-            && self.points[1] == (1.0, 1.0)
+        self.points.len() == 2 && self.points[0] == (0.0, 0.0) && self.points[1] == (1.0, 1.0)
+    }
+
+    /// Validate control points: at least 2, endpoints at x=0 and x=1,
+    /// all values in [0,1], strictly increasing x.
+    pub fn validate(&self) -> std::result::Result<(), String> {
+        let points = &self.points;
+        if points.len() < 2 {
+            return Err(format!("need at least 2 points, got {}", points.len()));
+        }
+        if (points[0].0).abs() > 1e-6 {
+            return Err(format!("first point x must be 0.0, got {}", points[0].0));
+        }
+        if (points.last().unwrap().0 - 1.0).abs() > 1e-6 {
+            return Err(format!(
+                "last point x must be 1.0, got {}",
+                points.last().unwrap().0
+            ));
+        }
+        for &(x, y) in points {
+            if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
+                return Err(format!("point ({x}, {y}) out of range [0, 1]"));
+            }
+        }
+        for i in 1..points.len() {
+            if points[i].0 <= points[i - 1].0 {
+                return Err(format!(
+                    "x values must be strictly increasing: {} >= {}",
+                    points[i].0,
+                    points[i - 1].0
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -536,7 +567,7 @@ impl ToneCurveParams {
 
 /// Build a 256-entry lookup table from a tone curve using
 /// Fritsch-Carlson monotone cubic hermite interpolation.
-pub fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
+pub(crate) fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
     let pts = &curve.points;
     let n = pts.len();
     debug_assert!(n >= 2);
@@ -547,10 +578,10 @@ pub fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
         let (x0, y0) = pts[0];
         let (x1, y1) = pts[1];
         let dx = x1 - x0;
-        for i in 0..256 {
+        for (i, slot) in lut.iter_mut().enumerate() {
             let t = i as f32 / 255.0;
             let frac = if dx.abs() < 1e-9 { 0.0 } else { (t - x0) / dx };
-            lut[i] = (y0 + frac * (y1 - y0)).clamp(0.0, 1.0);
+            *slot = (y0 + frac * (y1 - y0)).clamp(0.0, 1.0);
         }
         return lut;
     }
@@ -594,7 +625,7 @@ pub fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
     // Step 4: Evaluate hermite spline at 256 points
     let mut lut = [0.0_f32; 256];
     let mut seg = 0_usize;
-    for i in 0..256 {
+    for (i, slot) in lut.iter_mut().enumerate() {
         let x = i as f32 / 255.0;
 
         // Advance segment
@@ -606,7 +637,7 @@ pub fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
         let (x1, y1) = pts[seg + 1];
         let h = x1 - x0;
         if h.abs() < 1e-9 {
-            lut[i] = y0;
+            *slot = y0;
             continue;
         }
 
@@ -620,15 +651,15 @@ pub fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
         let h01 = -2.0 * t3 + 3.0 * t2;
         let h11 = t3 - t2;
 
-        lut[i] = (h00 * y0 + h10 * h * m[seg] + h01 * y1 + h11 * h * m[seg + 1]).clamp(0.0, 1.0);
+        *slot = (h00 * y0 + h10 * h * m[seg] + h01 * y1 + h11 * h * m[seg + 1]).clamp(0.0, 1.0);
     }
 
     lut
 }
 
 /// Look up a value in a precomputed 256-entry LUT with linear interpolation.
-#[inline]
-pub fn lut_lookup(lut: &[f32; 256], value: f32) -> f32 {
+#[inline(always)]
+pub(crate) fn lut_lookup(lut: &[f32; 256], value: f32) -> f32 {
     let idx = value * 255.0;
     let idx = idx.clamp(0.0, 255.0);
     let lo = idx.floor() as usize;
