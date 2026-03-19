@@ -328,6 +328,63 @@ struct EditArgs {
     #[arg(long, default_value = "elliptical")]
     vignette_shape: agx::VignetteShape,
 
+    // --- Color grading ---
+    /// Color grading: shadow wheel hue (0-360 degrees)
+    #[arg(long = "cg-shadows-hue", default_value_t = 0.0)]
+    cg_shadows_hue: f32,
+    /// Color grading: shadow wheel saturation (0-100)
+    #[arg(long = "cg-shadows-sat", default_value_t = 0.0)]
+    cg_shadows_sat: f32,
+    /// Color grading: shadow wheel luminance (-100 to +100)
+    #[arg(
+        long = "cg-shadows-lum",
+        default_value_t = 0.0,
+        allow_hyphen_values = true
+    )]
+    cg_shadows_lum: f32,
+    /// Color grading: midtone wheel hue (0-360 degrees)
+    #[arg(long = "cg-midtones-hue", default_value_t = 0.0)]
+    cg_midtones_hue: f32,
+    /// Color grading: midtone wheel saturation (0-100)
+    #[arg(long = "cg-midtones-sat", default_value_t = 0.0)]
+    cg_midtones_sat: f32,
+    /// Color grading: midtone wheel luminance (-100 to +100)
+    #[arg(
+        long = "cg-midtones-lum",
+        default_value_t = 0.0,
+        allow_hyphen_values = true
+    )]
+    cg_midtones_lum: f32,
+    /// Color grading: highlight wheel hue (0-360 degrees)
+    #[arg(long = "cg-highlights-hue", default_value_t = 0.0)]
+    cg_highlights_hue: f32,
+    /// Color grading: highlight wheel saturation (0-100)
+    #[arg(long = "cg-highlights-sat", default_value_t = 0.0)]
+    cg_highlights_sat: f32,
+    /// Color grading: highlight wheel luminance (-100 to +100)
+    #[arg(
+        long = "cg-highlights-lum",
+        default_value_t = 0.0,
+        allow_hyphen_values = true
+    )]
+    cg_highlights_lum: f32,
+    /// Color grading: global wheel hue (0-360 degrees)
+    #[arg(long = "cg-global-hue", default_value_t = 0.0)]
+    cg_global_hue: f32,
+    /// Color grading: global wheel saturation (0-100)
+    #[arg(long = "cg-global-sat", default_value_t = 0.0)]
+    cg_global_sat: f32,
+    /// Color grading: global wheel luminance (-100 to +100)
+    #[arg(
+        long = "cg-global-lum",
+        default_value_t = 0.0,
+        allow_hyphen_values = true
+    )]
+    cg_global_lum: f32,
+    /// Color grading: shadow/highlight balance (-100 to +100)
+    #[arg(long = "cg-balance", default_value_t = 0.0, allow_hyphen_values = true)]
+    cg_balance: f32,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
@@ -347,6 +404,29 @@ impl EditArgs {
             vignette: agx::VignetteParams {
                 amount: self.vignette_amount,
                 shape: self.vignette_shape,
+            },
+            color_grading: agx::ColorGradingParams {
+                shadows: agx::ColorWheel {
+                    hue: self.cg_shadows_hue,
+                    saturation: self.cg_shadows_sat,
+                    luminance: self.cg_shadows_lum,
+                },
+                midtones: agx::ColorWheel {
+                    hue: self.cg_midtones_hue,
+                    saturation: self.cg_midtones_sat,
+                    luminance: self.cg_midtones_lum,
+                },
+                highlights: agx::ColorWheel {
+                    hue: self.cg_highlights_hue,
+                    saturation: self.cg_highlights_sat,
+                    luminance: self.cg_highlights_lum,
+                },
+                global: agx::ColorWheel {
+                    hue: self.cg_global_hue,
+                    saturation: self.cg_global_sat,
+                    luminance: self.cg_global_lum,
+                },
+                balance: self.cg_balance,
             },
         }
     }

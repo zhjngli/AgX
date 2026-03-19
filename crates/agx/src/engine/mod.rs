@@ -136,6 +136,9 @@ pub struct Parameters {
     /// Creative vignette (edge darkening/brightening)
     #[serde(default)]
     pub vignette: VignetteParams,
+    /// 3-way color grading (shadows/midtones/highlights/global wheels + balance)
+    #[serde(default)]
+    pub color_grading: crate::adjust::ColorGradingParams,
 }
 
 impl Default for Parameters {
@@ -151,6 +154,7 @@ impl Default for Parameters {
             tint: 0.0,
             hsl: HslChannels::default(),
             vignette: VignetteParams::default(),
+            color_grading: crate::adjust::ColorGradingParams::default(),
         }
     }
 }
@@ -342,6 +346,126 @@ impl From<&VignetteParams> for PartialVignetteParams {
     }
 }
 
+/// Partial color wheel — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialColorWheel {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hue: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saturation: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub luminance: Option<f32>,
+}
+
+impl PartialColorWheel {
+    /// Merge overlay on top of self (last-write-wins).
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            hue: overlay.hue.or(self.hue),
+            saturation: overlay.saturation.or(self.saturation),
+            luminance: overlay.luminance.or(self.luminance),
+        }
+    }
+
+    /// Convert to concrete ColorWheel. None fields become 0.0.
+    pub fn materialize(&self) -> crate::adjust::ColorWheel {
+        crate::adjust::ColorWheel {
+            hue: self.hue.unwrap_or(0.0),
+            saturation: self.saturation.unwrap_or(0.0),
+            luminance: self.luminance.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::ColorWheel> for PartialColorWheel {
+    fn from(w: &crate::adjust::ColorWheel) -> Self {
+        Self {
+            hue: Some(w.hue),
+            saturation: Some(w.saturation),
+            luminance: Some(w.luminance),
+        }
+    }
+}
+
+/// Partial color grading parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialColorGradingParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shadows: Option<PartialColorWheel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub midtones: Option<PartialColorWheel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlights: Option<PartialColorWheel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub global: Option<PartialColorWheel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub balance: Option<f32>,
+}
+
+impl PartialColorGradingParams {
+    fn merge_wheel(
+        base: &Option<PartialColorWheel>,
+        overlay: &Option<PartialColorWheel>,
+    ) -> Option<PartialColorWheel> {
+        match (base, overlay) {
+            (None, None) => None,
+            (Some(b), None) => Some(b.clone()),
+            (None, Some(o)) => Some(o.clone()),
+            (Some(b), Some(o)) => Some(b.merge(o)),
+        }
+    }
+
+    /// Merge overlay on top of self (last-write-wins per field).
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            shadows: Self::merge_wheel(&self.shadows, &overlay.shadows),
+            midtones: Self::merge_wheel(&self.midtones, &overlay.midtones),
+            highlights: Self::merge_wheel(&self.highlights, &overlay.highlights),
+            global: Self::merge_wheel(&self.global, &overlay.global),
+            balance: overlay.balance.or(self.balance),
+        }
+    }
+
+    /// Convert to concrete ColorGradingParams. None fields become defaults.
+    pub fn materialize(&self) -> crate::adjust::ColorGradingParams {
+        crate::adjust::ColorGradingParams {
+            shadows: self
+                .shadows
+                .as_ref()
+                .map(|w| w.materialize())
+                .unwrap_or_default(),
+            midtones: self
+                .midtones
+                .as_ref()
+                .map(|w| w.materialize())
+                .unwrap_or_default(),
+            highlights: self
+                .highlights
+                .as_ref()
+                .map(|w| w.materialize())
+                .unwrap_or_default(),
+            global: self
+                .global
+                .as_ref()
+                .map(|w| w.materialize())
+                .unwrap_or_default(),
+            balance: self.balance.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::ColorGradingParams> for PartialColorGradingParams {
+    fn from(cg: &crate::adjust::ColorGradingParams) -> Self {
+        Self {
+            shadows: Some(PartialColorWheel::from(&cg.shadows)),
+            midtones: Some(PartialColorWheel::from(&cg.midtones)),
+            highlights: Some(PartialColorWheel::from(&cg.highlights)),
+            global: Some(PartialColorWheel::from(&cg.global)),
+            balance: Some(cg.balance),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -368,6 +492,8 @@ pub struct PartialParameters {
     pub hsl: Option<PartialHslChannels>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vignette: Option<PartialVignetteParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_grading: Option<PartialColorGradingParams>,
 }
 
 impl PartialParameters {
@@ -389,6 +515,12 @@ impl PartialParameters {
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
             vignette: match (&self.vignette, &other.vignette) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
+            color_grading: match (&self.color_grading, &other.color_grading) {
                 (None, None) => None,
                 (Some(b), None) => Some(b.clone()),
                 (None, Some(o)) => Some(o.clone()),
@@ -418,6 +550,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|v| v.materialize())
                 .unwrap_or_default(),
+            color_grading: self
+                .color_grading
+                .as_ref()
+                .map(|cg| cg.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -435,6 +572,7 @@ impl From<&Parameters> for PartialParameters {
             tint: Some(params.tint),
             hsl: Some(PartialHslChannels::from(&params.hsl)),
             vignette: Some(PartialVignetteParams::from(&params.vignette)),
+            color_grading: Some(PartialColorGradingParams::from(&params.color_grading)),
         }
     }
 }
@@ -518,9 +656,10 @@ impl Engine {
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
     /// 5. HSL adjustments (sRGB gamma space)
-    /// 6. LUT application (sRGB gamma space)
-    /// 7. Vignette (sRGB gamma space, position-dependent)
-    /// 8. Convert back to linear space
+    /// 6. Color grading (sRGB gamma space) — 3-way color wheels
+    /// 7. LUT application (sRGB gamma space)
+    /// 8. Vignette (sRGB gamma space, position-dependent)
+    /// 9. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
@@ -530,6 +669,8 @@ impl Engine {
         let whites = self.params.whites;
         let blacks = self.params.blacks;
         let hsl_active = !self.params.hsl.is_default();
+        let color_grading_pre = (!self.params.color_grading.is_default())
+            .then(|| adjust::ColorGradingPrecomputed::new(&self.params.color_grading));
         let vignette_pre = (!self.params.vignette.is_default()).then(|| {
             adjust::VignettePrecomputed::new(
                 self.params.vignette.amount,
@@ -607,7 +748,15 @@ impl Engine {
                 sb = hb;
             }
 
-            // 10. LUT (sRGB gamma space)
+            // 10. Color grading (sRGB gamma space)
+            if let Some(pre) = &color_grading_pre {
+                let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
+                sr = cr;
+                sg = cg;
+                sb = cb;
+            }
+
+            // 11. LUT (sRGB gamma space)
             if let Some(lut) = &self.lut {
                 let (lr, lg, lb) = lut.lookup(sr, sg, sb);
                 sr = lr;
@@ -615,7 +764,7 @@ impl Engine {
                 sb = lb;
             }
 
-            // 11. Vignette (sRGB gamma space, position-dependent)
+            // 12. Vignette (sRGB gamma space, position-dependent)
             if let Some(pre) = &vignette_pre {
                 let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
                 sr = vr;
@@ -623,7 +772,7 @@ impl Engine {
                 sb = vb;
             }
 
-            // 12. Convert back to linear space
+            // 13. Convert back to linear space
             let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
             Rgb([lr, lg, lb])
@@ -1269,5 +1418,52 @@ mod tests {
 
         let _ = std::fs::remove_file(&input);
         let _ = std::fs::remove_file(&output);
+    }
+
+    // --- Color grading partial tests ---
+
+    #[test]
+    fn partial_color_grading_merge() {
+        let base = PartialColorGradingParams {
+            shadows: Some(PartialColorWheel {
+                hue: Some(200.0),
+                saturation: Some(30.0),
+                luminance: None,
+            }),
+            midtones: None,
+            highlights: None,
+            global: None,
+            balance: Some(-10.0),
+        };
+        let overlay = PartialColorGradingParams {
+            shadows: Some(PartialColorWheel {
+                hue: None,
+                saturation: Some(50.0),
+                luminance: Some(-5.0),
+            }),
+            midtones: None,
+            highlights: None,
+            global: None,
+            balance: None,
+        };
+        let merged = base.merge(&overlay);
+        let shadows = merged.shadows.unwrap();
+        assert_eq!(shadows.hue, Some(200.0));
+        assert_eq!(shadows.saturation, Some(50.0));
+        assert_eq!(shadows.luminance, Some(-5.0));
+        assert_eq!(merged.balance, Some(-10.0));
+    }
+
+    #[test]
+    fn partial_color_grading_materialize_defaults() {
+        let partial = PartialColorGradingParams::default();
+        let materialized = partial.materialize();
+        assert!(materialized.is_default());
+    }
+
+    #[test]
+    fn render_default_color_grading_is_identity() {
+        let params = Parameters::default();
+        assert!(params.color_grading.is_default());
     }
 }
