@@ -1,0 +1,16 @@
+[metadata]
+name = "Teal Orange"
+author = "agx-e2e"
+
+[color_grading]
+balance = -10.0
+
+[color_grading.shadows]
+hue = 200.0
+saturation = 35.0
+luminance = -5.0
+
+[color_grading.highlights]
+hue = 30.0
+saturation = 30.0
+luminance = 5.0

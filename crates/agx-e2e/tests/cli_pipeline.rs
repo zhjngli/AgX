@@ -18,6 +18,8 @@ const ALL_LOOKS: &[&str] = &[
     "bw_street",
     "bw_lofi",
     "vignette_test",
+    "teal_orange",
+    "cool_shadows",
 ];
 
 // --- Helpers ---
