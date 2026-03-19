@@ -139,6 +139,9 @@ pub struct Parameters {
     /// 3-way color grading (shadows/midtones/highlights/global wheels + balance)
     #[serde(default)]
     pub color_grading: crate::adjust::ColorGradingParams,
+    /// 5-channel tone curves (RGB, luma, R, G, B)
+    #[serde(default)]
+    pub tone_curve: crate::adjust::ToneCurveParams,
 }
 
 impl Default for Parameters {
@@ -155,6 +158,7 @@ impl Default for Parameters {
             hsl: HslChannels::default(),
             vignette: VignetteParams::default(),
             color_grading: crate::adjust::ColorGradingParams::default(),
+            tone_curve: crate::adjust::ToneCurveParams::default(),
         }
     }
 }
@@ -466,6 +470,118 @@ impl From<&crate::adjust::ColorGradingParams> for PartialColorGradingParams {
     }
 }
 
+// --- Partial Tone Curve Types ---
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialToneCurve {
+    pub points: Option<Vec<(f32, f32)>>,
+}
+
+impl PartialToneCurve {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            points: overlay.points.clone().or_else(|| self.points.clone()),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::ToneCurve {
+        crate::adjust::ToneCurve {
+            points: self
+                .points
+                .clone()
+                .unwrap_or_else(|| vec![(0.0, 0.0), (1.0, 1.0)]),
+        }
+    }
+}
+
+impl From<&crate::adjust::ToneCurve> for PartialToneCurve {
+    fn from(tc: &crate::adjust::ToneCurve) -> Self {
+        Self {
+            points: Some(tc.points.clone()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialToneCurveParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rgb: Option<PartialToneCurve>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub luma: Option<PartialToneCurve>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub red: Option<PartialToneCurve>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub green: Option<PartialToneCurve>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blue: Option<PartialToneCurve>,
+}
+
+impl PartialToneCurveParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            rgb: merge_opt_tone_curve(&self.rgb, &overlay.rgb),
+            luma: merge_opt_tone_curve(&self.luma, &overlay.luma),
+            red: merge_opt_tone_curve(&self.red, &overlay.red),
+            green: merge_opt_tone_curve(&self.green, &overlay.green),
+            blue: merge_opt_tone_curve(&self.blue, &overlay.blue),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::ToneCurveParams {
+        crate::adjust::ToneCurveParams {
+            rgb: self
+                .rgb
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            luma: self
+                .luma
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            red: self
+                .red
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            green: self
+                .green
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+            blue: self
+                .blue
+                .as_ref()
+                .map(|c| c.materialize())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+fn merge_opt_tone_curve(
+    base: &Option<PartialToneCurve>,
+    overlay: &Option<PartialToneCurve>,
+) -> Option<PartialToneCurve> {
+    match (base, overlay) {
+        (None, None) => None,
+        (Some(b), None) => Some(b.clone()),
+        (None, Some(o)) => Some(o.clone()),
+        (Some(b), Some(o)) => Some(b.merge(o)),
+    }
+}
+
+impl From<&crate::adjust::ToneCurveParams> for PartialToneCurveParams {
+    fn from(params: &crate::adjust::ToneCurveParams) -> Self {
+        Self {
+            rgb: Some(PartialToneCurve::from(&params.rgb)),
+            luma: Some(PartialToneCurve::from(&params.luma)),
+            red: Some(PartialToneCurve::from(&params.red)),
+            green: Some(PartialToneCurve::from(&params.green)),
+            blue: Some(PartialToneCurve::from(&params.blue)),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -494,6 +610,8 @@ pub struct PartialParameters {
     pub vignette: Option<PartialVignetteParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_grading: Option<PartialColorGradingParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tone_curve: Option<PartialToneCurveParams>,
 }
 
 impl PartialParameters {
@@ -521,6 +639,12 @@ impl PartialParameters {
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
             color_grading: match (&self.color_grading, &other.color_grading) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
+            tone_curve: match (&self.tone_curve, &other.tone_curve) {
                 (None, None) => None,
                 (Some(b), None) => Some(b.clone()),
                 (None, Some(o)) => Some(o.clone()),
@@ -555,6 +679,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|cg| cg.materialize())
                 .unwrap_or_default(),
+            tone_curve: self
+                .tone_curve
+                .as_ref()
+                .map(|tc| tc.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -573,6 +702,7 @@ impl From<&Parameters> for PartialParameters {
             hsl: Some(PartialHslChannels::from(&params.hsl)),
             vignette: Some(PartialVignetteParams::from(&params.vignette)),
             color_grading: Some(PartialColorGradingParams::from(&params.color_grading)),
+            tone_curve: Some(PartialToneCurveParams::from(&params.tone_curve)),
         }
     }
 }
@@ -671,6 +801,8 @@ impl Engine {
         let hsl_active = !self.params.hsl.is_default();
         let color_grading_pre = (!self.params.color_grading.is_default())
             .then(|| adjust::ColorGradingPrecomputed::new(&self.params.color_grading));
+        let tone_curve_pre = (!self.params.tone_curve.is_default())
+            .then(|| adjust::ToneCurvePrecomputed::new(&self.params.tone_curve));
         let vignette_pre = (!self.params.vignette.is_default()).then(|| {
             adjust::VignettePrecomputed::new(
                 self.params.vignette.amount,
@@ -732,7 +864,15 @@ impl Engine {
                     adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_blacks(v, blacks));
             }
 
-            // 9. HSL adjustments (sRGB gamma space)
+            // 9. Tone curves (sRGB gamma space)
+            if let Some(ref pre) = tone_curve_pre {
+                let result = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
+                sr = result.0;
+                sg = result.1;
+                sb = result.2;
+            }
+
+            // 10. HSL adjustments (sRGB gamma space)
             if hsl_active {
                 let (hr, hg, hb) = adjust::apply_hsl(
                     sr,
@@ -748,7 +888,7 @@ impl Engine {
                 sb = hb;
             }
 
-            // 10. Color grading (sRGB gamma space)
+            // 11. Color grading (sRGB gamma space)
             if let Some(pre) = &color_grading_pre {
                 let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
                 sr = cr;
@@ -756,7 +896,7 @@ impl Engine {
                 sb = cb;
             }
 
-            // 11. LUT (sRGB gamma space)
+            // 12. LUT (sRGB gamma space)
             if let Some(lut) = &self.lut {
                 let (lr, lg, lb) = lut.lookup(sr, sg, sb);
                 sr = lr;
@@ -764,7 +904,7 @@ impl Engine {
                 sb = lb;
             }
 
-            // 12. Vignette (sRGB gamma space, position-dependent)
+            // 13. Vignette (sRGB gamma space, position-dependent)
             if let Some(pre) = &vignette_pre {
                 let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
                 sr = vr;
@@ -772,7 +912,7 @@ impl Engine {
                 sb = vb;
             }
 
-            // 13. Convert back to linear space
+            // 14. Convert back to linear space
             let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
             Rgb([lr, lg, lb])
@@ -1465,5 +1605,45 @@ mod tests {
     fn render_default_color_grading_is_identity() {
         let params = Parameters::default();
         assert!(params.color_grading.is_default());
+    }
+
+    // --- Tone Curve tests ---
+
+    #[test]
+    fn partial_tone_curve_merge() {
+        let base = PartialToneCurveParams {
+            rgb: Some(PartialToneCurve {
+                points: Some(vec![(0.0, 0.0), (0.5, 0.6), (1.0, 1.0)]),
+            }),
+            luma: None,
+            red: None,
+            green: None,
+            blue: None,
+        };
+        let overlay = PartialToneCurveParams {
+            rgb: None,
+            luma: Some(PartialToneCurve {
+                points: Some(vec![(0.0, 0.1), (1.0, 0.9)]),
+            }),
+            red: None,
+            green: None,
+            blue: None,
+        };
+        let merged = base.merge(&overlay);
+        assert!(merged.rgb.is_some(), "rgb should be preserved from base");
+        assert!(merged.luma.is_some(), "luma should come from overlay");
+    }
+
+    #[test]
+    fn partial_tone_curve_materialize_defaults() {
+        let partial = PartialToneCurveParams::default();
+        let materialized = partial.materialize();
+        assert!(materialized.is_default());
+    }
+
+    #[test]
+    fn render_default_tone_curves_is_identity() {
+        let params = Parameters::default();
+        assert!(params.tone_curve.is_default());
     }
 }

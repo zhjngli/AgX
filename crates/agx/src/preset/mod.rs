@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::{
     Parameters, PartialColorGradingParams, PartialHslChannels, PartialParameters,
-    PartialVignetteParams,
+    PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
 };
 use crate::error::{AgxError, Result};
 
@@ -72,6 +72,63 @@ struct PresetRaw {
     vignette: Option<PartialVignetteParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     color_grading: Option<PartialColorGradingParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tone_curve: Option<PartialToneCurveParams>,
+}
+
+fn validate_tone_curve_points(points: &[(f32, f32)], channel: &str) -> Result<()> {
+    if points.len() < 2 {
+        return Err(AgxError::Preset(format!(
+            "tone_curve.{channel}: need at least 2 points, got {}",
+            points.len()
+        )));
+    }
+    if (points[0].0).abs() > 1e-6 {
+        return Err(AgxError::Preset(format!(
+            "tone_curve.{channel}: first point x must be 0.0, got {}",
+            points[0].0
+        )));
+    }
+    if (points.last().unwrap().0 - 1.0).abs() > 1e-6 {
+        return Err(AgxError::Preset(format!(
+            "tone_curve.{channel}: last point x must be 1.0, got {}",
+            points.last().unwrap().0
+        )));
+    }
+    for &(x, y) in points {
+        if !(0.0..=1.0).contains(&x) || !(0.0..=1.0).contains(&y) {
+            return Err(AgxError::Preset(format!(
+                "tone_curve.{channel}: point ({x}, {y}) out of range [0, 1]"
+            )));
+        }
+    }
+    for i in 1..points.len() {
+        if points[i].0 <= points[i - 1].0 {
+            return Err(AgxError::Preset(format!(
+                "tone_curve.{channel}: x values must be strictly increasing: {} >= {}",
+                points[i].0,
+                points[i - 1].0
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
+    fn validate_channel(tc: &Option<PartialToneCurve>, name: &str) -> Result<()> {
+        if let Some(ref c) = tc {
+            if let Some(ref pts) = c.points {
+                validate_tone_curve_points(pts, name)?;
+            }
+        }
+        Ok(())
+    }
+    validate_channel(&params.rgb, "rgb")?;
+    validate_channel(&params.luma, "luma")?;
+    validate_channel(&params.red, "red")?;
+    validate_channel(&params.green, "green")?;
+    validate_channel(&params.blue, "blue")?;
+    Ok(())
 }
 
 /// Build a PartialParameters from a PresetRaw.
@@ -88,6 +145,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         hsl: raw.hsl.clone(),
         vignette: raw.vignette.clone(),
         color_grading: raw.color_grading.clone(),
+        tone_curve: raw.tone_curve.clone(),
     }
 }
 
@@ -129,6 +187,9 @@ impl Preset {
         let raw: PresetRaw =
             toml::from_str(toml_str).map_err(|e| AgxError::Preset(e.to_string()))?;
         let partial = build_partial_params(&raw);
+        if let Some(ref tc) = partial.tone_curve {
+            validate_tone_curve_params(tc)?;
+        }
         Ok(Self {
             metadata: raw.metadata,
             partial_params: partial,
@@ -158,6 +219,7 @@ impl Preset {
             hsl: self.partial_params.hsl.clone(),
             vignette: self.partial_params.vignette.clone(),
             color_grading: self.partial_params.color_grading.clone(),
+            tone_curve: self.partial_params.tone_curve.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
@@ -813,5 +875,55 @@ extends = "{}"
 
         let _ = std::fs::remove_file(&a_path);
         let _ = std::fs::remove_file(&b_path);
+    }
+
+    #[test]
+    fn tone_curve_preset_round_trip() {
+        let toml_str = r#"
+[metadata]
+name = "Test Tone Curve"
+
+[tone_curve.rgb]
+points = [[0.0, 0.0], [0.25, 0.15], [0.75, 0.85], [1.0, 1.0]]
+
+[tone_curve.red]
+points = [[0.0, 0.0], [0.5, 0.6], [1.0, 1.0]]
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let params = preset.partial_params.tone_curve.as_ref().unwrap();
+        let rgb_pts = params.rgb.as_ref().unwrap().points.as_ref().unwrap();
+        assert_eq!(rgb_pts.len(), 4);
+        assert_eq!(rgb_pts[1], (0.25, 0.15));
+
+        // Round-trip
+        let serialized = preset.to_toml().unwrap();
+        let preset2 = Preset::from_toml(&serialized).unwrap();
+        let params2 = preset2.partial_params.tone_curve.as_ref().unwrap();
+        let rgb_pts2 = params2.rgb.as_ref().unwrap().points.as_ref().unwrap();
+        assert_eq!(rgb_pts, rgb_pts2);
+    }
+
+    #[test]
+    fn preset_missing_tone_curve_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No curves"
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let materialized = preset.partial_params.materialize();
+        assert!(materialized.tone_curve.is_default());
+    }
+
+    #[test]
+    fn preset_tone_curve_invalid_points_rejected() {
+        let toml_str = r#"
+[metadata]
+name = "Bad curve"
+
+[tone_curve.rgb]
+points = [[0.0, 0.0], [0.8, 0.5], [0.3, 0.7], [1.0, 1.0]]
+"#;
+        let result = Preset::from_toml(toml_str);
+        assert!(result.is_err(), "non-increasing x should be rejected");
     }
 }
