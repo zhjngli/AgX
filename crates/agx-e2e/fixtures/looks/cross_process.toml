@@ -1,0 +1,12 @@
+[metadata]
+name = "Cross Process"
+author = "agx-e2e"
+
+[tone_curve.red]
+points = [[0.0, 0.0], [0.25, 0.3], [0.75, 0.85], [1.0, 1.0]]
+
+[tone_curve.green]
+points = [[0.0, 0.0], [0.5, 0.45], [1.0, 1.0]]
+
+[tone_curve.blue]
+points = [[0.0, 0.1], [0.5, 0.4], [1.0, 0.9]]
