@@ -269,6 +269,7 @@ pub struct ColorGradingPrecomputed {
     highlight_lum: f32,
     global_lum: f32,
     balance_factor: f32,
+    balance_active: bool,
 }
 
 impl ColorGradingPrecomputed {
@@ -288,11 +289,12 @@ impl ColorGradingPrecomputed {
             midtone_tint: Self::wheel_to_tint(&params.midtones),
             highlight_tint: Self::wheel_to_tint(&params.highlights),
             global_tint: Self::wheel_to_tint(&params.global),
-            shadow_lum: params.shadows.luminance,
-            midtone_lum: params.midtones.luminance,
-            highlight_lum: params.highlights.luminance,
-            global_lum: params.global.luminance,
+            shadow_lum: params.shadows.luminance / 100.0,
+            midtone_lum: params.midtones.luminance / 100.0,
+            highlight_lum: params.highlights.luminance / 100.0,
+            global_lum: params.global.luminance / 100.0,
             balance_factor: 2.0_f32.powf(-params.balance / 100.0),
+            balance_active: params.balance != 0.0,
         }
     }
 }
@@ -301,6 +303,7 @@ impl ColorGradingPrecomputed {
 ///
 /// Operates in sRGB gamma space. Uses Rec. 709 luminance coefficients on
 /// gamma-encoded values as a perceptual approximation for weight computation.
+#[inline]
 pub fn apply_color_grading_pre(
     r: f32,
     g: f32,
@@ -310,8 +313,12 @@ pub fn apply_color_grading_pre(
     // Pixel luminance (Rec. 709 on gamma-encoded values)
     let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-    // Balance remapping
-    let lum_adj = lum.clamp(0.0, 1.0).powf(pre.balance_factor);
+    // Balance remapping (skip powf when balance is neutral)
+    let lum_adj = if pre.balance_active {
+        lum.clamp(0.0, 1.0).powf(pre.balance_factor)
+    } else {
+        lum.clamp(0.0, 1.0)
+    };
 
     // 3-way weights (always sum to 1.0)
     let w_shadow = (1.0 - lum_adj) * (1.0 - lum_adj);
@@ -339,12 +346,11 @@ pub fn apply_color_grading_pre(
     let mut out_g = (g * combined_g).clamp(0.0, 1.0);
     let mut out_b = (b * combined_b).clamp(0.0, 1.0);
 
-    // Luminance shifts (weighted additive)
-    let lum_shift = pre.shadow_lum * w_shadow
+    // Luminance shifts (weighted additive, pre-divided by 100)
+    let adjustment = pre.shadow_lum * w_shadow
         + pre.midtone_lum * w_midtone
         + pre.highlight_lum * w_highlight
         + pre.global_lum;
-    let adjustment = lum_shift / 100.0;
     out_r = (out_r + adjustment).clamp(0.0, 1.0);
     out_g = (out_g + adjustment).clamp(0.0, 1.0);
     out_b = (out_b + adjustment).clamp(0.0, 1.0);
