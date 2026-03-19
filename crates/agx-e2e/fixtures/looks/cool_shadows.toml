@@ -1,0 +1,16 @@
+[metadata]
+name = "Cool Shadows"
+author = "agx-e2e"
+
+[color_grading.shadows]
+hue = 220.0
+saturation = 25.0
+
+[color_grading.midtones]
+hue = 40.0
+saturation = 10.0
+
+[color_grading.highlights]
+hue = 45.0
+saturation = 20.0
+luminance = 3.0

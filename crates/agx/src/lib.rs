@@ -7,12 +7,13 @@ pub mod lut;
 pub mod metadata;
 pub mod preset;
 
-pub use adjust::VignetteShape;
+pub use adjust::{ColorGradingParams, ColorWheel, VignetteShape};
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
 pub use engine::{
-    Engine, HslChannel, HslChannels, Parameters, PartialHslChannel, PartialHslChannels,
-    PartialParameters, PartialVignetteParams, VignetteParams,
+    Engine, HslChannel, HslChannels, Parameters, PartialColorGradingParams, PartialColorWheel,
+    PartialHslChannel, PartialHslChannels, PartialParameters, PartialVignetteParams,
+    VignetteParams,
 };
 pub use error::{AgxError, Result};
 pub use lut::Lut3D;

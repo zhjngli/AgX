@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{Parameters, PartialHslChannels, PartialParameters, PartialVignetteParams};
+use crate::engine::{
+    Parameters, PartialColorGradingParams, PartialHslChannels, PartialParameters,
+    PartialVignetteParams,
+};
 use crate::error::{AgxError, Result};
 
 /// Preset metadata (name, version, author).
@@ -67,6 +70,8 @@ struct PresetRaw {
     hsl: Option<PartialHslChannels>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     vignette: Option<PartialVignetteParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    color_grading: Option<PartialColorGradingParams>,
 }
 
 /// Build a PartialParameters from a PresetRaw.
@@ -82,6 +87,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         tint: raw.white_balance.tint,
         hsl: raw.hsl.clone(),
         vignette: raw.vignette.clone(),
+        color_grading: raw.color_grading.clone(),
     }
 }
 
@@ -151,6 +157,7 @@ impl Preset {
             lut: LutSection::default(),
             hsl: self.partial_params.hsl.clone(),
             vignette: self.partial_params.vignette.clone(),
+            color_grading: self.partial_params.color_grading.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
@@ -606,6 +613,53 @@ amount = -15.0
         let vig = preset.partial_params.vignette.as_ref().unwrap();
         assert_eq!(vig.amount, Some(-15.0));
         assert_eq!(vig.shape, None);
+    }
+
+    // --- Color grading preset tests ---
+
+    #[test]
+    fn color_grading_preset_round_trip() {
+        let toml_str = r#"
+[metadata]
+name = "Color Grading Test"
+
+[color_grading]
+balance = -10.0
+
+[color_grading.shadows]
+hue = 200.0
+saturation = 30.0
+luminance = -5.0
+
+[color_grading.highlights]
+hue = 30.0
+saturation = 25.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let cg = preset.partial_params.color_grading.as_ref().unwrap();
+        assert_eq!(cg.balance, Some(-10.0));
+        let shadows = cg.shadows.as_ref().unwrap();
+        assert_eq!(shadows.hue, Some(200.0));
+        assert_eq!(shadows.saturation, Some(30.0));
+        assert_eq!(shadows.luminance, Some(-5.0));
+        let highlights = cg.highlights.as_ref().unwrap();
+        assert_eq!(highlights.hue, Some(30.0));
+        assert_eq!(highlights.saturation, Some(25.0));
+        assert_eq!(highlights.luminance, None);
+        assert!(cg.midtones.is_none());
+    }
+
+    #[test]
+    fn preset_missing_color_grading_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No CG"
+
+[tone]
+exposure = 1.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert!(preset.params().color_grading.is_default());
     }
 
     // --- Preset inheritance tests ---
