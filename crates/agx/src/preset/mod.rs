@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{
-    Parameters, PartialColorGradingParams, PartialHslChannels, PartialParameters, PartialToneCurve,
-    PartialToneCurveParams, PartialVignetteParams,
+    Parameters, PartialColorGradingParams, PartialDetailParams, PartialHslChannels,
+    PartialParameters, PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
 };
 use crate::error::{AgxError, Result};
 
@@ -74,6 +74,8 @@ struct PresetRaw {
     color_grading: Option<PartialColorGradingParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tone_curve: Option<PartialToneCurveParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    detail: Option<PartialDetailParams>,
 }
 
 fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
@@ -113,6 +115,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         vignette: raw.vignette.clone(),
         color_grading: raw.color_grading.clone(),
         tone_curve: raw.tone_curve.clone(),
+        detail: raw.detail.clone(),
     }
 }
 
@@ -187,6 +190,7 @@ impl Preset {
             vignette: self.partial_params.vignette.clone(),
             color_grading: self.partial_params.color_grading.clone(),
             tone_curve: self.partial_params.tone_curve.clone(),
+            detail: self.partial_params.detail.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }

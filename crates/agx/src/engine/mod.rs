@@ -586,6 +586,101 @@ impl From<&crate::adjust::ToneCurveParams> for PartialToneCurveParams {
     }
 }
 
+/// Partial sharpening parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialSharpeningParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub masking: Option<f32>,
+}
+
+impl PartialSharpeningParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            amount: overlay.amount.or(self.amount),
+            radius: overlay.radius.or(self.radius),
+            threshold: overlay.threshold.or(self.threshold),
+            masking: overlay.masking.or(self.masking),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::SharpeningParams {
+        crate::adjust::SharpeningParams {
+            amount: self.amount.unwrap_or(0.0),
+            radius: self.radius.unwrap_or(1.0),
+            threshold: self.threshold.unwrap_or(25.0),
+            masking: self.masking.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::SharpeningParams> for PartialSharpeningParams {
+    fn from(s: &crate::adjust::SharpeningParams) -> Self {
+        Self {
+            amount: Some(s.amount),
+            radius: Some(s.radius),
+            threshold: Some(s.threshold),
+            masking: Some(s.masking),
+        }
+    }
+}
+
+/// Partial detail parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialDetailParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sharpening: Option<PartialSharpeningParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clarity: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub texture: Option<f32>,
+}
+
+impl PartialDetailParams {
+    fn merge_sharpening(
+        base: &Option<PartialSharpeningParams>,
+        overlay: &Option<PartialSharpeningParams>,
+    ) -> Option<PartialSharpeningParams> {
+        match (base, overlay) {
+            (None, None) => None,
+            (Some(b), None) => Some(b.clone()),
+            (None, Some(o)) => Some(o.clone()),
+            (Some(b), Some(o)) => Some(b.merge(o)),
+        }
+    }
+
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            sharpening: Self::merge_sharpening(&self.sharpening, &overlay.sharpening),
+            clarity: overlay.clarity.or(self.clarity),
+            texture: overlay.texture.or(self.texture),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::DetailParams {
+        crate::adjust::DetailParams {
+            sharpening: self.sharpening.as_ref().map(|s| s.materialize()).unwrap_or_default(),
+            clarity: self.clarity.unwrap_or(0.0),
+            texture: self.texture.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::DetailParams> for PartialDetailParams {
+    fn from(d: &crate::adjust::DetailParams) -> Self {
+        Self {
+            sharpening: Some(PartialSharpeningParams::from(&d.sharpening)),
+            clarity: Some(d.clarity),
+            texture: Some(d.texture),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -616,6 +711,8 @@ pub struct PartialParameters {
     pub color_grading: Option<PartialColorGradingParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tone_curve: Option<PartialToneCurveParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<PartialDetailParams>,
 }
 
 impl PartialParameters {
@@ -649,6 +746,12 @@ impl PartialParameters {
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
             tone_curve: match (&self.tone_curve, &other.tone_curve) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
+            detail: match (&self.detail, &other.detail) {
                 (None, None) => None,
                 (Some(b), None) => Some(b.clone()),
                 (None, Some(o)) => Some(o.clone()),
@@ -688,7 +791,7 @@ impl PartialParameters {
                 .as_ref()
                 .map(|tc| tc.materialize())
                 .unwrap_or_default(),
-            detail: crate::adjust::DetailParams::default(),
+            detail: self.detail.as_ref().map(|d| d.materialize()).unwrap_or_default(),
         }
     }
 }
@@ -708,6 +811,7 @@ impl From<&Parameters> for PartialParameters {
             vignette: Some(PartialVignetteParams::from(&params.vignette)),
             color_grading: Some(PartialColorGradingParams::from(&params.color_grading)),
             tone_curve: Some(PartialToneCurveParams::from(&params.tone_curve)),
+            detail: Some(PartialDetailParams::from(&params.detail)),
         }
     }
 }
@@ -1650,5 +1754,63 @@ mod tests {
     fn render_default_tone_curves_is_identity() {
         let params = Parameters::default();
         assert!(params.tone_curve.is_default());
+    }
+
+    // --- PartialDetailParams tests ---
+
+    #[test]
+    fn partial_detail_merge_overlay_wins() {
+        let base = PartialDetailParams {
+            sharpening: Some(PartialSharpeningParams {
+                amount: Some(40.0),
+                radius: Some(1.5),
+                threshold: None,
+                masking: None,
+            }),
+            clarity: Some(20.0),
+            texture: None,
+        };
+        let overlay = PartialDetailParams {
+            sharpening: Some(PartialSharpeningParams {
+                amount: Some(60.0),
+                radius: None,
+                threshold: Some(50.0),
+                masking: None,
+            }),
+            clarity: None,
+            texture: Some(10.0),
+        };
+        let merged = base.merge(&overlay);
+        let sharp = merged.sharpening.unwrap();
+        assert_eq!(sharp.amount, Some(60.0));
+        assert_eq!(sharp.radius, Some(1.5));
+        assert_eq!(sharp.threshold, Some(50.0));
+        assert_eq!(sharp.masking, None);
+        assert_eq!(merged.clarity, Some(20.0));
+        assert_eq!(merged.texture, Some(10.0));
+    }
+
+    #[test]
+    fn partial_detail_materialize_defaults() {
+        let partial = PartialDetailParams::default();
+        let concrete = partial.materialize();
+        assert_eq!(concrete, crate::adjust::DetailParams::default());
+    }
+
+    #[test]
+    fn partial_detail_from_concrete_roundtrip() {
+        let concrete = crate::adjust::DetailParams {
+            sharpening: crate::adjust::SharpeningParams {
+                amount: 40.0,
+                radius: 2.0,
+                threshold: 30.0,
+                masking: 50.0,
+            },
+            clarity: 25.0,
+            texture: -10.0,
+        };
+        let partial = PartialDetailParams::from(&concrete);
+        let back = partial.materialize();
+        assert_eq!(concrete, back);
     }
 }
