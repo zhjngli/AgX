@@ -484,6 +484,7 @@ impl EditArgs {
                 green: parse_tc(&self.tc_green),
                 blue: parse_tc(&self.tc_blue),
             },
+            detail: agx::DetailParams::default(),
         }
     }
 

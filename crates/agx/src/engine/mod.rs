@@ -142,6 +142,9 @@ pub struct Parameters {
     /// 5-channel tone curves (RGB, luma, R, G, B)
     #[serde(default)]
     pub tone_curve: crate::adjust::ToneCurveParams,
+    /// Detail pass: sharpening, clarity, texture
+    #[serde(default)]
+    pub detail: crate::adjust::DetailParams,
 }
 
 impl Default for Parameters {
@@ -159,6 +162,7 @@ impl Default for Parameters {
             vignette: VignetteParams::default(),
             color_grading: crate::adjust::ColorGradingParams::default(),
             tone_curve: crate::adjust::ToneCurveParams::default(),
+            detail: crate::adjust::DetailParams::default(),
         }
     }
 }
@@ -684,6 +688,7 @@ impl PartialParameters {
                 .as_ref()
                 .map(|tc| tc.materialize())
                 .unwrap_or_default(),
+            detail: crate::adjust::DetailParams::default(),
         }
     }
 }

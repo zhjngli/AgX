@@ -7,7 +7,7 @@ pub mod lut;
 pub mod metadata;
 pub mod preset;
 
-pub use adjust::{ColorGradingParams, ColorWheel, ToneCurve, ToneCurveParams, VignetteShape};
+pub use adjust::{ColorGradingParams, ColorWheel, DetailParams, SharpeningParams, ToneCurve, ToneCurveParams, VignetteShape};
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
 pub use engine::{
