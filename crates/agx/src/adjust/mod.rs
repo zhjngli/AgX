@@ -1,6 +1,9 @@
 use palette::{Hsl, IntoColor, LinSrgb, Srgb};
 use serde::{Deserialize, Serialize};
 
+pub mod detail;
+pub use detail::{DetailParams, SharpeningParams};
+
 // --- Channel helpers ---
 
 /// Apply a per-channel adjustment function to all three channels.
