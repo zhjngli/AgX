@@ -26,6 +26,8 @@ const ALL_LOOKS: &[&str] = &[
     "sharp_landscape",
     "soft_portrait",
     "detail_boost",
+    "dehaze_landscape",
+    "haze_effect",
 ];
 
 // --- Helpers ---

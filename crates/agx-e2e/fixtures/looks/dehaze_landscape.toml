@@ -1,0 +1,7 @@
+[metadata]
+name = "Dehaze Landscape"
+version = "1.0"
+author = "agx"
+
+[dehaze]
+amount = 50.0
