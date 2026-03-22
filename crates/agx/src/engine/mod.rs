@@ -610,11 +610,12 @@ impl PartialSharpeningParams {
     }
 
     pub fn materialize(&self) -> crate::adjust::SharpeningParams {
+        let d = crate::adjust::SharpeningParams::default();
         crate::adjust::SharpeningParams {
-            amount: self.amount.unwrap_or(0.0),
-            radius: self.radius.unwrap_or(1.0),
-            threshold: self.threshold.unwrap_or(25.0),
-            masking: self.masking.unwrap_or(0.0),
+            amount: self.amount.unwrap_or(d.amount),
+            radius: self.radius.unwrap_or(d.radius),
+            threshold: self.threshold.unwrap_or(d.threshold),
+            masking: self.masking.unwrap_or(d.masking),
         }
     }
 }
@@ -932,7 +933,7 @@ impl Engine {
         let hue_shifts = self.params.hsl.hue_shifts();
         let sat_shifts = self.params.hsl.saturation_shifts();
         let lum_shifts = self.params.hsl.luminance_shifts();
-        let detail_active = !self.params.detail.is_default();
+        let detail_active = !self.params.detail.is_neutral();
 
         if detail_active {
             // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.

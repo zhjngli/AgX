@@ -23,8 +23,8 @@ impl Default for SharpeningParams {
     fn default() -> Self {
         Self {
             amount: 0.0,
-            radius: 1.0,
-            threshold: 25.0,
+            radius: default_sharpening_radius(),
+            threshold: default_sharpening_threshold(),
             masking: 0.0,
         }
     }
@@ -51,7 +51,11 @@ impl Default for DetailParams {
 }
 
 impl DetailParams {
-    pub fn is_default(&self) -> bool {
+    /// Returns true when no detail effect would be applied.
+    ///
+    /// Only checks the "active" fields (sharpening amount, clarity, texture).
+    /// Sharpening radius/threshold/masking are irrelevant when amount is 0.
+    pub fn is_neutral(&self) -> bool {
         self.sharpening.amount == 0.0 && self.clarity == 0.0 && self.texture == 0.0
     }
 }
@@ -229,7 +233,7 @@ pub fn apply_detail_pass(
     height: usize,
     params: &DetailParams,
 ) -> Vec<[f32; 3]> {
-    if params.is_default() {
+    if params.is_neutral() {
         return buf.to_vec();
     }
     let mut current = buf.to_vec();
@@ -254,13 +258,13 @@ mod tests {
     // --- Task 1: SharpeningParams and DetailParams ---
 
     #[test]
-    fn default_detail_params_is_default() {
+    fn default_detail_params_is_neutral() {
         let p = DetailParams::default();
-        assert!(p.is_default());
+        assert!(p.is_neutral());
     }
 
     #[test]
-    fn is_default_ignores_radius_threshold_masking() {
+    fn is_neutral_ignores_radius_threshold_masking() {
         let p = DetailParams {
             sharpening: SharpeningParams {
                 amount: 0.0,
@@ -271,11 +275,11 @@ mod tests {
             clarity: 0.0,
             texture: 0.0,
         };
-        assert!(p.is_default());
+        assert!(p.is_neutral());
     }
 
     #[test]
-    fn is_default_false_when_sharpening_active() {
+    fn is_neutral_false_when_sharpening_active() {
         let p = DetailParams {
             sharpening: SharpeningParams {
                 amount: 50.0,
@@ -283,25 +287,25 @@ mod tests {
             },
             ..Default::default()
         };
-        assert!(!p.is_default());
+        assert!(!p.is_neutral());
     }
 
     #[test]
-    fn is_default_false_when_clarity_active() {
+    fn is_neutral_false_when_clarity_active() {
         let p = DetailParams {
             clarity: 30.0,
             ..Default::default()
         };
-        assert!(!p.is_default());
+        assert!(!p.is_neutral());
     }
 
     #[test]
-    fn is_default_false_when_texture_active() {
+    fn is_neutral_false_when_texture_active() {
         let p = DetailParams {
             texture: -20.0,
             ..Default::default()
         };
-        assert!(!p.is_default());
+        assert!(!p.is_neutral());
     }
 
     #[test]

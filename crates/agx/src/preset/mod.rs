@@ -978,7 +978,7 @@ points = [[0.0, 0.0], [0.8, 0.5], [0.3, 0.7], [1.0, 1.0]]
 name = "No Detail"
 "#;
         let preset = Preset::from_toml(toml_str).unwrap();
-        assert!(preset.params().detail.is_default());
+        assert!(preset.params().detail.is_neutral());
     }
 
     #[test]
