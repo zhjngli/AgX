@@ -7,6 +7,12 @@ pub use detail::{DetailParams, SharpeningParams};
 pub mod dehaze;
 pub use dehaze::DehazeParams;
 
+// --- Luminance coefficients (Rec. 709) ---
+
+pub(crate) const LUMA_R: f32 = 0.2126;
+pub(crate) const LUMA_G: f32 = 0.7152;
+pub(crate) const LUMA_B: f32 = 0.0722;
+
 // --- Channel helpers ---
 
 /// Apply a per-channel adjustment function to all three channels.
@@ -317,7 +323,7 @@ pub fn apply_color_grading_pre(
     pre: &ColorGradingPrecomputed,
 ) -> (f32, f32, f32) {
     // Pixel luminance (Rec. 709 on gamma-encoded values)
-    let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    let lum = LUMA_R * r + LUMA_G * g + LUMA_B * b;
 
     // Balance remapping (skip powf when balance is neutral)
     let lum_adj = if pre.balance_active {
@@ -723,7 +729,7 @@ pub fn apply_tone_curves_pre(
 
     // Step 3: Luminance curve
     if let Some(ref lut) = pre.luma {
-        let l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let l = LUMA_R * r + LUMA_G * g + LUMA_B * b;
         let l_new = lut_lookup(lut, l);
         if l > 1e-6 {
             let scale = l_new / l;

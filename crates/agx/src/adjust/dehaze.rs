@@ -124,9 +124,11 @@ fn estimate_airlight(buf: &[[f32; 3]], dark_ch: &[f32]) -> [f32; 3] {
     // Number of top pixels to consider (at least 1)
     let top_count = ((n as f64 * AIRLIGHT_PERCENTILE).ceil() as usize).max(1);
 
-    // Sort indices by dark channel value (descending)
+    // Partition indices so the top `top_count` by dark channel value are at the front.
+    // Uses O(n) average-case selection instead of O(n log n) full sort.
     let mut indices: Vec<usize> = (0..n).collect();
-    indices.sort_unstable_by(|&a, &b| dark_ch[b].partial_cmp(&dark_ch[a]).unwrap());
+    let pivot = top_count.min(n) - 1;
+    indices.select_nth_unstable_by(pivot, |&a, &b| dark_ch[b].partial_cmp(&dark_ch[a]).unwrap());
 
     // Among top dark channel pixels, find the one with highest intensity
     let mut best_idx = indices[0];
@@ -233,9 +235,6 @@ fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> V
 }
 
 const T_MIN: f32 = 0.1;
-const LUMA_R: f32 = 0.2126;
-const LUMA_G: f32 = 0.7152;
-const LUMA_B: f32 = 0.0722;
 
 /// Apply dehaze adjustment to a linear RGB buffer.
 ///
@@ -298,7 +297,7 @@ pub fn apply_dehaze(
     let mut guide = vec![0.0_f32; n];
     for i in 0..n {
         let [r, g, b] = buf[i];
-        guide[i] = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+        guide[i] = super::LUMA_R * r + super::LUMA_G * g + super::LUMA_B * b;
     }
     let t_refined = guided_filter(&guide, &t_raw, width, height);
 
