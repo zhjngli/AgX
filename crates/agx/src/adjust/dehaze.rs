@@ -24,6 +24,7 @@ impl DehazeParams {
 }
 
 const PATCH_SIZE: usize = 15;
+const AIRLIGHT_PERCENTILE: f64 = 0.001;
 
 /// O(n) centered sliding window minimum using a monotonic deque.
 ///
@@ -110,6 +111,38 @@ fn dark_channel(buf: &[[f32; 3]], width: usize, height: usize) -> Vec<f32> {
     result
 }
 
+/// Estimate the atmospheric light color from the image and its dark channel.
+///
+/// Selects the top 0.1% brightest pixels in the dark channel (haziest regions),
+/// then picks the pixel with the highest RGB intensity among those.
+fn estimate_airlight(buf: &[[f32; 3]], dark_ch: &[f32]) -> [f32; 3] {
+    let n = buf.len();
+    if n == 0 {
+        return [1.0, 1.0, 1.0];
+    }
+
+    // Number of top pixels to consider (at least 1)
+    let top_count = ((n as f64 * AIRLIGHT_PERCENTILE).ceil() as usize).max(1);
+
+    // Sort indices by dark channel value (descending)
+    let mut indices: Vec<usize> = (0..n).collect();
+    indices.sort_unstable_by(|&a, &b| dark_ch[b].partial_cmp(&dark_ch[a]).unwrap());
+
+    // Among top dark channel pixels, find the one with highest intensity
+    let mut best_idx = indices[0];
+    let mut best_intensity = 0.0_f32;
+    for &idx in indices.iter().take(top_count) {
+        let [r, g, b] = buf[idx];
+        let intensity = r + g + b;
+        if intensity > best_intensity {
+            best_intensity = intensity;
+            best_idx = idx;
+        }
+    }
+
+    buf[best_idx]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,5 +191,14 @@ mod tests {
         for &v in &dc {
             assert!((v - 0.1).abs() < 1e-6, "Expected 0.1, got {v}");
         }
+    }
+
+    #[test]
+    fn airlight_selects_brightest_in_haziest_region() {
+        let mut buf = vec![[0.1, 0.1, 0.1]; 16]; // 4x4 clear
+        buf[0] = [0.9, 0.85, 0.8]; // bright hazy pixel (high min channel)
+        let dc = dark_channel(&buf, 4, 4);
+        let a = estimate_airlight(&buf, &dc);
+        assert!(a[0] > 0.5, "Expected bright airlight R, got {}", a[0]);
     }
 }
