@@ -145,6 +145,9 @@ pub struct Parameters {
     /// Detail pass: sharpening, clarity, texture
     #[serde(default)]
     pub detail: crate::adjust::DetailParams,
+    /// Dehaze: atmospheric haze removal/addition
+    #[serde(default)]
+    pub dehaze: crate::adjust::DehazeParams,
 }
 
 impl Default for Parameters {
@@ -163,6 +166,7 @@ impl Default for Parameters {
             color_grading: crate::adjust::ColorGradingParams::default(),
             tone_curve: crate::adjust::ToneCurveParams::default(),
             detail: crate::adjust::DetailParams::default(),
+            dehaze: crate::adjust::DehazeParams::default(),
         }
     }
 }
@@ -686,6 +690,35 @@ impl From<&crate::adjust::DetailParams> for PartialDetailParams {
     }
 }
 
+/// Partial dehaze parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialDehazeParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+}
+
+impl PartialDehazeParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            amount: overlay.amount.or(self.amount),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::DehazeParams {
+        crate::adjust::DehazeParams {
+            amount: self.amount.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::DehazeParams> for PartialDehazeParams {
+    fn from(d: &crate::adjust::DehazeParams) -> Self {
+        Self {
+            amount: Some(d.amount),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -718,6 +751,8 @@ pub struct PartialParameters {
     pub tone_curve: Option<PartialToneCurveParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<PartialDetailParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dehaze: Option<PartialDehazeParams>,
 }
 
 impl PartialParameters {
@@ -762,6 +797,12 @@ impl PartialParameters {
                 (None, Some(o)) => Some(o.clone()),
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
+            dehaze: match (&self.dehaze, &other.dehaze) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
         }
     }
 
@@ -801,6 +842,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|d| d.materialize())
                 .unwrap_or_default(),
+            dehaze: self
+                .dehaze
+                .as_ref()
+                .map(|d| d.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -821,6 +867,7 @@ impl From<&Parameters> for PartialParameters {
             color_grading: Some(PartialColorGradingParams::from(&params.color_grading)),
             tone_curve: Some(PartialToneCurveParams::from(&params.tone_curve)),
             detail: Some(PartialDetailParams::from(&params.detail)),
+            dehaze: Some(PartialDehazeParams::from(&params.dehaze)),
         }
     }
 }
@@ -1195,6 +1242,8 @@ mod tests {
         assert_eq!(p.blacks, 0.0);
         assert_eq!(p.temperature, 0.0);
         assert_eq!(p.tint, 0.0);
+        assert!(p.dehaze.is_neutral());
+        assert_eq!(p.dehaze.amount, 0.0);
     }
 
     #[test]
@@ -2001,5 +2050,25 @@ mod tests {
                 "default detail should not change output"
             );
         }
+    }
+
+    #[test]
+    fn partial_dehaze_merge_and_materialize() {
+        let base = PartialDehazeParams {
+            amount: Some(30.0),
+        };
+        let overlay = PartialDehazeParams { amount: None };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.amount, Some(30.0));
+
+        let overlay2 = PartialDehazeParams {
+            amount: Some(50.0),
+        };
+        let merged2 = base.merge(&overlay2);
+        assert_eq!(merged2.amount, Some(50.0));
+
+        let empty = PartialDehazeParams::default();
+        let mat = empty.materialize();
+        assert_eq!(mat.amount, 0.0);
     }
 }
