@@ -1028,19 +1028,12 @@ impl Engine {
             } else {
                 let p = self.original.get_pixel(x, y);
                 let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
-                let wb = adjust::apply_white_balance(
-                    r,
-                    g,
-                    b,
-                    self.params.temperature,
-                    self.params.tint,
-                );
+                let wb =
+                    adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
                 r = wb.0;
                 g = wb.1;
                 b = wb.2;
-                adjust::apply_per_channel(r, g, b, |v| {
-                    adjust::apply_exposure(v, exposure_factor)
-                })
+                adjust::apply_per_channel(r, g, b, |v| adjust::apply_exposure(v, exposure_factor))
             }
         };
 
@@ -2085,16 +2078,12 @@ mod tests {
 
     #[test]
     fn partial_dehaze_merge_and_materialize() {
-        let base = PartialDehazeParams {
-            amount: Some(30.0),
-        };
+        let base = PartialDehazeParams { amount: Some(30.0) };
         let overlay = PartialDehazeParams { amount: None };
         let merged = base.merge(&overlay);
         assert_eq!(merged.amount, Some(30.0));
 
-        let overlay2 = PartialDehazeParams {
-            amount: Some(50.0),
-        };
+        let overlay2 = PartialDehazeParams { amount: Some(50.0) };
         let merged2 = base.merge(&overlay2);
         assert_eq!(merged2.amount, Some(50.0));
 

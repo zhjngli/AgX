@@ -421,7 +421,11 @@ struct EditArgs {
     texture: f32,
 
     /// Dehaze amount (-100 to +100). Positive removes haze, negative adds haze.
-    #[arg(long = "dehaze-amount", default_value_t = 0.0, allow_hyphen_values = true)]
+    #[arg(
+        long = "dehaze-amount",
+        default_value_t = 0.0,
+        allow_hyphen_values = true
+    )]
     dehaze_amount: f32,
 
     #[command(flatten)]

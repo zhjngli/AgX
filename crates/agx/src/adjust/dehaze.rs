@@ -461,7 +461,11 @@ mod tests {
         let result = apply_dehaze(&buf, 10, 10, &params);
         for px in &result {
             for c in 0..3 {
-                assert!(px[c] >= 0.0 && px[c] <= 1.0, "Output {:.4} out of [0,1]", px[c]);
+                assert!(
+                    px[c] >= 0.0 && px[c] <= 1.0,
+                    "Output {:.4} out of [0,1]",
+                    px[c]
+                );
             }
         }
     }
