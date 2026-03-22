@@ -232,6 +232,89 @@ fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> V
     result
 }
 
+const T_MIN: f32 = 0.1;
+const LUMA_R: f32 = 0.2126;
+const LUMA_G: f32 = 0.7152;
+const LUMA_B: f32 = 0.0722;
+
+/// Apply dehaze adjustment to a linear RGB buffer.
+///
+/// The buffer contains pixels in linear sRGB space (after white balance and exposure).
+/// Positive amount removes haze, negative amount adds haze/fog.
+/// Returns a new buffer of the same size.
+pub fn apply_dehaze(
+    buf: &[[f32; 3]],
+    width: usize,
+    height: usize,
+    params: &DehazeParams,
+) -> Vec<[f32; 3]> {
+    if params.is_neutral() {
+        return buf.to_vec();
+    }
+
+    let n = width * height;
+    let amount = params.amount;
+
+    // Step 1: Dark channel of the original image
+    let dc = dark_channel(buf, width, height);
+
+    // Step 2: Atmospheric light estimation
+    let a = estimate_airlight(buf, &dc);
+
+    if amount < 0.0 {
+        // Negative amount: add haze by blending toward airlight
+        let strength = (-amount / 100.0).min(1.0);
+        let mut result = vec![[0.0_f32; 3]; n];
+        for i in 0..n {
+            for c in 0..3 {
+                result[i][c] = (buf[i][c] * (1.0 - strength) + a[c] * strength).clamp(0.0, 1.0);
+            }
+        }
+        return result;
+    }
+
+    // Positive amount: remove haze
+    let omega = (amount / 100.0).min(1.0);
+
+    // Step 3: Normalize image by airlight and compute dark channel of normalized
+    let a_safe = [a[0].max(0.01), a[1].max(0.01), a[2].max(0.01)];
+    let mut normalized = vec![[0.0_f32; 3]; n];
+    for i in 0..n {
+        normalized[i] = [
+            buf[i][0] / a_safe[0],
+            buf[i][1] / a_safe[1],
+            buf[i][2] / a_safe[2],
+        ];
+    }
+    let dc_norm = dark_channel(&normalized, width, height);
+
+    // Raw transmission map
+    let mut t_raw = vec![0.0_f32; n];
+    for i in 0..n {
+        t_raw[i] = 1.0 - omega * dc_norm[i];
+    }
+
+    // Step 4: Guided filter refinement
+    let mut guide = vec![0.0_f32; n];
+    for i in 0..n {
+        let [r, g, b] = buf[i];
+        guide[i] = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+    }
+    let t_refined = guided_filter(&guide, &t_raw, width, height);
+
+    // Step 5: Scene recovery
+    let mut result = vec![[0.0_f32; 3]; n];
+    for i in 0..n {
+        let t = t_refined[i].max(T_MIN);
+        for c in 0..3 {
+            let recovered = (buf[i][c] - a[c]) / t + a[c];
+            result[i][c] = recovered.clamp(0.0, 1.0);
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +401,84 @@ mod tests {
             "Right should be bright, got {}",
             result[width - 1]
         );
+    }
+
+    #[test]
+    fn apply_dehaze_zero_amount_is_identity() {
+        let buf = vec![[0.5, 0.3, 0.7]; 4];
+        let params = DehazeParams { amount: 0.0 };
+        let result = apply_dehaze(&buf, 2, 2, &params);
+        for (i, px) in result.iter().enumerate() {
+            for c in 0..3 {
+                assert!(
+                    (px[c] - buf[i][c]).abs() < 1e-6,
+                    "Pixel {i} channel {c}: expected {}, got {}",
+                    buf[i][c],
+                    px[c]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn apply_dehaze_positive_changes_output() {
+        // Non-uniform image simulating a hazy scene with variation
+        let mut buf = Vec::with_capacity(100);
+        for i in 0..100 {
+            let base = 0.5 + 0.3 * (i as f32 / 100.0);
+            buf.push([base, base * 0.9, base * 0.85]);
+        }
+        let params = DehazeParams { amount: 50.0 };
+        let result = apply_dehaze(&buf, 10, 10, &params);
+        let differs = result
+            .iter()
+            .zip(buf.iter())
+            .any(|(r, b)| (r[0] - b[0]).abs() > 1e-4);
+        assert!(differs, "Dehaze should change hazy image");
+    }
+
+    #[test]
+    fn apply_dehaze_negative_adds_haze() {
+        // Non-uniform image: negative dehaze blends toward estimated airlight
+        let mut buf = Vec::with_capacity(100);
+        for i in 0..100 {
+            let t = i as f32 / 100.0;
+            buf.push([0.2 + 0.5 * t, 0.3 + 0.3 * t, 0.1 + 0.4 * t]);
+        }
+        let params = DehazeParams { amount: -30.0 };
+        let result = apply_dehaze(&buf, 10, 10, &params);
+        let differs = result
+            .iter()
+            .zip(buf.iter())
+            .any(|(r, b)| (r[0] - b[0]).abs() > 1e-4);
+        assert!(differs, "Negative dehaze should add haze");
+    }
+
+    #[test]
+    fn apply_dehaze_output_clamped_to_0_1() {
+        let buf = vec![[0.95, 0.95, 0.95]; 100]; // very bright, 10x10
+        let params = DehazeParams { amount: 100.0 };
+        let result = apply_dehaze(&buf, 10, 10, &params);
+        for px in &result {
+            for c in 0..3 {
+                assert!(px[c] >= 0.0 && px[c] <= 1.0, "Output {:.4} out of [0,1]", px[c]);
+            }
+        }
+    }
+
+    #[test]
+    fn apply_dehaze_t_min_prevents_extreme_values() {
+        let buf = vec![[0.8, 0.8, 0.8]; 100]; // 10x10 very hazy
+        let params = DehazeParams { amount: 100.0 };
+        let result = apply_dehaze(&buf, 10, 10, &params);
+        for px in &result {
+            for c in 0..3 {
+                assert!(
+                    px[c] >= 0.0 && px[c] <= 1.0,
+                    "T_MIN should prevent extreme values, got {:.4}",
+                    px[c]
+                );
+            }
+        }
     }
 }
