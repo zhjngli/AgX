@@ -664,7 +664,11 @@ impl PartialDetailParams {
 
     pub fn materialize(&self) -> crate::adjust::DetailParams {
         crate::adjust::DetailParams {
-            sharpening: self.sharpening.as_ref().map(|s| s.materialize()).unwrap_or_default(),
+            sharpening: self
+                .sharpening
+                .as_ref()
+                .map(|s| s.materialize())
+                .unwrap_or_default(),
             clarity: self.clarity.unwrap_or(0.0),
             texture: self.texture.unwrap_or(0.0),
         }
@@ -791,7 +795,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|tc| tc.materialize())
                 .unwrap_or_default(),
-            detail: self.detail.as_ref().map(|d| d.materialize()).unwrap_or_default(),
+            detail: self
+                .detail
+                .as_ref()
+                .map(|d| d.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -898,7 +906,8 @@ impl Engine {
     /// 6. Color grading (sRGB gamma space) — 3-way color wheels
     /// 7. LUT application (sRGB gamma space)
     /// 8. Vignette (sRGB gamma space, position-dependent)
-    /// 9. Convert back to linear space
+    /// 9. Detail pass — sharpening, clarity, texture (sRGB gamma space, when active)
+    /// 10. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
@@ -923,109 +932,245 @@ impl Engine {
         let hue_shifts = self.params.hsl.hue_shifts();
         let sat_shifts = self.params.hsl.saturation_shifts();
         let lum_shifts = self.params.hsl.luminance_shifts();
+        let detail_active = !self.params.detail.is_default();
 
-        Rgb32FImage::from_fn(w, h, |x, y| {
-            let p = self.original.get_pixel(x, y);
-            let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
+        if detail_active {
+            // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.
+            let mut srgb_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
+            for y in 0..h {
+                for x in 0..w {
+                    let p = self.original.get_pixel(x, y);
+                    let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
 
-            // 1. White balance (linear space)
-            let wb =
-                adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
-            r = wb.0;
-            g = wb.1;
-            b = wb.2;
+                    // 1. White balance (linear space)
+                    let wb = adjust::apply_white_balance(
+                        r,
+                        g,
+                        b,
+                        self.params.temperature,
+                        self.params.tint,
+                    );
+                    r = wb.0;
+                    g = wb.1;
+                    b = wb.2;
 
-            // 2. Exposure (linear space)
-            (r, g, b) =
-                adjust::apply_per_channel(r, g, b, |v| adjust::apply_exposure(v, exposure_factor));
+                    // 2. Exposure (linear space)
+                    (r, g, b) = adjust::apply_per_channel(r, g, b, |v| {
+                        adjust::apply_exposure(v, exposure_factor)
+                    });
 
-            // 3. Convert to sRGB gamma space
-            let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
+                    // 3. Convert to sRGB gamma space
+                    let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
 
-            // 4. Contrast
-            if contrast != 0.0 {
-                (sr, sg, sb) =
-                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_contrast(v, contrast));
+                    // 4. Contrast
+                    if contrast != 0.0 {
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_contrast(v, contrast)
+                        });
+                    }
+
+                    // 5. Highlights
+                    if highlights != 0.0 {
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_highlights(v, highlights)
+                        });
+                    }
+
+                    // 6. Shadows
+                    if shadows != 0.0 {
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_shadows(v, shadows)
+                        });
+                    }
+
+                    // 7. Whites
+                    if whites != 0.0 {
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_whites(v, whites)
+                        });
+                    }
+
+                    // 8. Blacks
+                    if blacks != 0.0 {
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_blacks(v, blacks)
+                        });
+                    }
+
+                    // 9. Tone curves (sRGB gamma space)
+                    if let Some(ref pre) = tone_curve_pre {
+                        let (tr, tg, tb) = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
+                        sr = tr;
+                        sg = tg;
+                        sb = tb;
+                    }
+
+                    // 10. HSL adjustments (sRGB gamma space)
+                    if hsl_active {
+                        let (hr, hg, hb) = adjust::apply_hsl(
+                            sr,
+                            sg,
+                            sb,
+                            &hue_shifts,
+                            &sat_shifts,
+                            &lum_shifts,
+                            adjust::cosine_weight,
+                        );
+                        sr = hr;
+                        sg = hg;
+                        sb = hb;
+                    }
+
+                    // 11. Color grading (sRGB gamma space)
+                    if let Some(pre) = &color_grading_pre {
+                        let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
+                        sr = cr;
+                        sg = cg;
+                        sb = cb;
+                    }
+
+                    // 12. LUT (sRGB gamma space)
+                    if let Some(lut) = &self.lut {
+                        let (lr, lg, lb) = lut.lookup(sr, sg, sb);
+                        sr = lr;
+                        sg = lg;
+                        sb = lb;
+                    }
+
+                    // 13. Vignette (sRGB gamma space, position-dependent)
+                    if let Some(pre) = &vignette_pre {
+                        let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
+                        sr = vr;
+                        sg = vg;
+                        sb = vb;
+                    }
+
+                    srgb_buf.push([sr, sg, sb]);
+                }
             }
 
-            // 5. Highlights
-            if highlights != 0.0 {
-                (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                    adjust::apply_highlights(v, highlights)
+            // Detail pass (sharpening, clarity, texture) operates in sRGB gamma space.
+            let detail_buf = adjust::detail::apply_detail_pass(
+                &srgb_buf,
+                w as usize,
+                h as usize,
+                &self.params.detail,
+            );
+
+            // Convert each pixel back to linear and build output image.
+            Rgb32FImage::from_fn(w, h, |x, y| {
+                let idx = (y * w + x) as usize;
+                let [sr, sg, sb] = detail_buf[idx];
+                let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
+                Rgb([lr, lg, lb])
+            })
+        } else {
+            Rgb32FImage::from_fn(w, h, |x, y| {
+                let p = self.original.get_pixel(x, y);
+                let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
+
+                // 1. White balance (linear space)
+                let wb =
+                    adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
+                r = wb.0;
+                g = wb.1;
+                b = wb.2;
+
+                // 2. Exposure (linear space)
+                (r, g, b) = adjust::apply_per_channel(r, g, b, |v| {
+                    adjust::apply_exposure(v, exposure_factor)
                 });
-            }
 
-            // 6. Shadows
-            if shadows != 0.0 {
-                (sr, sg, sb) =
-                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_shadows(v, shadows));
-            }
+                // 3. Convert to sRGB gamma space
+                let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
 
-            // 7. Whites
-            if whites != 0.0 {
-                (sr, sg, sb) =
-                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_whites(v, whites));
-            }
+                // 4. Contrast
+                if contrast != 0.0 {
+                    (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                        adjust::apply_contrast(v, contrast)
+                    });
+                }
 
-            // 8. Blacks
-            if blacks != 0.0 {
-                (sr, sg, sb) =
-                    adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_blacks(v, blacks));
-            }
+                // 5. Highlights
+                if highlights != 0.0 {
+                    (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                        adjust::apply_highlights(v, highlights)
+                    });
+                }
 
-            // 9. Tone curves (sRGB gamma space)
-            if let Some(ref pre) = tone_curve_pre {
-                let (tr, tg, tb) = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
-                sr = tr;
-                sg = tg;
-                sb = tb;
-            }
+                // 6. Shadows
+                if shadows != 0.0 {
+                    (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                        adjust::apply_shadows(v, shadows)
+                    });
+                }
 
-            // 10. HSL adjustments (sRGB gamma space)
-            if hsl_active {
-                let (hr, hg, hb) = adjust::apply_hsl(
-                    sr,
-                    sg,
-                    sb,
-                    &hue_shifts,
-                    &sat_shifts,
-                    &lum_shifts,
-                    adjust::cosine_weight,
-                );
-                sr = hr;
-                sg = hg;
-                sb = hb;
-            }
+                // 7. Whites
+                if whites != 0.0 {
+                    (sr, sg, sb) =
+                        adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_whites(v, whites));
+                }
 
-            // 11. Color grading (sRGB gamma space)
-            if let Some(pre) = &color_grading_pre {
-                let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
-                sr = cr;
-                sg = cg;
-                sb = cb;
-            }
+                // 8. Blacks
+                if blacks != 0.0 {
+                    (sr, sg, sb) =
+                        adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_blacks(v, blacks));
+                }
 
-            // 12. LUT (sRGB gamma space)
-            if let Some(lut) = &self.lut {
-                let (lr, lg, lb) = lut.lookup(sr, sg, sb);
-                sr = lr;
-                sg = lg;
-                sb = lb;
-            }
+                // 9. Tone curves (sRGB gamma space)
+                if let Some(ref pre) = tone_curve_pre {
+                    let (tr, tg, tb) = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
+                    sr = tr;
+                    sg = tg;
+                    sb = tb;
+                }
 
-            // 13. Vignette (sRGB gamma space, position-dependent)
-            if let Some(pre) = &vignette_pre {
-                let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
-                sr = vr;
-                sg = vg;
-                sb = vb;
-            }
+                // 10. HSL adjustments (sRGB gamma space)
+                if hsl_active {
+                    let (hr, hg, hb) = adjust::apply_hsl(
+                        sr,
+                        sg,
+                        sb,
+                        &hue_shifts,
+                        &sat_shifts,
+                        &lum_shifts,
+                        adjust::cosine_weight,
+                    );
+                    sr = hr;
+                    sg = hg;
+                    sb = hb;
+                }
 
-            // 14. Convert back to linear space
-            let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
+                // 11. Color grading (sRGB gamma space)
+                if let Some(pre) = &color_grading_pre {
+                    let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
+                    sr = cr;
+                    sg = cg;
+                    sb = cb;
+                }
 
-            Rgb([lr, lg, lb])
-        })
+                // 12. LUT (sRGB gamma space)
+                if let Some(lut) = &self.lut {
+                    let (lr, lg, lb) = lut.lookup(sr, sg, sb);
+                    sr = lr;
+                    sg = lg;
+                    sb = lb;
+                }
+
+                // 13. Vignette (sRGB gamma space, position-dependent)
+                if let Some(pre) = &vignette_pre {
+                    let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
+                    sr = vr;
+                    sg = vg;
+                    sb = vb;
+                }
+
+                // 14. Convert back to linear space
+                let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
+
+                Rgb([lr, lg, lb])
+            })
+        }
     }
 }
 
@@ -1812,5 +1957,48 @@ mod tests {
         let partial = PartialDetailParams::from(&concrete);
         let back = partial.materialize();
         assert_eq!(concrete, back);
+    }
+
+    #[test]
+    fn render_with_sharpening_differs_from_neutral() {
+        let w = 16;
+        let h = 16;
+        let img = Rgb32FImage::from_fn(w, h, |x, _y| {
+            let v = x as f32 / (w - 1) as f32;
+            Rgb([v * 0.5, v * 0.5, v * 0.5])
+        });
+        let mut engine = Engine::new(img.clone());
+        let neutral_render = engine.render();
+
+        engine.params_mut().detail.sharpening.amount = 80.0;
+        engine.params_mut().detail.sharpening.threshold = 0.0;
+        let sharp_render = engine.render();
+
+        let mut diffs = 0;
+        for y in 2..h - 2 {
+            for x in 2..w - 2 {
+                let n = neutral_render.get_pixel(x, y);
+                let s = sharp_render.get_pixel(x, y);
+                if (n.0[0] - s.0[0]).abs() > 1e-4 {
+                    diffs += 1;
+                }
+            }
+        }
+        assert!(diffs > 0, "sharpening should change at least some pixels");
+    }
+
+    #[test]
+    fn render_default_detail_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let engine = Engine::new(img);
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "default detail should not change output"
+            );
+        }
     }
 }
