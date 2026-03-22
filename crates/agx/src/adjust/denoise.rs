@@ -76,6 +76,35 @@ fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> Vec<[f32; 3]> {
     pixels
 }
 
+/// Estimate noise standard deviation using median absolute deviation (MAD).
+///
+/// sigma = median(|data|) / 0.6745
+///
+/// This is a robust estimator assuming the finest wavelet level is dominated
+/// by Gaussian noise (Donoho & Johnstone, 1994).
+fn estimate_sigma(data: &[f32]) -> f32 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    let mut abs_vals: Vec<f32> = data.iter().map(|v| v.abs()).collect();
+    let mid = abs_vals.len() / 2;
+    abs_vals.select_nth_unstable_by(mid, |a, b| a.partial_cmp(b).unwrap());
+    let median = abs_vals[mid];
+    median / 0.6745
+}
+
+/// Apply soft thresholding in-place: sign(x) * max(|x| - threshold, 0).
+fn soft_threshold(data: &mut [f32], threshold: f32) {
+    for v in data.iter_mut() {
+        let abs = v.abs();
+        if abs <= threshold {
+            *v = 0.0;
+        } else {
+            *v = v.signum() * (abs - threshold);
+        }
+    }
+}
+
 /// Number of wavelet decomposition levels.
 const NUM_LEVELS: usize = 5;
 
@@ -194,6 +223,47 @@ mod tests {
             detail: 50.0,
         };
         assert!(!p3.is_neutral());
+    }
+
+    #[test]
+    fn estimate_noise_sigma_on_known_noise() {
+        let n = 1000;
+        let mut data = Vec::with_capacity(n);
+        let mut rng: u64 = 42;
+        for _ in 0..n {
+            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let u = (rng >> 33) as f32 / (1u64 << 31) as f32;
+            data.push((u - 0.5) * 0.2);
+        }
+        let sigma = estimate_sigma(&data);
+        assert!(
+            sigma > 0.01 && sigma < 0.2,
+            "sigma={sigma} out of expected range"
+        );
+    }
+
+    #[test]
+    fn soft_threshold_zero_threshold_is_identity() {
+        let mut data = vec![-0.5, -0.1, 0.0, 0.1, 0.5];
+        let original = data.clone();
+        soft_threshold(&mut data, 0.0);
+        for (i, v) in data.iter().enumerate() {
+            assert!(
+                (v - original[i]).abs() < 1e-7,
+                "zero threshold should be identity at index {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn soft_threshold_removes_small_coefficients() {
+        let mut data = vec![-0.5, -0.1, 0.0, 0.1, 0.5];
+        soft_threshold(&mut data, 0.2);
+        assert_eq!(data[1], 0.0);
+        assert_eq!(data[2], 0.0);
+        assert_eq!(data[3], 0.0);
+        assert!((data[0] - (-0.3)).abs() < 1e-6);
+        assert!((data[4] - 0.3).abs() < 1e-6);
     }
 
     #[test]
