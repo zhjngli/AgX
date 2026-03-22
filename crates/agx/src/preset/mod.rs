@@ -3,8 +3,9 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{
-    Parameters, PartialColorGradingParams, PartialDetailParams, PartialHslChannels,
-    PartialParameters, PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
+    Parameters, PartialColorGradingParams, PartialDehazeParams, PartialDetailParams,
+    PartialHslChannels, PartialParameters, PartialToneCurve, PartialToneCurveParams,
+    PartialVignetteParams,
 };
 use crate::error::{AgxError, Result};
 
@@ -76,6 +77,8 @@ struct PresetRaw {
     tone_curve: Option<PartialToneCurveParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     detail: Option<PartialDetailParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dehaze: Option<PartialDehazeParams>,
 }
 
 fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
@@ -148,6 +151,17 @@ fn validate_detail_params(params: &PartialDetailParams) -> Result<()> {
     Ok(())
 }
 
+fn validate_dehaze_params(params: &PartialDehazeParams) -> Result<()> {
+    if let Some(amount) = params.amount {
+        if !(-100.0..=100.0).contains(&amount) {
+            return Err(AgxError::Preset(format!(
+                "dehaze.amount must be -100 to 100, got {amount}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Build a PartialParameters from a PresetRaw.
 fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
     PartialParameters {
@@ -164,6 +178,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         color_grading: raw.color_grading.clone(),
         tone_curve: raw.tone_curve.clone(),
         detail: raw.detail.clone(),
+        dehaze: raw.dehaze.clone(),
     }
 }
 
@@ -211,6 +226,9 @@ impl Preset {
         if let Some(ref detail) = partial.detail {
             validate_detail_params(detail)?;
         }
+        if let Some(ref dehaze) = partial.dehaze {
+            validate_dehaze_params(dehaze)?;
+        }
         Ok(Self {
             metadata: raw.metadata,
             partial_params: partial,
@@ -242,6 +260,7 @@ impl Preset {
             color_grading: self.partial_params.color_grading.clone(),
             tone_curve: self.partial_params.tone_curve.clone(),
             detail: self.partial_params.detail.clone(),
+            dehaze: self.partial_params.dehaze.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
@@ -279,6 +298,9 @@ impl Preset {
         let this_partial = build_partial_params(&raw);
         if let Some(ref detail) = this_partial.detail {
             validate_detail_params(detail)?;
+        }
+        if let Some(ref dehaze) = this_partial.dehaze {
+            validate_dehaze_params(dehaze)?;
         }
 
         // Resolve inheritance
@@ -1010,5 +1032,50 @@ amount = 150.0
 "#;
         let result = Preset::from_toml(toml_str);
         assert!(result.is_err(), "amount > 100 should be rejected");
+    }
+
+    #[test]
+    fn dehaze_section_roundtrip() {
+        let toml_str = r#"
+[metadata]
+name = "Dehaze Test"
+
+[dehaze]
+amount = 40.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let params = preset.params();
+        assert!((params.dehaze.amount - 40.0).abs() < 1e-6);
+
+        let serialized = preset.to_toml().unwrap();
+        let roundtrip = Preset::from_toml(&serialized).unwrap();
+        assert_eq!(preset, roundtrip);
+    }
+
+    #[test]
+    fn missing_dehaze_section_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No Dehaze"
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert!(preset.params().dehaze.is_neutral());
+    }
+
+    #[test]
+    fn dehaze_validation_rejects_out_of_range() {
+        let toml_str = r#"
+[dehaze]
+amount = 150.0
+"#;
+        let result = Preset::from_toml(toml_str);
+        assert!(result.is_err());
+
+        let toml_str2 = r#"
+[dehaze]
+amount = -150.0
+"#;
+        let result2 = Preset::from_toml(toml_str2);
+        assert!(result2.is_err());
     }
 }

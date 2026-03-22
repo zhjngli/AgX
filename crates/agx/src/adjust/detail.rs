@@ -112,14 +112,10 @@ fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f32) -> Vec<
 
 // --- Luminance extraction and unsharp mask ---
 
-const LUMA_R: f32 = 0.2126;
-const LUMA_G: f32 = 0.7152;
-const LUMA_B: f32 = 0.0722;
-
 fn extract_luminance(buf: &[[f32; 3]], width: usize, height: usize) -> Vec<f32> {
     debug_assert_eq!(buf.len(), width * height);
     buf.iter()
-        .map(|px| LUMA_R * px[0] + LUMA_G * px[1] + LUMA_B * px[2])
+        .map(|px| super::LUMA_R * px[0] + super::LUMA_G * px[1] + super::LUMA_B * px[2])
         .collect()
 }
 

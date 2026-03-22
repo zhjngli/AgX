@@ -10,13 +10,13 @@ All per-pixel editing features are now implemented: exposure, contrast, highligh
 
 ## Editing — Neighborhood Operations
 
-These need access to surrounding pixels and require a multi-pass approach (separate pass over the full image buffer after per-pixel adjustments). Once we have 3+ of these, formalize into a pluggable stage-based pipeline.
+These need access to surrounding pixels and require a multi-pass approach (separate pass over the full image buffer after per-pixel adjustments). The detail pass (sharpening, clarity, texture) is now implemented with a two-phase render architecture. Once we have 3+ of these, formalize into a pluggable stage-based pipeline.
 
-Some of these (sharpening, film grain) are preset-friendly — they apply uniformly and make sense in batch workflows. Others (local adjustments, geometric corrections) are more photo-specific and lower priority for the current preset-first direction.
+Some of these (noise reduction, film grain) are preset-friendly — they apply uniformly and make sense in batch workflows. Others (local adjustments, geometric corrections) are more photo-specific and lower priority for the current preset-first direction.
 
 | File | Summary | Notes |
 |------|---------|-------|
-| [sharpening-and-detail.md](sharpening-and-detail.md) | Sharpening, clarity, texture (convolution kernels), and noise reduction | Preset-friendly |
+| [noise-reduction.md](noise-reduction.md) | Luminance and chroma noise reduction (wavelet or bilateral filtering) | Preset-friendly |
 | [film-and-grain.md](film-and-grain.md) | Film grain simulation and film emulation database | Algorithm TBD (may be per-pixel or neighborhood) |
 | [dehaze.md](dehaze.md) | Atmospheric haze removal (local region analysis) | |
 | [local-adjustments.md](local-adjustments.md) | Brushes, gradients, and radial filters for per-region edits | Photo-specific, lower priority |

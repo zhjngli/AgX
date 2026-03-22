@@ -145,6 +145,9 @@ pub struct Parameters {
     /// Detail pass: sharpening, clarity, texture
     #[serde(default)]
     pub detail: crate::adjust::DetailParams,
+    /// Dehaze: atmospheric haze removal/addition
+    #[serde(default)]
+    pub dehaze: crate::adjust::DehazeParams,
 }
 
 impl Default for Parameters {
@@ -163,6 +166,7 @@ impl Default for Parameters {
             color_grading: crate::adjust::ColorGradingParams::default(),
             tone_curve: crate::adjust::ToneCurveParams::default(),
             detail: crate::adjust::DetailParams::default(),
+            dehaze: crate::adjust::DehazeParams::default(),
         }
     }
 }
@@ -686,6 +690,35 @@ impl From<&crate::adjust::DetailParams> for PartialDetailParams {
     }
 }
 
+/// Partial dehaze parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialDehazeParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+}
+
+impl PartialDehazeParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            amount: overlay.amount.or(self.amount),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::DehazeParams {
+        crate::adjust::DehazeParams {
+            amount: self.amount.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::DehazeParams> for PartialDehazeParams {
+    fn from(d: &crate::adjust::DehazeParams) -> Self {
+        Self {
+            amount: Some(d.amount),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -718,6 +751,8 @@ pub struct PartialParameters {
     pub tone_curve: Option<PartialToneCurveParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<PartialDetailParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dehaze: Option<PartialDehazeParams>,
 }
 
 impl PartialParameters {
@@ -762,6 +797,12 @@ impl PartialParameters {
                 (None, Some(o)) => Some(o.clone()),
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
+            dehaze: match (&self.dehaze, &other.dehaze) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
         }
     }
 
@@ -801,6 +842,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|d| d.materialize())
                 .unwrap_or_default(),
+            dehaze: self
+                .dehaze
+                .as_ref()
+                .map(|d| d.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -821,6 +867,7 @@ impl From<&Parameters> for PartialParameters {
             color_grading: Some(PartialColorGradingParams::from(&params.color_grading)),
             tone_curve: Some(PartialToneCurveParams::from(&params.tone_curve)),
             detail: Some(PartialDetailParams::from(&params.detail)),
+            dehaze: Some(PartialDehazeParams::from(&params.dehaze)),
         }
     }
 }
@@ -901,6 +948,7 @@ impl Engine {
     /// Pipeline order:
     /// 1. White balance (linear space) — channel multipliers
     /// 2. Exposure (linear space) — multiply by 2^stops
+    ///    2b. Dehaze (linear space, buffer-level, when active)
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
     /// 5. HSL adjustments (sRGB gamma space)
@@ -934,16 +982,16 @@ impl Engine {
         let sat_shifts = self.params.hsl.saturation_shifts();
         let lum_shifts = self.params.hsl.luminance_shifts();
         let detail_active = !self.params.detail.is_neutral();
+        let dehaze_active = !self.params.dehaze.is_neutral();
 
-        if detail_active {
-            // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.
-            let mut srgb_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
+        // When dehaze is active, build WB+exposure linear buffer and apply dehaze.
+        // This replaces steps 1-2 in the per-pixel loop for dehaze paths.
+        let dehazed_buf: Option<Vec<[f32; 3]>> = if dehaze_active {
+            let mut linear_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
             for y in 0..h {
                 for x in 0..w {
                     let p = self.original.get_pixel(x, y);
                     let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
-
-                    // 1. White balance (linear space)
                     let wb = adjust::apply_white_balance(
                         r,
                         g,
@@ -954,11 +1002,47 @@ impl Engine {
                     r = wb.0;
                     g = wb.1;
                     b = wb.2;
-
-                    // 2. Exposure (linear space)
                     (r, g, b) = adjust::apply_per_channel(r, g, b, |v| {
                         adjust::apply_exposure(v, exposure_factor)
                     });
+                    linear_buf.push([r, g, b]);
+                }
+            }
+            Some(adjust::dehaze::apply_dehaze(
+                &linear_buf,
+                w as usize,
+                h as usize,
+                &self.params.dehaze,
+            ))
+        } else {
+            None
+        };
+
+        // Helper: get linear (r, g, b) for pixel (x, y).
+        // When dehaze is active, reads from the pre-computed dehazed buffer.
+        // Otherwise, reads from original image and applies WB + exposure.
+        let get_linear = |x: u32, y: u32| -> (f32, f32, f32) {
+            if let Some(ref buf) = dehazed_buf {
+                let idx = (y * w + x) as usize;
+                (buf[idx][0], buf[idx][1], buf[idx][2])
+            } else {
+                let p = self.original.get_pixel(x, y);
+                let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
+                let wb =
+                    adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
+                r = wb.0;
+                g = wb.1;
+                b = wb.2;
+                adjust::apply_per_channel(r, g, b, |v| adjust::apply_exposure(v, exposure_factor))
+            }
+        };
+
+        if detail_active {
+            // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.
+            let mut srgb_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
+            for y in 0..h {
+                for x in 0..w {
+                    let (r, g, b) = get_linear(x, y);
 
                     // 3. Convert to sRGB gamma space
                     let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
@@ -1067,20 +1151,7 @@ impl Engine {
             })
         } else {
             Rgb32FImage::from_fn(w, h, |x, y| {
-                let p = self.original.get_pixel(x, y);
-                let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
-
-                // 1. White balance (linear space)
-                let wb =
-                    adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
-                r = wb.0;
-                g = wb.1;
-                b = wb.2;
-
-                // 2. Exposure (linear space)
-                (r, g, b) = adjust::apply_per_channel(r, g, b, |v| {
-                    adjust::apply_exposure(v, exposure_factor)
-                });
+                let (r, g, b) = get_linear(x, y);
 
                 // 3. Convert to sRGB gamma space
                 let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
@@ -1195,6 +1266,8 @@ mod tests {
         assert_eq!(p.blacks, 0.0);
         assert_eq!(p.temperature, 0.0);
         assert_eq!(p.tint, 0.0);
+        assert!(p.dehaze.is_neutral());
+        assert_eq!(p.dehaze.amount, 0.0);
     }
 
     #[test]
@@ -1999,6 +2072,57 @@ mod tests {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-5,
                 "default detail should not change output"
+            );
+        }
+    }
+
+    #[test]
+    fn partial_dehaze_merge_and_materialize() {
+        let base = PartialDehazeParams { amount: Some(30.0) };
+        let overlay = PartialDehazeParams { amount: None };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.amount, Some(30.0));
+
+        let overlay2 = PartialDehazeParams { amount: Some(50.0) };
+        let merged2 = base.merge(&overlay2);
+        assert_eq!(merged2.amount, Some(50.0));
+
+        let empty = PartialDehazeParams::default();
+        let mat = empty.materialize();
+        assert_eq!(mat.amount, 0.0);
+    }
+
+    #[test]
+    fn render_with_dehaze_changes_output() {
+        // Use a gradient image so dehaze has variation to work with
+        let mut img = Rgb32FImage::new(10, 10);
+        for y in 0..10 {
+            for x in 0..10 {
+                let t = (y * 10 + x) as f32 / 100.0;
+                img.put_pixel(x, y, Rgb([0.4 + 0.4 * t, 0.4 + 0.3 * t, 0.45 + 0.3 * t]));
+            }
+        }
+        let mut engine = Engine::new(img.clone());
+        engine.params_mut().dehaze.amount = 50.0;
+        let dehazed = engine.render();
+        let neutral = Engine::new(img).render();
+        let dp = dehazed.get_pixel(0, 0);
+        let np = neutral.get_pixel(0, 0);
+        let differs = (0..3).any(|i| (dp.0[i] - np.0[i]).abs() > 1e-4);
+        assert!(differs, "Dehaze should change output");
+    }
+
+    #[test]
+    fn render_default_dehaze_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let engine = Engine::new(img);
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "default dehaze should not change output"
             );
         }
     }
