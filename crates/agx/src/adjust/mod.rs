@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 pub mod detail;
 pub use detail::{DetailParams, SharpeningParams};
 
+pub mod dehaze;
+pub use dehaze::DehazeParams;
+
 // --- Channel helpers ---
 
 /// Apply a per-channel adjustment function to all three channels.
