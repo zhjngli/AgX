@@ -1,0 +1,13 @@
+[metadata]
+name = "Detail Boost"
+author = "agx-e2e"
+
+[detail]
+clarity = 20.0
+texture = 15.0
+
+[detail.sharpening]
+amount = 50.0
+radius = 1.5
+threshold = 60.0
+masking = 0.0
