@@ -158,11 +158,11 @@ fn box_filter_1d(data: &[f32], radius: usize) -> Vec<f32> {
         prefix[i + 1] = prefix[i] + data[i];
     }
     let mut result = vec![0.0_f32; n];
-    for i in 0..n {
-        let left = if i >= radius { i - radius } else { 0 };
+    for (i, val) in result.iter_mut().enumerate() {
+        let left = i.saturating_sub(radius);
         let right = (i + radius).min(n - 1);
         let count = (right - left + 1) as f32;
-        result[i] = (prefix[right + 1] - prefix[left]) / count;
+        *val = (prefix[right + 1] - prefix[left]) / count;
     }
     result
 }

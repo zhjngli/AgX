@@ -948,7 +948,7 @@ impl Engine {
     /// Pipeline order:
     /// 1. White balance (linear space) — channel multipliers
     /// 2. Exposure (linear space) — multiply by 2^stops
-    /// 2b. Dehaze (linear space, buffer-level, when active)
+    ///    2b. Dehaze (linear space, buffer-level, when active)
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
     /// 5. HSL adjustments (sRGB gamma space)
