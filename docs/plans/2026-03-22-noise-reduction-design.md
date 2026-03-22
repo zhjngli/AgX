@@ -23,8 +23,11 @@ Sensor noise degrades image quality, especially in high-ISO and low-light photos
 
 ```rust
 pub struct NoiseReductionParams {
+    #[serde(default)]
     pub luminance: f32,  // 0–100, strength of luma denoising
+    #[serde(default)]
     pub color: f32,      // 0–100, strength of chroma denoising
+    #[serde(default)]
     pub detail: f32,     // 0–100, finest-scale protection (higher = more detail kept)
 }
 ```
@@ -86,25 +89,29 @@ Decompose each channel (Y, Cb, Cr) independently into 5 detail levels + 1 residu
 
 **Kernel:** B3-spline `[1/16, 1/4, 3/8, 1/4, 1/16]`
 
-At each level `k`:
-1. Convolve the current approximation with the B3-spline kernel, using tap spacing of `2^k` pixels (the "à trous" gaps)
+Levels are indexed 0–4. At each level `k` (k = 0, 1, 2, 3, 4):
+1. Convolve the current approximation with the B3-spline kernel, using tap spacing of `2^k` pixels (the "à trous" gaps). At level 0, tap spacing is 1 (adjacent pixels). At level 4, tap spacing is 16.
 2. The convolution is separable: horizontal pass then vertical pass
 3. Detail at level `k` = previous approximation − current approximation
 4. The current approximation becomes the input for the next level
 
 After 5 levels, the remaining approximation is the residual (coarse structure).
 
+**Boundary handling:** Mirror (reflect) at image edges. This avoids edge artifacts and is the standard choice for wavelet denoising.
+
 **Complexity:** O(n) per level. Total: O(5n) ≈ O(n) since the kernel size is fixed (5 taps) and the image stays at full resolution throughout.
 
 ### Step 3: Noise Estimation
 
-Estimate noise standard deviation from the finest wavelet detail level (level 1) using the median absolute deviation (MAD):
+Estimate noise standard deviation from the finest wavelet detail level (level 0) using the median absolute deviation (MAD):
 
 ```
-sigma = median(|detail_level_1|) / 0.6745
+sigma = median(|detail_level_0|) / 0.6745
 ```
 
 This is computed once per channel and used to scale thresholds at all levels.
+
+**Limitation:** A single global sigma is a simplification. In linear space, sensor noise variance scales with signal level (photon shot noise), so a global estimate may underestimate noise in shadows and overestimate in highlights. Per-pixel adaptive thresholding could address this in a future enhancement.
 
 ### Step 4: Soft Thresholding
 
@@ -116,9 +123,9 @@ output = sign(x) * max(|x| - threshold, 0)
 ```
 
 Where:
-- `strength_factor` is derived from the `luminance` parameter (for Y channel) or `color` parameter (for Cb/Cr channels), scaled from 0–100 to a practical multiplier range
-- `k_level` increases with wavelet level (coarser levels get slightly higher thresholds since they contain less noise)
-- **Detail preservation:** The `detail` parameter (0–100) reduces the threshold at level 1 (finest scale). At detail=100, level 1 is untouched. At detail=0, level 1 gets full thresholding. This protects fine texture and edges.
+- `strength_factor` maps the user parameter (0–100) to a multiplier range: `param / 100.0 * 3.0`, giving a 0–3 range. For the Y channel this uses `luminance`; for Cb/Cr it uses `color`. These initial values may be tuned based on visual results.
+- `k_level` is a per-level scale factor that increases with level (coarser levels contain less noise, so they need proportionally higher thresholds to avoid over-smoothing structure). Initial schedule: `[1.0, 1.0, 1.2, 1.5, 2.0]` for levels 0–4.
+- **Detail preservation:** The `detail` parameter (0–100) reduces the threshold at level 0 (finest scale). The level-0 threshold is multiplied by `1.0 - detail / 100.0`. At detail=100, level 0 is untouched. At detail=0, level 0 gets full thresholding. This protects fine texture and edges.
 
 ### Step 5: Reconstruction
 
@@ -161,10 +168,14 @@ The existing linear buffer logic in `engine/mod.rs` generalizes:
 
 - Build WB+exposure linear buffer when `dehaze_active || nr_active`
 - If dehaze active → apply dehaze to that buffer
-- If NR active → apply noise reduction to that same buffer (in-place via `&mut`)
+- If NR active → apply noise reduction, taking `&[[f32; 3]]` and returning a new `Vec<[f32; 3]>` (same pattern as `apply_dehaze`)
 - `get_linear` reads from the buffer (no changes to the closure)
 
-The condition for building the buffer changes from `dehaze_active` to `dehaze_active || nr_active`. No new buffer allocation needed beyond the wavelet working memory.
+The condition for building the buffer changes from `dehaze_active` to `dehaze_active || nr_active`.
+
+### Memory
+
+The à trous decomposition requires storing 5 detail levels + 1 residual per channel. For a 24MP image, each single-channel buffer is ~92 MB. To limit peak memory, channels are processed sequentially (Y first, then Cb, then Cr) — only one channel's wavelet stack is in memory at a time. This requires 6 full-resolution single-channel buffers (~550 MB for 24MP) plus the 3-channel input/output buffers. The wavelet buffers are freed after reconstruction of each channel.
 
 ### Zero Overhead When Neutral
 
@@ -190,7 +201,7 @@ The condition for building the buffer changes from `dehaze_active` to `dehaze_ac
 - `crates/agx-e2e/fixtures/looks/nr_landscape.toml` — moderate NR (luminance=30, color=20, detail=50)
 - `crates/agx-e2e/fixtures/looks/nr_heavy.toml` — aggressive NR (luminance=80, color=60, detail=30)
 - Add both to `ALL_LOOKS` in `cli_pipeline.rs`
-- Generate 12 new golden files (6 images × 2 presets)
+- Generate 10 new golden files (5 color images × 2 presets; B&W image uses BW_LOOKS only)
 
 ## Testing Strategy
 
@@ -206,6 +217,7 @@ The condition for building the buffer changes from `dehaze_active` to `dehaze_ac
 - `apply_nr_color_reduces_chroma_variation` — chroma noise, verify reduction
 - `apply_nr_detail_preserves_edges` — sharp edge, verify high detail keeps edges
 - `ycbcr_roundtrip` — RGB → YCbCr → RGB is identity
+- `atrous_boundary_handling_small_image` — verify correctness on image smaller than kernel reach at coarsest level
 
 ### Engine Tests
 
@@ -221,7 +233,7 @@ The condition for building the buffer changes from `dehaze_active` to `dehaze_ac
 
 ### E2E
 
-Two presets exercised across all 6 test images (12 new golden files) via the existing `ALL_LOOKS` matrix.
+Two presets exercised across 5 color test images (10 new golden files) via the existing `ALL_LOOKS` matrix.
 
 ## Module Dependencies
 
