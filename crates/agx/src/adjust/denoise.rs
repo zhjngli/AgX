@@ -76,6 +76,91 @@ fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> Vec<[f32; 3]> {
     pixels
 }
 
+/// Number of wavelet decomposition levels.
+const NUM_LEVELS: usize = 5;
+
+/// B3-spline kernel: [1/16, 1/4, 3/8, 1/4, 1/16]
+const B3_KERNEL: [f32; 5] = [1.0 / 16.0, 4.0 / 16.0, 6.0 / 16.0, 4.0 / 16.0, 1.0 / 16.0];
+
+/// Mirror-reflect index at image boundaries.
+#[inline]
+fn mirror(i: isize, max: usize) -> usize {
+    if max <= 1 {
+        return 0;
+    }
+    let period = 2 * max - 2;
+    let pos = if i < 0 { (-i) as usize } else { i as usize };
+    let m = pos % period;
+    if m >= max {
+        period - m
+    } else {
+        m
+    }
+}
+
+/// Horizontal convolution with B3-spline kernel at given tap spacing (gap = 2^level).
+fn convolve_horizontal(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
+    let mut output = vec![0.0f32; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let mut sum = 0.0;
+            for (k, &w_k) in B3_KERNEL.iter().enumerate() {
+                let offset = (k as isize - 2) * gap as isize;
+                let xi = mirror(x as isize + offset, width);
+                sum += w_k * input[y * width + xi];
+            }
+            output[y * width + x] = sum;
+        }
+    }
+    output
+}
+
+/// Vertical convolution with B3-spline kernel at given tap spacing (gap = 2^level).
+fn convolve_vertical(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
+    let mut output = vec![0.0f32; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let mut sum = 0.0;
+            for (k, &w_k) in B3_KERNEL.iter().enumerate() {
+                let offset = (k as isize - 2) * gap as isize;
+                let yi = mirror(y as isize + offset, height);
+                sum += w_k * input[yi * width + x];
+            }
+            output[y * width + x] = sum;
+        }
+    }
+    output
+}
+
+/// À trous wavelet decomposition into NUM_LEVELS detail levels + residual.
+///
+/// At each level k (0–4), the kernel tap spacing is 2^k pixels.
+/// detail[k] = approx_prev - approx_current.
+/// The residual is the final approximation after all levels.
+fn atrous_decompose(input: &[f32], width: usize, height: usize) -> (Vec<Vec<f32>>, Vec<f32>) {
+    let n = width * height;
+    let mut details: Vec<Vec<f32>> = Vec::with_capacity(NUM_LEVELS);
+    let mut approximation = input.to_vec();
+
+    for level in 0..NUM_LEVELS {
+        let gap = 1 << level; // 1, 2, 4, 8, 16
+        let smoothed = convolve_vertical(
+            &convolve_horizontal(&approximation, width, height, gap),
+            width,
+            height,
+            gap,
+        );
+        let mut detail = vec![0.0f32; n];
+        for i in 0..n {
+            detail[i] = approximation[i] - smoothed[i];
+        }
+        details.push(detail);
+        approximation = smoothed;
+    }
+
+    (details, approximation)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,6 +194,52 @@ mod tests {
             detail: 50.0,
         };
         assert!(!p3.is_neutral());
+    }
+
+    #[test]
+    fn atrous_decompose_and_reconstruct_is_identity() {
+        let w = 16;
+        let h = 16;
+        let input: Vec<f32> = (0..w * h).map(|i| i as f32 / (w * h) as f32).collect();
+        let (details, residual) = atrous_decompose(&input, w, h);
+        assert_eq!(details.len(), NUM_LEVELS);
+        assert_eq!(residual.len(), w * h);
+        let mut reconstructed = residual;
+        for level in &details {
+            for (i, v) in level.iter().enumerate() {
+                reconstructed[i] += v;
+            }
+        }
+        for i in 0..input.len() {
+            assert!(
+                (reconstructed[i] - input[i]).abs() < 1e-5,
+                "pixel {i}: expected {}, got {}",
+                input[i],
+                reconstructed[i]
+            );
+        }
+    }
+
+    #[test]
+    fn atrous_boundary_handling_small_image() {
+        let w = 4;
+        let h = 4;
+        let input: Vec<f32> = (0..w * h).map(|i| i as f32 / 16.0).collect();
+        let (details, residual) = atrous_decompose(&input, w, h);
+        let mut reconstructed = residual;
+        for level in &details {
+            for (i, v) in level.iter().enumerate() {
+                reconstructed[i] += v;
+            }
+        }
+        for i in 0..input.len() {
+            assert!(
+                (reconstructed[i] - input[i]).abs() < 1e-5,
+                "small image pixel {i}: expected {}, got {}",
+                input[i],
+                reconstructed[i]
+            );
+        }
     }
 
     #[test]
