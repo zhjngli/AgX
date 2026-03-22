@@ -164,6 +164,31 @@ fn validate_dehaze_params(params: &PartialDehazeParams) -> Result<()> {
     Ok(())
 }
 
+fn validate_noise_reduction_params(params: &PartialNoiseReductionParams) -> Result<()> {
+    if let Some(luminance) = params.luminance {
+        if !(0.0..=100.0).contains(&luminance) {
+            return Err(AgxError::Preset(format!(
+                "noise_reduction.luminance must be 0-100, got {luminance}"
+            )));
+        }
+    }
+    if let Some(color) = params.color {
+        if !(0.0..=100.0).contains(&color) {
+            return Err(AgxError::Preset(format!(
+                "noise_reduction.color must be 0-100, got {color}"
+            )));
+        }
+    }
+    if let Some(detail) = params.detail {
+        if !(0.0..=100.0).contains(&detail) {
+            return Err(AgxError::Preset(format!(
+                "noise_reduction.detail must be 0-100, got {detail}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Build a PartialParameters from a PresetRaw.
 fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
     PartialParameters {
@@ -231,6 +256,9 @@ impl Preset {
         }
         if let Some(ref dehaze) = partial.dehaze {
             validate_dehaze_params(dehaze)?;
+        }
+        if let Some(ref nr) = partial.noise_reduction {
+            validate_noise_reduction_params(nr)?;
         }
         Ok(Self {
             metadata: raw.metadata,
@@ -305,6 +333,9 @@ impl Preset {
         }
         if let Some(ref dehaze) = this_partial.dehaze {
             validate_dehaze_params(dehaze)?;
+        }
+        if let Some(ref nr) = this_partial.noise_reduction {
+            validate_noise_reduction_params(nr)?;
         }
 
         // Resolve inheritance
@@ -1081,5 +1112,58 @@ amount = -150.0
 "#;
         let result2 = Preset::from_toml(toml_str2);
         assert!(result2.is_err());
+    }
+
+    #[test]
+    fn nr_section_roundtrip() {
+        let toml_str = r#"
+[metadata]
+name = "NR Test"
+
+[noise_reduction]
+luminance = 40.0
+color = 25.0
+detail = 50.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let params = preset.params();
+        assert!((params.noise_reduction.luminance - 40.0).abs() < 1e-6);
+        assert!((params.noise_reduction.color - 25.0).abs() < 1e-6);
+        assert!((params.noise_reduction.detail - 50.0).abs() < 1e-6);
+
+        let serialized = preset.to_toml().unwrap();
+        let roundtrip = Preset::from_toml(&serialized).unwrap();
+        assert_eq!(preset, roundtrip);
+    }
+
+    #[test]
+    fn missing_nr_section_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No NR"
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert!(preset.params().noise_reduction.is_neutral());
+    }
+
+    #[test]
+    fn nr_validation_rejects_out_of_range() {
+        let toml_str = r#"
+[noise_reduction]
+luminance = 150.0
+"#;
+        assert!(Preset::from_toml(toml_str).is_err());
+
+        let toml_str2 = r#"
+[noise_reduction]
+color = -10.0
+"#;
+        assert!(Preset::from_toml(toml_str2).is_err());
+
+        let toml_str3 = r#"
+[noise_reduction]
+detail = 101.0
+"#;
+        assert!(Preset::from_toml(toml_str3).is_err());
     }
 }
