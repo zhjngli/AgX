@@ -1,0 +1,12 @@
+[metadata]
+name = "Sharp Landscape"
+author = "agx-e2e"
+
+[detail]
+clarity = 25.0
+
+[detail.sharpening]
+amount = 60.0
+radius = 1.0
+threshold = 40.0
+masking = 30.0

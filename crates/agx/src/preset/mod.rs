@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::engine::{
-    Parameters, PartialColorGradingParams, PartialHslChannels, PartialParameters, PartialToneCurve,
-    PartialToneCurveParams, PartialVignetteParams,
+    Parameters, PartialColorGradingParams, PartialDetailParams, PartialHslChannels,
+    PartialParameters, PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
 };
 use crate::error::{AgxError, Result};
 
@@ -74,6 +74,8 @@ struct PresetRaw {
     color_grading: Option<PartialColorGradingParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tone_curve: Option<PartialToneCurveParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    detail: Option<PartialDetailParams>,
 }
 
 fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
@@ -98,6 +100,54 @@ fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
     Ok(())
 }
 
+fn validate_detail_params(params: &PartialDetailParams) -> Result<()> {
+    if let Some(ref sharp) = params.sharpening {
+        if let Some(amount) = sharp.amount {
+            if !(0.0..=100.0).contains(&amount) {
+                return Err(AgxError::Preset(format!(
+                    "detail.sharpening.amount must be 0-100, got {amount}"
+                )));
+            }
+        }
+        if let Some(radius) = sharp.radius {
+            if !(0.5..=3.0).contains(&radius) {
+                return Err(AgxError::Preset(format!(
+                    "detail.sharpening.radius must be 0.5-3.0, got {radius}"
+                )));
+            }
+        }
+        if let Some(threshold) = sharp.threshold {
+            if !(0.0..=100.0).contains(&threshold) {
+                return Err(AgxError::Preset(format!(
+                    "detail.sharpening.threshold must be 0-100, got {threshold}"
+                )));
+            }
+        }
+        if let Some(masking) = sharp.masking {
+            if !(0.0..=100.0).contains(&masking) {
+                return Err(AgxError::Preset(format!(
+                    "detail.sharpening.masking must be 0-100, got {masking}"
+                )));
+            }
+        }
+    }
+    if let Some(clarity) = params.clarity {
+        if !(-100.0..=100.0).contains(&clarity) {
+            return Err(AgxError::Preset(format!(
+                "detail.clarity must be -100 to 100, got {clarity}"
+            )));
+        }
+    }
+    if let Some(texture) = params.texture {
+        if !(-100.0..=100.0).contains(&texture) {
+            return Err(AgxError::Preset(format!(
+                "detail.texture must be -100 to 100, got {texture}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Build a PartialParameters from a PresetRaw.
 fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
     PartialParameters {
@@ -113,6 +163,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         vignette: raw.vignette.clone(),
         color_grading: raw.color_grading.clone(),
         tone_curve: raw.tone_curve.clone(),
+        detail: raw.detail.clone(),
     }
 }
 
@@ -157,6 +208,9 @@ impl Preset {
         if let Some(ref tc) = partial.tone_curve {
             validate_tone_curve_params(tc)?;
         }
+        if let Some(ref detail) = partial.detail {
+            validate_detail_params(detail)?;
+        }
         Ok(Self {
             metadata: raw.metadata,
             partial_params: partial,
@@ -187,6 +241,7 @@ impl Preset {
             vignette: self.partial_params.vignette.clone(),
             color_grading: self.partial_params.color_grading.clone(),
             tone_curve: self.partial_params.tone_curve.clone(),
+            detail: self.partial_params.detail.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
@@ -222,6 +277,9 @@ impl Preset {
 
         let base_dir = path.parent().unwrap_or(std::path::Path::new("."));
         let this_partial = build_partial_params(&raw);
+        if let Some(ref detail) = this_partial.detail {
+            validate_detail_params(detail)?;
+        }
 
         // Resolve inheritance
         let (merged_partial, base_lut) = if let Some(extends_path) = &raw.metadata.extends {
@@ -892,5 +950,65 @@ points = [[0.0, 0.0], [0.8, 0.5], [0.3, 0.7], [1.0, 1.0]]
 "#;
         let result = Preset::from_toml(toml_str);
         assert!(result.is_err(), "non-increasing x should be rejected");
+    }
+
+    #[test]
+    fn detail_section_roundtrip() {
+        use crate::engine::{PartialDetailParams, PartialSharpeningParams};
+        let mut preset = Preset::default();
+        preset.partial_params.detail = Some(PartialDetailParams {
+            sharpening: Some(PartialSharpeningParams {
+                amount: Some(40.0),
+                radius: Some(1.5),
+                threshold: Some(30.0),
+                masking: Some(50.0),
+            }),
+            clarity: Some(25.0),
+            texture: Some(-10.0),
+        });
+        let toml_str = preset.to_toml().unwrap();
+        let parsed = Preset::from_toml(&toml_str).unwrap();
+        assert_eq!(preset, parsed);
+    }
+
+    #[test]
+    fn missing_detail_section_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No Detail"
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        assert!(preset.params().detail.is_neutral());
+    }
+
+    #[test]
+    fn detail_sharpening_subtable_parses() {
+        let toml_str = r#"
+[metadata]
+name = "Sharp"
+
+[detail]
+clarity = 30.0
+
+[detail.sharpening]
+amount = 60.0
+radius = 2.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let p = preset.params();
+        assert_eq!(p.detail.clarity, 30.0);
+        assert_eq!(p.detail.sharpening.amount, 60.0);
+        assert_eq!(p.detail.sharpening.radius, 2.0);
+        assert_eq!(p.detail.sharpening.threshold, 25.0); // default
+    }
+
+    #[test]
+    fn detail_validation_rejects_out_of_range() {
+        let toml_str = r#"
+[detail.sharpening]
+amount = 150.0
+"#;
+        let result = Preset::from_toml(toml_str);
+        assert!(result.is_err(), "amount > 100 should be rejected");
     }
 }

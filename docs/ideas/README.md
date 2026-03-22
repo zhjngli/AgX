@@ -6,12 +6,7 @@ Ideas are roughly ordered by alignment with the project philosophy: preset-first
 
 ## Editing — Per-Pixel Features
 
-These operate on each pixel independently, fit into the current single-pass engine with no architecture changes, and translate directly to preset parameters. High priority — they make presets more powerful.
-
-| File | Summary |
-|------|---------|
-| [tone-curves.md](tone-curves.md) | Parametric and point curves for precise tonal control |
-| [color-grading.md](color-grading.md) | 3-way color wheels for shadow/midtone/highlight grading |
+All per-pixel editing features are now implemented: exposure, contrast, highlights, shadows, whites, blacks, white balance, HSL adjustments, vignette, color grading, and tone curves. No remaining ideas in this category.
 
 ## Editing — Neighborhood Operations
 

@@ -23,6 +23,9 @@ const ALL_LOOKS: &[&str] = &[
     "s_curve_contrast",
     "faded_film",
     "cross_process",
+    "sharp_landscape",
+    "soft_portrait",
+    "detail_boost",
 ];
 
 // --- Helpers ---
