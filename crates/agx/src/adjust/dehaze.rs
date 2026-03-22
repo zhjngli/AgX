@@ -143,6 +143,95 @@ fn estimate_airlight(buf: &[[f32; 3]], dark_ch: &[f32]) -> [f32; 3] {
     buf[best_idx]
 }
 
+const GUIDED_FILTER_RADIUS: usize = 40;
+const GUIDED_FILTER_EPSILON: f32 = 0.001;
+
+/// O(n) box filter using running sums.
+/// Computes the mean of each window of size (2*radius+1) centered at each position.
+fn box_filter_1d(data: &[f32], radius: usize) -> Vec<f32> {
+    let n = data.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut prefix = vec![0.0_f32; n + 1];
+    for i in 0..n {
+        prefix[i + 1] = prefix[i] + data[i];
+    }
+    let mut result = vec![0.0_f32; n];
+    for i in 0..n {
+        let left = if i >= radius { i - radius } else { 0 };
+        let right = (i + radius).min(n - 1);
+        let count = (right - left + 1) as f32;
+        result[i] = (prefix[right + 1] - prefix[left]) / count;
+    }
+    result
+}
+
+/// 2D box filter (separable: horizontal then vertical).
+fn box_filter_2d(data: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
+    let n = width * height;
+    // Horizontal pass
+    let mut h_filtered = vec![0.0_f32; n];
+    for y in 0..height {
+        let row_start = y * width;
+        let row = &data[row_start..row_start + width];
+        let filtered = box_filter_1d(row, radius);
+        h_filtered[row_start..row_start + width].copy_from_slice(&filtered);
+    }
+    // Vertical pass
+    let mut result = vec![0.0_f32; n];
+    let mut col = vec![0.0_f32; height];
+    for x in 0..width {
+        for y in 0..height {
+            col[y] = h_filtered[y * width + x];
+        }
+        let filtered = box_filter_1d(&col, radius);
+        for y in 0..height {
+            result[y * width + x] = filtered[y];
+        }
+    }
+    result
+}
+
+/// Guided filter: edge-aware smoothing of `input` using `guide` as reference.
+///
+/// Implements He et al. 2010. Guide is grayscale (single channel), input is the
+/// raw transmission map. Uses box filters for O(n) complexity.
+fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> Vec<f32> {
+    let r = GUIDED_FILTER_RADIUS;
+    let eps = GUIDED_FILTER_EPSILON;
+    let n = width * height;
+
+    let mean_g = box_filter_2d(guide, width, height, r);
+    let mean_p = box_filter_2d(input, width, height, r);
+
+    let mut gp = vec![0.0_f32; n];
+    let mut gg = vec![0.0_f32; n];
+    for i in 0..n {
+        gp[i] = guide[i] * input[i];
+        gg[i] = guide[i] * guide[i];
+    }
+    let mean_gp = box_filter_2d(&gp, width, height, r);
+    let mean_gg = box_filter_2d(&gg, width, height, r);
+
+    let mut a = vec![0.0_f32; n];
+    let mut b = vec![0.0_f32; n];
+    for i in 0..n {
+        let cov_gp = mean_gp[i] - mean_g[i] * mean_p[i];
+        let var_g = mean_gg[i] - mean_g[i] * mean_g[i];
+        a[i] = cov_gp / (var_g + eps);
+        b[i] = mean_p[i] - a[i] * mean_g[i];
+    }
+
+    let mean_a = box_filter_2d(&a, width, height, r);
+    let mean_b = box_filter_2d(&b, width, height, r);
+    let mut result = vec![0.0_f32; n];
+    for i in 0..n {
+        result[i] = mean_a[i] * guide[i] + mean_b[i];
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +289,34 @@ mod tests {
         let dc = dark_channel(&buf, 4, 4);
         let a = estimate_airlight(&buf, &dc);
         assert!(a[0] > 0.5, "Expected bright airlight R, got {}", a[0]);
+    }
+
+    #[test]
+    fn guided_filter_uniform_input_is_identity() {
+        let guide = vec![0.5_f32; 9];
+        let input = vec![0.7_f32; 9];
+        let result = guided_filter(&guide, &input, 3, 3);
+        for &v in &result {
+            assert!((v - 0.7).abs() < 1e-4, "Expected ~0.7, got {v}");
+        }
+    }
+
+    #[test]
+    fn guided_filter_preserves_step_edge() {
+        let width = 20;
+        let height = 1;
+        let mut guide = vec![0.0_f32; width];
+        let mut input = vec![0.0_f32; width];
+        for i in width / 2..width {
+            guide[i] = 1.0;
+            input[i] = 1.0;
+        }
+        let result = guided_filter(&guide, &input, width, height);
+        assert!(result[0] < 0.3, "Left should be dark, got {}", result[0]);
+        assert!(
+            result[width - 1] > 0.7,
+            "Right should be bright, got {}",
+            result[width - 1]
+        );
     }
 }
