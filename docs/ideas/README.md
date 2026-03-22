@@ -10,7 +10,7 @@ All per-pixel editing features are now implemented: exposure, contrast, highligh
 
 ## Editing — Neighborhood Operations
 
-These need access to surrounding pixels and require a multi-pass approach (separate pass over the full image buffer after per-pixel adjustments). The detail pass (sharpening, clarity, texture) is now implemented with a two-phase render architecture. Once we have 3+ of these, formalize into a pluggable stage-based pipeline.
+These need access to surrounding pixels and require a multi-pass approach (separate pass over the full image buffer after per-pixel adjustments). The detail pass (sharpening, clarity, texture) and dehaze (Dark Channel Prior) are now implemented with buffer-level render architecture. Once we have 3+ of these, formalize into a pluggable stage-based pipeline.
 
 Some of these (noise reduction, film grain) are preset-friendly — they apply uniformly and make sense in batch workflows. Others (local adjustments, geometric corrections) are more photo-specific and lower priority for the current preset-first direction.
 
@@ -18,7 +18,6 @@ Some of these (noise reduction, film grain) are preset-friendly — they apply u
 |------|---------|-------|
 | [noise-reduction.md](noise-reduction.md) | Luminance and chroma noise reduction (wavelet or bilateral filtering) | Preset-friendly |
 | [film-and-grain.md](film-and-grain.md) | Film grain simulation and film emulation database | Algorithm TBD (may be per-pixel or neighborhood) |
-| [dehaze.md](dehaze.md) | Atmospheric haze removal (local region analysis) | |
 | [local-adjustments.md](local-adjustments.md) | Brushes, gradients, and radial filters for per-region edits | Photo-specific, lower priority |
 | [geometric-corrections.md](geometric-corrections.md) | Lens corrections, perspective, crop and rotation | Photo-specific, lower priority |
 
