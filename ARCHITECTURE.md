@@ -122,6 +122,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-18 | [Vignette Design](docs/plans/2026-03-18-vignette-design.md)                                      |
 | 2026-03-18 | [Color Grading Design](docs/plans/2026-03-18-color-grading-design.md)                            |
 | 2026-03-18 | [Tone Curves Design](docs/plans/2026-03-18-tone-curves-design.md)                                |
+| 2026-03-21 | [Detail Pass Design](docs/plans/2026-03-21-detail-pass-design.md)                                |
 
 ### Ideas
 
