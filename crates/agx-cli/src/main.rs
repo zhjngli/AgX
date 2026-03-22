@@ -401,6 +401,25 @@ struct EditArgs {
     #[arg(long = "tc-blue")]
     tc_blue: Option<String>,
 
+    /// Sharpening amount (0-100)
+    #[arg(long = "sharpen-amount", default_value_t = 0.0)]
+    sharpen_amount: f32,
+    /// Sharpening radius / sigma (0.5-3.0)
+    #[arg(long = "sharpen-radius", default_value_t = 1.0)]
+    sharpen_radius: f32,
+    /// Sharpening threshold (0-100). Higher = sharpen finer detail.
+    #[arg(long = "sharpen-threshold", default_value_t = 25.0)]
+    sharpen_threshold: f32,
+    /// Sharpening masking (0-100). Limits sharpening to textured areas.
+    #[arg(long = "sharpen-masking", default_value_t = 0.0)]
+    sharpen_masking: f32,
+    /// Clarity: local contrast at medium frequencies (-100 to +100)
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
+    clarity: f32,
+    /// Texture: local contrast at high frequencies (-100 to +100)
+    #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
+    texture: f32,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
@@ -484,7 +503,16 @@ impl EditArgs {
                 green: parse_tc(&self.tc_green),
                 blue: parse_tc(&self.tc_blue),
             },
-            detail: agx::DetailParams::default(),
+            detail: agx::DetailParams {
+                sharpening: agx::SharpeningParams {
+                    amount: self.sharpen_amount,
+                    radius: self.sharpen_radius,
+                    threshold: self.sharpen_threshold,
+                    masking: self.sharpen_masking,
+                },
+                clarity: self.clarity,
+                texture: self.texture,
+            },
         }
     }
 
