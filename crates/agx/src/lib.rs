@@ -8,16 +8,16 @@ pub mod metadata;
 pub mod preset;
 
 pub use adjust::{
-    ColorGradingParams, ColorWheel, DetailParams, SharpeningParams, ToneCurve, ToneCurveParams,
-    VignetteShape,
+    ColorGradingParams, ColorWheel, DehazeParams, DetailParams, SharpeningParams, ToneCurve,
+    ToneCurveParams, VignetteShape,
 };
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
 pub use engine::{
     Engine, HslChannel, HslChannels, Parameters, PartialColorGradingParams, PartialColorWheel,
-    PartialDetailParams, PartialHslChannel, PartialHslChannels, PartialParameters,
-    PartialSharpeningParams, PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
-    VignetteParams,
+    PartialDehazeParams, PartialDetailParams, PartialHslChannel, PartialHslChannels,
+    PartialParameters, PartialSharpeningParams, PartialToneCurve, PartialToneCurveParams,
+    PartialVignetteParams, VignetteParams,
 };
 pub use error::{AgxError, Result};
 pub use lut::Lut3D;

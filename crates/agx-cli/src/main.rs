@@ -420,6 +420,10 @@ struct EditArgs {
     #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
     texture: f32,
 
+    /// Dehaze amount (-100 to +100). Positive removes haze, negative adds haze.
+    #[arg(long = "dehaze-amount", default_value_t = 0.0, allow_hyphen_values = true)]
+    dehaze_amount: f32,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
@@ -512,6 +516,9 @@ impl EditArgs {
                 },
                 clarity: self.clarity,
                 texture: self.texture,
+            },
+            dehaze: agx::DehazeParams {
+                amount: self.dehaze_amount,
             },
         }
     }
