@@ -29,6 +29,7 @@ Some of these (film grain) are preset-friendly — they apply uniformly and make
 | [multi-preset-cli.md](multi-preset-cli.md) | Decode once, apply N presets per CLI invocation (cuts e2e test time) |
 | [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness (build after 3+ neighborhood ops) |
 | [algorithm-documentation.md](algorithm-documentation.md) | Human-readable docs explaining each algorithm's math, paper references, and constant choices |
+| [parallel-ci-e2e.md](parallel-ci-e2e.md) | Parallelize e2e tests in GitHub Actions via matrix strategy to reduce CI wall-clock time |
 
 ## Color & Ecosystem
 
