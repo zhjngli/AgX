@@ -28,6 +28,8 @@ const ALL_LOOKS: &[&str] = &[
     "detail_boost",
     "dehaze_landscape",
     "haze_effect",
+    "nr_landscape",
+    "nr_heavy",
 ];
 
 // --- Helpers ---

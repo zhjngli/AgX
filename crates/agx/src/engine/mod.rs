@@ -148,6 +148,9 @@ pub struct Parameters {
     /// Dehaze: atmospheric haze removal/addition
     #[serde(default)]
     pub dehaze: crate::adjust::DehazeParams,
+    /// Noise reduction: luminance, color, and detail preservation
+    #[serde(default)]
+    pub noise_reduction: crate::adjust::NoiseReductionParams,
 }
 
 impl Default for Parameters {
@@ -167,6 +170,7 @@ impl Default for Parameters {
             tone_curve: crate::adjust::ToneCurveParams::default(),
             detail: crate::adjust::DetailParams::default(),
             dehaze: crate::adjust::DehazeParams::default(),
+            noise_reduction: crate::adjust::NoiseReductionParams::default(),
         }
     }
 }
@@ -719,6 +723,45 @@ impl From<&crate::adjust::DehazeParams> for PartialDehazeParams {
     }
 }
 
+/// Partial noise reduction parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialNoiseReductionParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub luminance: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<f32>,
+}
+
+impl PartialNoiseReductionParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            luminance: overlay.luminance.or(self.luminance),
+            color: overlay.color.or(self.color),
+            detail: overlay.detail.or(self.detail),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::NoiseReductionParams {
+        crate::adjust::NoiseReductionParams {
+            luminance: self.luminance.unwrap_or(0.0),
+            color: self.color.unwrap_or(0.0),
+            detail: self.detail.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::NoiseReductionParams> for PartialNoiseReductionParams {
+    fn from(p: &crate::adjust::NoiseReductionParams) -> Self {
+        Self {
+            luminance: Some(p.luminance),
+            color: Some(p.color),
+            detail: Some(p.detail),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -753,6 +796,8 @@ pub struct PartialParameters {
     pub detail: Option<PartialDetailParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dehaze: Option<PartialDehazeParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub noise_reduction: Option<PartialNoiseReductionParams>,
 }
 
 impl PartialParameters {
@@ -803,6 +848,12 @@ impl PartialParameters {
                 (None, Some(o)) => Some(o.clone()),
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
+            noise_reduction: match (&self.noise_reduction, &other.noise_reduction) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
         }
     }
 
@@ -847,6 +898,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|d| d.materialize())
                 .unwrap_or_default(),
+            noise_reduction: self
+                .noise_reduction
+                .as_ref()
+                .map(|nr| nr.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -868,6 +924,7 @@ impl From<&Parameters> for PartialParameters {
             tone_curve: Some(PartialToneCurveParams::from(&params.tone_curve)),
             detail: Some(PartialDetailParams::from(&params.detail)),
             dehaze: Some(PartialDehazeParams::from(&params.dehaze)),
+            noise_reduction: Some(PartialNoiseReductionParams::from(&params.noise_reduction)),
         }
     }
 }
@@ -983,10 +1040,10 @@ impl Engine {
         let lum_shifts = self.params.hsl.luminance_shifts();
         let detail_active = !self.params.detail.is_neutral();
         let dehaze_active = !self.params.dehaze.is_neutral();
+        let nr_active = !self.params.noise_reduction.is_neutral();
 
-        // When dehaze is active, build WB+exposure linear buffer and apply dehaze.
-        // This replaces steps 1-2 in the per-pixel loop for dehaze paths.
-        let dehazed_buf: Option<Vec<[f32; 3]>> = if dehaze_active {
+        // When dehaze or NR is active, build WB+exposure linear buffer for buffer-level passes.
+        let linear_processed_buf: Option<Vec<[f32; 3]>> = if dehaze_active || nr_active {
             let mut linear_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
             for y in 0..h {
                 for x in 0..w {
@@ -1008,21 +1065,34 @@ impl Engine {
                     linear_buf.push([r, g, b]);
                 }
             }
-            Some(adjust::dehaze::apply_dehaze(
-                &linear_buf,
-                w as usize,
-                h as usize,
-                &self.params.dehaze,
-            ))
+            // Apply dehaze if active
+            if dehaze_active {
+                linear_buf = adjust::dehaze::apply_dehaze(
+                    &linear_buf,
+                    w as usize,
+                    h as usize,
+                    &self.params.dehaze,
+                );
+            }
+            // Apply noise reduction if active
+            if nr_active {
+                linear_buf = adjust::denoise::apply_noise_reduction(
+                    &linear_buf,
+                    w as usize,
+                    h as usize,
+                    &self.params.noise_reduction,
+                );
+            }
+            Some(linear_buf)
         } else {
             None
         };
 
         // Helper: get linear (r, g, b) for pixel (x, y).
-        // When dehaze is active, reads from the pre-computed dehazed buffer.
+        // When buffer-level passes are active, reads from the pre-computed buffer.
         // Otherwise, reads from original image and applies WB + exposure.
         let get_linear = |x: u32, y: u32| -> (f32, f32, f32) {
-            if let Some(ref buf) = dehazed_buf {
+            if let Some(ref buf) = linear_processed_buf {
                 let idx = (y * w + x) as usize;
                 (buf[idx][0], buf[idx][1], buf[idx][2])
             } else {
@@ -2123,6 +2193,71 @@ mod tests {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-5,
                 "default dehaze should not change output"
+            );
+        }
+    }
+
+    #[test]
+    fn partial_nr_merge_and_materialize() {
+        let base = PartialNoiseReductionParams {
+            luminance: Some(30.0),
+            color: Some(20.0),
+            detail: None,
+        };
+        let overlay = PartialNoiseReductionParams {
+            luminance: None,
+            color: Some(40.0),
+            detail: Some(50.0),
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.luminance, Some(30.0));
+        assert_eq!(merged.color, Some(40.0));
+        assert_eq!(merged.detail, Some(50.0));
+
+        let mat = merged.materialize();
+        assert!((mat.luminance - 30.0).abs() < 1e-6);
+        assert!((mat.color - 40.0).abs() < 1e-6);
+        assert!((mat.detail - 50.0).abs() < 1e-6);
+
+        let empty = PartialNoiseReductionParams::default();
+        let mat_empty = empty.materialize();
+        assert!(mat_empty.is_neutral());
+    }
+
+    #[test]
+    fn render_with_nr_changes_output() {
+        let mut img = Rgb32FImage::new(32, 32);
+        let mut rng: u64 = 42;
+        for y in 0..32 {
+            for x in 0..32 {
+                let base = (y * 32 + x) as f32 / 1024.0 * 0.5 + 0.25;
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let noise = ((rng >> 33) as f32 / (1u64 << 31) as f32 - 0.5) * 0.1;
+                let v = (base + noise).clamp(0.0, 1.0);
+                img.put_pixel(x, y, Rgb([v, v, v]));
+            }
+        }
+        let mut engine = Engine::new(img.clone());
+        engine.params_mut().noise_reduction.luminance = 50.0;
+        let denoised = engine.render();
+        let neutral = Engine::new(img).render();
+        let dp = denoised.get_pixel(0, 0);
+        let np = neutral.get_pixel(0, 0);
+        let differs = (0..3).any(|i| (dp.0[i] - np.0[i]).abs() > 1e-4);
+        assert!(differs, "Noise reduction should change output");
+    }
+
+    #[test]
+    fn render_default_nr_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let engine = Engine::new(img);
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "default NR should not change output"
             );
         }
     }

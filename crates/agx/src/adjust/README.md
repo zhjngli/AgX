@@ -26,6 +26,10 @@ All tone functions operate on a single channel and return a clamped `f32`.
 - `VignetteShape` -- enum: `Elliptical` (default, aspect-matched) or `Circular` (image-circle)
 - `apply_vignette(r, g, b, amount, shape, x, y, w, h)` -- position-dependent edge darkening/brightening using power-curve falloff (sRGB gamma space)
 
+### Noise Reduction
+- `NoiseReductionParams` -- luminance (0-100), color (0-100), detail (0-100) noise reduction parameters
+- `apply_noise_reduction(pixels, width, height, params)` -- à trous wavelet denoising in YCbCr space (linear buffer-level pass)
+
 ## Extension Guide
 1. Add a new `pub fn apply_foo(value: f32, amount: f32) -> f32` here.
 2. Add a `foo` field to `Parameters` in `engine/mod.rs`.

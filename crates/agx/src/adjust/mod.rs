@@ -7,6 +7,9 @@ pub use detail::{DetailParams, SharpeningParams};
 pub mod dehaze;
 pub use dehaze::DehazeParams;
 
+pub mod denoise;
+pub use denoise::NoiseReductionParams;
+
 // --- Luminance coefficients (Rec. 709) ---
 
 pub(crate) const LUMA_R: f32 = 0.2126;

@@ -428,6 +428,16 @@ struct EditArgs {
     )]
     dehaze_amount: f32,
 
+    /// Noise reduction: luminance strength (0-100)
+    #[arg(long = "nr-luminance", default_value_t = 0.0)]
+    nr_luminance: f32,
+    /// Noise reduction: color strength (0-100)
+    #[arg(long = "nr-color", default_value_t = 0.0)]
+    nr_color: f32,
+    /// Noise reduction: detail preservation (0-100)
+    #[arg(long = "nr-detail", default_value_t = 0.0)]
+    nr_detail: f32,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
@@ -523,6 +533,11 @@ impl EditArgs {
             },
             dehaze: agx::DehazeParams {
                 amount: self.dehaze_amount,
+            },
+            noise_reduction: agx::NoiseReductionParams {
+                luminance: self.nr_luminance,
+                color: self.nr_color,
+                detail: self.nr_detail,
             },
         }
     }
