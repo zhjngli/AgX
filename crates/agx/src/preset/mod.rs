@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::{
     Parameters, PartialColorGradingParams, PartialDehazeParams, PartialDetailParams,
-    PartialHslChannels, PartialNoiseReductionParams, PartialParameters, PartialToneCurve,
-    PartialToneCurveParams, PartialVignetteParams,
+    PartialGrainParams, PartialHslChannels, PartialNoiseReductionParams, PartialParameters,
+    PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
 };
 use crate::error::{AgxError, Result};
 
@@ -81,6 +81,8 @@ struct PresetRaw {
     dehaze: Option<PartialDehazeParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     noise_reduction: Option<PartialNoiseReductionParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    grain: Option<PartialGrainParams>,
 }
 
 fn validate_tone_curve_params(params: &PartialToneCurveParams) -> Result<()> {
@@ -189,6 +191,31 @@ fn validate_noise_reduction_params(params: &PartialNoiseReductionParams) -> Resu
     Ok(())
 }
 
+fn validate_grain_params(params: &PartialGrainParams) -> Result<()> {
+    if let Some(amount) = params.amount {
+        if !(0.0..=100.0).contains(&amount) {
+            return Err(AgxError::Preset(format!(
+                "grain amount must be 0-100, got {amount}"
+            )));
+        }
+    }
+    if let Some(size) = params.size {
+        if !(0.0..=100.0).contains(&size) {
+            return Err(AgxError::Preset(format!(
+                "grain size must be 0-100, got {size}"
+            )));
+        }
+    }
+    if let Some(chromatic) = params.chromatic {
+        if !(0.0..=100.0).contains(&chromatic) {
+            return Err(AgxError::Preset(format!(
+                "grain chromatic must be 0-100, got {chromatic}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Build a PartialParameters from a PresetRaw.
 fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
     PartialParameters {
@@ -207,6 +234,7 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
         detail: raw.detail.clone(),
         dehaze: raw.dehaze.clone(),
         noise_reduction: raw.noise_reduction.clone(),
+        grain: raw.grain.clone(),
     }
 }
 
@@ -260,6 +288,9 @@ impl Preset {
         if let Some(ref nr) = partial.noise_reduction {
             validate_noise_reduction_params(nr)?;
         }
+        if let Some(ref g) = partial.grain {
+            validate_grain_params(g)?;
+        }
         Ok(Self {
             metadata: raw.metadata,
             partial_params: partial,
@@ -293,6 +324,7 @@ impl Preset {
             detail: self.partial_params.detail.clone(),
             dehaze: self.partial_params.dehaze.clone(),
             noise_reduction: self.partial_params.noise_reduction.clone(),
+            grain: self.partial_params.grain.clone(),
         };
         toml::to_string_pretty(&raw).map_err(|e| AgxError::Preset(e.to_string()))
     }
@@ -336,6 +368,9 @@ impl Preset {
         }
         if let Some(ref nr) = this_partial.noise_reduction {
             validate_noise_reduction_params(nr)?;
+        }
+        if let Some(ref g) = this_partial.grain {
+            validate_grain_params(g)?;
         }
 
         // Resolve inheritance
@@ -1165,5 +1200,57 @@ color = -10.0
 detail = 101.0
 "#;
         assert!(Preset::from_toml(toml_str3).is_err());
+    }
+
+    #[test]
+    fn grain_section_roundtrip() {
+        let toml_str = r#"
+[metadata]
+name = "Grain Test"
+version = "1.0"
+
+[grain]
+type = "harsh"
+amount = 60.0
+size = 70.0
+chromatic = 30.0
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let params = preset.params();
+        assert_eq!(params.grain.grain_type, crate::adjust::GrainType::Harsh);
+        assert_eq!(params.grain.amount, 60.0);
+        assert_eq!(params.grain.size, 70.0);
+        assert_eq!(params.grain.chromatic, 30.0);
+
+        let round_tripped = preset.to_toml().unwrap();
+        let preset2 = Preset::from_toml(&round_tripped).unwrap();
+        let params2 = preset2.params();
+        assert_eq!(params.grain, params2.grain);
+    }
+
+    #[test]
+    fn missing_grain_section_defaults_to_neutral() {
+        let toml_str = r#"
+[metadata]
+name = "No Grain"
+version = "1.0"
+"#;
+        let preset = Preset::from_toml(toml_str).unwrap();
+        let params = preset.params();
+        assert!(params.grain.is_neutral());
+    }
+
+    #[test]
+    fn grain_validation_rejects_out_of_range() {
+        let toml_str = r#"
+[metadata]
+name = "Bad Grain"
+version = "1.0"
+
+[grain]
+amount = 150.0
+"#;
+        let result = Preset::from_toml(toml_str);
+        assert!(result.is_err());
     }
 }

@@ -151,6 +151,9 @@ pub struct Parameters {
     /// Noise reduction: luminance, color, and detail preservation
     #[serde(default)]
     pub noise_reduction: crate::adjust::NoiseReductionParams,
+    /// Film grain simulation
+    #[serde(default)]
+    pub grain: crate::adjust::GrainParams,
 }
 
 impl Default for Parameters {
@@ -171,6 +174,7 @@ impl Default for Parameters {
             detail: crate::adjust::DetailParams::default(),
             dehaze: crate::adjust::DehazeParams::default(),
             noise_reduction: crate::adjust::NoiseReductionParams::default(),
+            grain: crate::adjust::GrainParams::default(),
         }
     }
 }
@@ -762,6 +766,50 @@ impl From<&crate::adjust::NoiseReductionParams> for PartialNoiseReductionParams 
     }
 }
 
+/// Partial grain parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialGrainParams {
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "type")]
+    pub grain_type: Option<crate::adjust::GrainType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chromatic: Option<f32>,
+}
+
+impl PartialGrainParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            grain_type: overlay.grain_type.or(self.grain_type),
+            amount: overlay.amount.or(self.amount),
+            size: overlay.size.or(self.size),
+            chromatic: overlay.chromatic.or(self.chromatic),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::GrainParams {
+        crate::adjust::GrainParams {
+            grain_type: self.grain_type.unwrap_or_default(),
+            amount: self.amount.unwrap_or(0.0),
+            size: self.size.unwrap_or(50.0),
+            chromatic: self.chromatic.unwrap_or(0.0),
+        }
+    }
+}
+
+impl From<&crate::adjust::GrainParams> for PartialGrainParams {
+    fn from(p: &crate::adjust::GrainParams) -> Self {
+        Self {
+            grain_type: Some(p.grain_type),
+            amount: Some(p.amount),
+            size: Some(p.size),
+            chromatic: Some(p.chromatic),
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -798,6 +846,8 @@ pub struct PartialParameters {
     pub dehaze: Option<PartialDehazeParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noise_reduction: Option<PartialNoiseReductionParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grain: Option<PartialGrainParams>,
 }
 
 impl PartialParameters {
@@ -854,6 +904,12 @@ impl PartialParameters {
                 (None, Some(o)) => Some(o.clone()),
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
+            grain: match (&self.grain, &other.grain) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
         }
     }
 
@@ -903,6 +959,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|nr| nr.materialize())
                 .unwrap_or_default(),
+            grain: self
+                .grain
+                .as_ref()
+                .map(|g| g.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -925,6 +986,7 @@ impl From<&Parameters> for PartialParameters {
             detail: Some(PartialDetailParams::from(&params.detail)),
             dehaze: Some(PartialDehazeParams::from(&params.dehaze)),
             noise_reduction: Some(PartialNoiseReductionParams::from(&params.noise_reduction)),
+            grain: Some(PartialGrainParams::from(&params.grain)),
         }
     }
 }
@@ -2258,6 +2320,43 @@ mod tests {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-5,
                 "default NR should not change output"
+            );
+        }
+    }
+
+    #[test]
+    fn partial_grain_merge_and_materialize() {
+        let base = PartialGrainParams {
+            grain_type: Some(crate::adjust::GrainType::Silver),
+            amount: Some(30.0),
+            size: None,
+            chromatic: None,
+        };
+        let overlay = PartialGrainParams {
+            grain_type: None,
+            amount: None,
+            size: Some(60.0),
+            chromatic: Some(25.0),
+        };
+        let merged = base.merge(&overlay);
+        let concrete = merged.materialize();
+        assert_eq!(concrete.grain_type, crate::adjust::GrainType::Silver);
+        assert_eq!(concrete.amount, 30.0);
+        assert_eq!(concrete.size, 60.0);
+        assert_eq!(concrete.chromatic, 25.0);
+    }
+
+    #[test]
+    fn render_default_grain_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let engine = Engine::new(img);
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "default grain should be identity"
             );
         }
     }
