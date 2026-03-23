@@ -138,6 +138,87 @@ fn simplex_noise_2d(x: f32, y: f32, perm: &[u8; 512]) -> f32 {
     70.0 * n
 }
 
+/// Internal configuration for each grain type.
+#[derive(Debug, Clone, Copy)]
+struct GrainTypeConfig {
+    /// Number of octaves (2 or 3)
+    octaves: u32,
+    /// Relative weight of each octave (up to 3 entries)
+    octave_weights: [f32; 3],
+    /// Contrast multiplier applied to raw noise
+    contrast: f32,
+    /// Luminance falloff exponent — higher = stronger midtone bias
+    luma_falloff: f32,
+}
+
+impl GrainTypeConfig {
+    fn from_type(grain_type: GrainType) -> Self {
+        match grain_type {
+            GrainType::Fine => Self {
+                octaves: 2,
+                octave_weights: [0.3, 0.7, 0.0],
+                contrast: 0.6,
+                luma_falloff: 3.0,
+            },
+            GrainType::Silver => Self {
+                octaves: 3,
+                octave_weights: [0.5, 0.35, 0.15],
+                contrast: 1.0,
+                luma_falloff: 2.0,
+            },
+            GrainType::Soft => Self {
+                octaves: 2,
+                octave_weights: [0.7, 0.3, 0.0],
+                contrast: 0.7,
+                luma_falloff: 3.0,
+            },
+            GrainType::Cubic => Self {
+                octaves: 3,
+                octave_weights: [0.4, 0.3, 0.3],
+                contrast: 1.3,
+                luma_falloff: 1.5,
+            },
+            GrainType::Tabular => Self {
+                octaves: 2,
+                octave_weights: [0.6, 0.4, 0.0],
+                contrast: 0.8,
+                luma_falloff: 2.0,
+            },
+            GrainType::Harsh => Self {
+                octaves: 3,
+                octave_weights: [0.3, 0.3, 0.4],
+                contrast: 1.5,
+                luma_falloff: 1.0,
+            },
+        }
+    }
+}
+
+/// Multi-octave simplex noise with size-dependent frequency scaling.
+///
+/// `size` is the user's 0–100 parameter. Lower size = higher frequency = finer grain.
+/// Returns a noise value (not yet scaled by amount or luminance weight).
+fn multi_octave_noise(
+    x: f32,
+    y: f32,
+    perm: &[u8; 512],
+    config: &GrainTypeConfig,
+    size: f32,
+) -> f32 {
+    // Map size 0–100 to frequency: size=0 → freq=0.1 (very fine), size=100 → freq=0.002 (very coarse)
+    let freq = 0.1 * (0.02f32).powf(size / 100.0);
+
+    let mut value = 0.0f32;
+    let mut freq_mult = 1.0f32;
+    for i in 0..config.octaves {
+        let weight = config.octave_weights[i as usize];
+        value += weight * simplex_noise_2d(x * freq * freq_mult, y * freq * freq_mult, perm);
+        freq_mult *= 2.0;
+    }
+
+    value * config.contrast
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,6 +294,58 @@ mod tests {
         assert!(
             same < total / 2,
             "different seeds should produce mostly different values, got {same}/{total} same"
+        );
+    }
+
+    #[test]
+    fn grain_types_produce_different_output() {
+        let types = [
+            GrainType::Fine, GrainType::Silver, GrainType::Soft,
+            GrainType::Cubic, GrainType::Tabular, GrainType::Harsh,
+        ];
+        let perm = build_permutation_table(42);
+        let mut variances = Vec::new();
+        for gt in &types {
+            let config = GrainTypeConfig::from_type(*gt);
+            let mut sum_sq = 0.0;
+            let n = 400;
+            for i in 0..20 {
+                for j in 0..20 {
+                    let v = multi_octave_noise(
+                        i as f32 * 0.1, j as f32 * 0.1, &perm, &config, 50.0,
+                    );
+                    sum_sq += v * v;
+                }
+            }
+            variances.push(sum_sq / n as f32);
+        }
+        let min = variances.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max = variances.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        assert!(
+            max > min * 1.1,
+            "grain types should produce different variances: {variances:?}"
+        );
+    }
+
+    #[test]
+    fn size_affects_frequency() {
+        let perm = build_permutation_table(42);
+        let config = GrainTypeConfig::from_type(GrainType::Silver);
+        let mut delta_small = 0.0f32;
+        for i in 0..99 {
+            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, 10.0);
+            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, 10.0);
+            delta_small += (a - b).abs();
+        }
+        let mut delta_large = 0.0f32;
+        for i in 0..99 {
+            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, 90.0);
+            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, 90.0);
+            delta_large += (a - b).abs();
+        }
+        assert!(
+            delta_small > delta_large,
+            "fine grain should vary more between adjacent pixels: small={delta_small}, large={delta_large}"
         );
     }
 }
