@@ -216,7 +216,8 @@ pub fn apply_noise_reduction(
     // Map user parameters (0–100) to multiplier range (0–3)
     let luma_strength = params.luminance / 100.0 * 3.0;
     let chroma_strength = params.color / 100.0 * 3.0;
-    let detail_factor = 1.0 - params.detail / 100.0; // 0 = full protection, 1 = no protection
+    // Inverted: detail=100 → factor=0 (level-0 threshold zeroed, preserving fine detail)
+    let detail_factor = 1.0 - params.detail / 100.0;
 
     let denoise_channel = |channel: &[f32], strength: f32, is_luma: bool| -> Vec<f32> {
         if strength == 0.0 {
