@@ -438,6 +438,19 @@ struct EditArgs {
     #[arg(long = "nr-detail", default_value_t = 0.0)]
     nr_detail: f32,
 
+    /// Grain type (fine, silver, soft, cubic, tabular, harsh)
+    #[arg(long = "grain-type", default_value = "silver")]
+    grain_type: String,
+    /// Grain amount (0-100)
+    #[arg(long = "grain-amount", default_value_t = 0.0)]
+    grain_amount: f32,
+    /// Grain size (0-100)
+    #[arg(long = "grain-size", default_value_t = 50.0)]
+    grain_size: f32,
+    /// Grain chromatic strength (0-100)
+    #[arg(long = "grain-chromatic", default_value_t = 0.0)]
+    grain_chromatic: f32,
+
     #[command(flatten)]
     hsl: HslArgs,
 }
@@ -538,6 +551,20 @@ impl EditArgs {
                 luminance: self.nr_luminance,
                 color: self.nr_color,
                 detail: self.nr_detail,
+            },
+            grain: agx::GrainParams {
+                grain_type: match self.grain_type.as_str() {
+                    "fine" => agx::GrainType::Fine,
+                    "silver" => agx::GrainType::Silver,
+                    "soft" => agx::GrainType::Soft,
+                    "cubic" => agx::GrainType::Cubic,
+                    "tabular" => agx::GrainType::Tabular,
+                    "harsh" => agx::GrainType::Harsh,
+                    _ => agx::GrainType::Silver,
+                },
+                amount: self.grain_amount,
+                size: self.grain_size,
+                chromatic: self.grain_chromatic,
             },
         }
     }
