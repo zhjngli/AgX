@@ -24,6 +24,7 @@ pub enum GrainType {
 /// - `amount`: 0–100, intensity of grain effect (0 = no grain)
 /// - `size`: 0–100, fine to coarse grain (default: 50)
 /// - `chromatic`: 0–100, strength of per-channel color variation (0 = luminance-only)
+/// - `seed`: optional fixed seed for deterministic grain (None = random each render)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrainParams {
     #[serde(default)]
@@ -34,6 +35,10 @@ pub struct GrainParams {
     pub size: f32,
     #[serde(default)]
     pub chromatic: f32,
+    /// Optional fixed seed for deterministic grain. When None, the engine
+    /// generates a random seed each render. Set in e2e test presets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
 }
 
 fn default_size() -> f32 {
@@ -47,6 +52,7 @@ impl Default for GrainParams {
             amount: 0.0,
             size: 50.0,
             chromatic: 0.0,
+            seed: None,
         }
     }
 }
@@ -455,6 +461,7 @@ mod tests {
             amount: 50.0,
             size: 50.0,
             chromatic: 0.0,
+            seed: None,
         };
         let pre = GrainPrecomputed::new(&params, 42, 100, 100);
         let (r, g, b) = apply_grain_pixel(0.5, 0.5, 0.5, 10, 10, &pre);
@@ -471,6 +478,7 @@ mod tests {
             amount: 50.0,
             size: 50.0,
             chromatic: 0.0,
+            seed: None,
         };
         let pre = GrainPrecomputed::new(&params, 42, 100, 100);
         let (r, g, b) = apply_grain_pixel(0.5, 0.5, 0.5, 10, 10, &pre);
@@ -490,6 +498,7 @@ mod tests {
             amount: 50.0,
             size: 50.0,
             chromatic: 100.0,
+            seed: None,
         };
         let pre = GrainPrecomputed::new(&params, 42, 100, 100);
         let mut found_diff = false;
@@ -516,6 +525,7 @@ mod tests {
             amount: 80.0,
             size: 50.0,
             chromatic: 0.0,
+            seed: None,
         };
         let pre = GrainPrecomputed::new(&params, 42, 200, 200);
         let measure = |lum: f32| -> f32 {
@@ -547,6 +557,7 @@ mod tests {
             amount: 50.0,
             size: 50.0,
             chromatic: 0.0,
+            seed: None,
         };
         let pre_small = GrainPrecomputed::new(&params, 42, 1000, 1000);
         let pre_large = GrainPrecomputed::new(&params, 42, 3000, 3000);
@@ -567,6 +578,7 @@ mod tests {
             amount: 100.0,
             size: 50.0,
             chromatic: 100.0,
+            seed: None,
         };
         let pre = GrainPrecomputed::new(&params, 42, 100, 100);
         for x in 0..50u32 {

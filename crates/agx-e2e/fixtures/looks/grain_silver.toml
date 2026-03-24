@@ -1,0 +1,10 @@
+[metadata]
+name = "Grain Silver"
+version = "1.0"
+author = "agx"
+
+[grain]
+type = "silver"
+amount = 40.0
+size = 50.0
+seed = 12345

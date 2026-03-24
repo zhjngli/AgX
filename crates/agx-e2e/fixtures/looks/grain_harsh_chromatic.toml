@@ -1,0 +1,11 @@
+[metadata]
+name = "Grain Harsh Chromatic"
+version = "1.0"
+author = "agx"
+
+[grain]
+type = "harsh"
+amount = 70.0
+size = 60.0
+chromatic = 40.0
+seed = 12345

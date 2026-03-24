@@ -565,6 +565,7 @@ impl EditArgs {
                 amount: self.grain_amount,
                 size: self.grain_size,
                 chromatic: self.grain_chromatic,
+                seed: None,
             },
         }
     }

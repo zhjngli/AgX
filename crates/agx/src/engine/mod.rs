@@ -777,6 +777,8 @@ pub struct PartialGrainParams {
     pub size: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chromatic: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
 }
 
 impl PartialGrainParams {
@@ -786,6 +788,7 @@ impl PartialGrainParams {
             amount: overlay.amount.or(self.amount),
             size: overlay.size.or(self.size),
             chromatic: overlay.chromatic.or(self.chromatic),
+            seed: overlay.seed.or(self.seed),
         }
     }
 
@@ -795,6 +798,7 @@ impl PartialGrainParams {
             amount: self.amount.unwrap_or(0.0),
             size: self.size.unwrap_or(50.0),
             chromatic: self.chromatic.unwrap_or(0.0),
+            seed: self.seed,
         }
     }
 }
@@ -806,6 +810,7 @@ impl From<&crate::adjust::GrainParams> for PartialGrainParams {
             amount: Some(p.amount),
             size: Some(p.size),
             chromatic: Some(p.chromatic),
+            seed: p.seed,
         }
     }
 }
@@ -1269,7 +1274,7 @@ impl Engine {
 
             // Post-detail-pass: apply grain and vignette, then convert to linear.
             let grain_pre = grain_active.then(|| {
-                let seed: u64 = rand::random();
+                let seed = self.params.grain.seed.unwrap_or_else(rand::random::<u64>);
                 adjust::grain::GrainPrecomputed::new(&self.params.grain, seed, w, h)
             });
 
@@ -2338,12 +2343,14 @@ mod tests {
             amount: Some(30.0),
             size: None,
             chromatic: None,
+            seed: None,
         };
         let overlay = PartialGrainParams {
             grain_type: None,
             amount: None,
             size: Some(60.0),
             chromatic: Some(25.0),
+            seed: None,
         };
         let merged = base.merge(&overlay);
         let concrete = merged.materialize();
@@ -2379,6 +2386,7 @@ mod tests {
             amount: 50.0,
             size: 50.0,
             chromatic: 0.0,
+            seed: None,
         };
         let after = engine.render();
         // Check multiple pixels — grain is random so at least some should differ
