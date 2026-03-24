@@ -18,6 +18,36 @@ pub enum GrainType {
     Harsh,
 }
 
+impl std::fmt::Display for GrainType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Fine => write!(f, "fine"),
+            Self::Silver => write!(f, "silver"),
+            Self::Soft => write!(f, "soft"),
+            Self::Cubic => write!(f, "cubic"),
+            Self::Tabular => write!(f, "tabular"),
+            Self::Harsh => write!(f, "harsh"),
+        }
+    }
+}
+
+impl std::str::FromStr for GrainType {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "fine" => Ok(Self::Fine),
+            "silver" => Ok(Self::Silver),
+            "soft" => Ok(Self::Soft),
+            "cubic" => Ok(Self::Cubic),
+            "tabular" => Ok(Self::Tabular),
+            "harsh" => Ok(Self::Harsh),
+            _ => Err(format!(
+                "invalid grain type '{s}'. Use: fine, silver, soft, cubic, tabular, or harsh"
+            )),
+        }
+    }
+}
+
 /// Film grain simulation parameters.
 ///
 /// - `grain_type`: selects the grain character (default: Silver)
@@ -200,26 +230,21 @@ impl GrainTypeConfig {
     }
 }
 
-/// Multi-octave simplex noise with size-dependent frequency scaling.
+/// Multi-octave simplex noise with precomputed per-octave frequencies.
 ///
-/// `size` is the user's 0–100 parameter. Lower size = higher frequency = finer grain.
 /// Returns a noise value (not yet scaled by amount or luminance weight).
 fn multi_octave_noise(
     x: f32,
     y: f32,
     perm: &[u8; 512],
     config: &GrainTypeConfig,
-    size: f32,
+    octave_freqs: &[f32; 3],
 ) -> f32 {
-    // Map size 0–100 to frequency: size=0 → freq=0.1 (very fine), size=100 → freq=0.002 (very coarse)
-    let freq = 0.1 * (0.02f32).powf(size / 100.0);
-
     let mut value = 0.0f32;
-    let mut freq_mult = 1.0f32;
     for i in 0..config.octaves {
+        let freq = octave_freqs[i as usize];
         let weight = config.octave_weights[i as usize];
-        value += weight * simplex_noise_2d(x * freq * freq_mult, y * freq * freq_mult, perm);
-        freq_mult *= 2.0;
+        value += weight * simplex_noise_2d(x * freq, y * freq, perm);
     }
 
     value * config.contrast
@@ -235,7 +260,8 @@ pub struct GrainPrecomputed {
     perm_b: [u8; 512],
     config: GrainTypeConfig,
     strength: f32,
-    size: f32,
+    /// Precomputed per-octave frequencies (avoids powf in hot loop).
+    octave_freqs: [f32; 3],
     chroma_blend: f32,
     res_scale: f32,
 }
@@ -246,6 +272,9 @@ impl GrainPrecomputed {
         let reference_dim = 3000.0f32;
         let dim = width.max(height) as f32;
         let res_scale = reference_dim / dim;
+        // Map size 0–100 to frequency: size=0 → freq=0.1 (very fine), size=100 → freq=0.002 (very coarse)
+        let base_freq = 0.1 * (0.02f32).powf(params.size / 100.0);
+        let octave_freqs = [base_freq, base_freq * 2.0, base_freq * 4.0];
         Self {
             perm: build_permutation_table(seed),
             perm_r: build_permutation_table(seed.wrapping_add(1)),
@@ -253,7 +282,7 @@ impl GrainPrecomputed {
             perm_b: build_permutation_table(seed.wrapping_add(3)),
             config,
             strength: params.amount / 100.0 * 0.15,
-            size: params.size,
+            octave_freqs,
             chroma_blend: params.chromatic / 100.0,
             res_scale,
         }
@@ -288,7 +317,7 @@ pub fn apply_grain_pixel(
     let scale = pre.strength * luma_w;
 
     if pre.chroma_blend == 0.0 {
-        let noise = multi_octave_noise(xf, yf, &pre.perm, &pre.config, pre.size);
+        let noise = multi_octave_noise(xf, yf, &pre.perm, &pre.config, &pre.octave_freqs);
         let shift = noise * scale;
         (
             (r + shift).clamp(0.0, 1.0),
@@ -296,10 +325,10 @@ pub fn apply_grain_pixel(
             (b + shift).clamp(0.0, 1.0),
         )
     } else {
-        let shared = multi_octave_noise(xf, yf, &pre.perm, &pre.config, pre.size);
-        let nr = multi_octave_noise(xf, yf, &pre.perm_r, &pre.config, pre.size);
-        let ng = multi_octave_noise(xf, yf, &pre.perm_g, &pre.config, pre.size);
-        let nb = multi_octave_noise(xf, yf, &pre.perm_b, &pre.config, pre.size);
+        let shared = multi_octave_noise(xf, yf, &pre.perm, &pre.config, &pre.octave_freqs);
+        let nr = multi_octave_noise(xf, yf, &pre.perm_r, &pre.config, &pre.octave_freqs);
+        let ng = multi_octave_noise(xf, yf, &pre.perm_g, &pre.config, &pre.octave_freqs);
+        let nb = multi_octave_noise(xf, yf, &pre.perm_b, &pre.config, &pre.octave_freqs);
 
         let blend = pre.chroma_blend;
         let shift_r = (shared * (1.0 - blend) + nr * blend) * scale;
@@ -392,6 +421,12 @@ mod tests {
         );
     }
 
+    /// Helper: compute octave_freqs from a size value (for tests).
+    fn octave_freqs_for_size(size: f32) -> [f32; 3] {
+        let base = 0.1 * (0.02f32).powf(size / 100.0);
+        [base, base * 2.0, base * 4.0]
+    }
+
     #[test]
     fn grain_types_produce_different_output() {
         let types = [
@@ -399,6 +434,7 @@ mod tests {
             GrainType::Cubic, GrainType::Tabular, GrainType::Harsh,
         ];
         let perm = build_permutation_table(42);
+        let freqs = octave_freqs_for_size(50.0);
         let mut variances = Vec::new();
         for gt in &types {
             let config = GrainTypeConfig::from_type(*gt);
@@ -407,7 +443,7 @@ mod tests {
             for i in 0..20 {
                 for j in 0..20 {
                     let v = multi_octave_noise(
-                        i as f32 * 0.1, j as f32 * 0.1, &perm, &config, 50.0,
+                        i as f32 * 0.1, j as f32 * 0.1, &perm, &config, &freqs,
                     );
                     sum_sq += v * v;
                 }
@@ -426,16 +462,18 @@ mod tests {
     fn size_affects_frequency() {
         let perm = build_permutation_table(42);
         let config = GrainTypeConfig::from_type(GrainType::Silver);
+        let freqs_small = octave_freqs_for_size(10.0);
         let mut delta_small = 0.0f32;
         for i in 0..99 {
-            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, 10.0);
-            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, 10.0);
+            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, &freqs_small);
+            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, &freqs_small);
             delta_small += (a - b).abs();
         }
+        let freqs_large = octave_freqs_for_size(90.0);
         let mut delta_large = 0.0f32;
         for i in 0..99 {
-            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, 90.0);
-            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, 90.0);
+            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, &freqs_large);
+            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, &freqs_large);
             delta_large += (a - b).abs();
         }
         assert!(

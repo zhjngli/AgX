@@ -1265,12 +1265,17 @@ impl Engine {
             }
 
             // Detail pass (sharpening, clarity, texture) operates in sRGB gamma space.
-            let detail_buf = adjust::detail::apply_detail_pass(
-                &srgb_buf,
-                w as usize,
-                h as usize,
-                &self.params.detail,
-            );
+            // Skip when detail is neutral to avoid an unnecessary full-image copy.
+            let detail_buf = if detail_active {
+                adjust::detail::apply_detail_pass(
+                    &srgb_buf,
+                    w as usize,
+                    h as usize,
+                    &self.params.detail,
+                )
+            } else {
+                srgb_buf
+            };
 
             // Post-detail-pass: apply grain and vignette, then convert to linear.
             let grain_pre = grain_active.then(|| {

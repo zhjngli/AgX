@@ -439,8 +439,8 @@ struct EditArgs {
     nr_detail: f32,
 
     /// Grain type (fine, silver, soft, cubic, tabular, harsh)
-    #[arg(long = "grain-type", default_value = "silver")]
-    grain_type: String,
+    #[arg(long = "grain-type", default_value_t = agx::GrainType::Silver)]
+    grain_type: agx::GrainType,
     /// Grain amount (0-100)
     #[arg(long = "grain-amount", default_value_t = 0.0)]
     grain_amount: f32,
@@ -553,15 +553,7 @@ impl EditArgs {
                 detail: self.nr_detail,
             },
             grain: agx::GrainParams {
-                grain_type: match self.grain_type.as_str() {
-                    "fine" => agx::GrainType::Fine,
-                    "silver" => agx::GrainType::Silver,
-                    "soft" => agx::GrainType::Soft,
-                    "cubic" => agx::GrainType::Cubic,
-                    "tabular" => agx::GrainType::Tabular,
-                    "harsh" => agx::GrainType::Harsh,
-                    _ => agx::GrainType::Silver,
-                },
+                grain_type: self.grain_type,
                 amount: self.grain_amount,
                 size: self.grain_size,
                 chromatic: self.grain_chromatic,
