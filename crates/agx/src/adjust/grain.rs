@@ -96,9 +96,18 @@ impl GrainParams {
 
 /// Standard 2D simplex noise gradient table (12 directions).
 const GRAD2: [[f32; 2]; 12] = [
-    [1.0, 1.0], [-1.0, 1.0], [1.0, -1.0], [-1.0, -1.0],
-    [1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0],
-    [1.0, 1.0], [-1.0, 1.0], [1.0, -1.0], [-1.0, -1.0],
+    [1.0, 1.0],
+    [-1.0, 1.0],
+    [1.0, -1.0],
+    [-1.0, -1.0],
+    [1.0, 0.0],
+    [-1.0, 0.0],
+    [0.0, 1.0],
+    [0.0, -1.0],
+    [1.0, 1.0],
+    [-1.0, 1.0],
+    [1.0, -1.0],
+    [-1.0, -1.0],
 ];
 
 /// Skewing factor for 2D simplex grid: (sqrt(3) - 1) / 2.
@@ -109,13 +118,15 @@ const G2: f32 = 0.211_324_87;
 /// Build a seeded 256-entry permutation table for simplex noise.
 fn build_permutation_table(seed: u64) -> [u8; 512] {
     let mut perm = [0u8; 256];
-    for i in 0..256 {
-        perm[i] = i as u8;
+    for (i, val) in perm.iter_mut().enumerate() {
+        *val = i as u8;
     }
     // Fisher-Yates shuffle with simple LCG seeded PRNG
     let mut rng = seed;
     for i in (1..256).rev() {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let j = (rng >> 33) as usize % (i + 1);
         perm.swap(i, j);
     }
@@ -384,7 +395,9 @@ mod tests {
                 assert!(
                     (-1.0..=1.0).contains(&v),
                     "noise at ({}, {}) = {} out of range",
-                    i, j, v
+                    i,
+                    j,
+                    v
                 );
             }
         }
@@ -430,8 +443,12 @@ mod tests {
     #[test]
     fn grain_types_produce_different_output() {
         let types = [
-            GrainType::Fine, GrainType::Silver, GrainType::Soft,
-            GrainType::Cubic, GrainType::Tabular, GrainType::Harsh,
+            GrainType::Fine,
+            GrainType::Silver,
+            GrainType::Soft,
+            GrainType::Cubic,
+            GrainType::Tabular,
+            GrainType::Harsh,
         ];
         let perm = build_permutation_table(42);
         let freqs = octave_freqs_for_size(50.0);
@@ -442,9 +459,8 @@ mod tests {
             let n = 400;
             for i in 0..20 {
                 for j in 0..20 {
-                    let v = multi_octave_noise(
-                        i as f32 * 0.1, j as f32 * 0.1, &perm, &config, &freqs,
-                    );
+                    let v =
+                        multi_octave_noise(i as f32 * 0.1, j as f32 * 0.1, &perm, &config, &freqs);
                     sum_sq += v * v;
                 }
             }
@@ -503,10 +519,11 @@ mod tests {
         };
         let pre = GrainPrecomputed::new(&params, 42, 100, 100);
         let (r, g, b) = apply_grain_pixel(0.5, 0.5, 0.5, 10, 10, &pre);
-        let changed = (r - 0.5).abs() > 1e-6
-            || (g - 0.5).abs() > 1e-6
-            || (b - 0.5).abs() > 1e-6;
-        assert!(changed, "grain should modify pixel values: got ({r}, {g}, {b})");
+        let changed = (r - 0.5).abs() > 1e-6 || (g - 0.5).abs() > 1e-6 || (b - 0.5).abs() > 1e-6;
+        assert!(
+            changed,
+            "grain should modify pixel values: got ({r}, {g}, {b})"
+        );
     }
 
     #[test]
@@ -551,9 +568,14 @@ mod tests {
                     break;
                 }
             }
-            if found_diff { break; }
+            if found_diff {
+                break;
+            }
         }
-        assert!(found_diff, "chromatic grain should produce different per-channel shifts");
+        assert!(
+            found_diff,
+            "chromatic grain should produce different per-channel shifts"
+        );
     }
 
     #[test]
@@ -622,11 +644,19 @@ mod tests {
         for x in 0..50u32 {
             for y in 0..50u32 {
                 let (r, g, b) = apply_grain_pixel(0.01, 0.01, 0.01, x, y, &pre);
-                assert!((0.0..=1.0).contains(&r) && (0.0..=1.0).contains(&g) && (0.0..=1.0).contains(&b),
-                    "output must be clamped: ({r}, {g}, {b})");
+                assert!(
+                    (0.0..=1.0).contains(&r)
+                        && (0.0..=1.0).contains(&g)
+                        && (0.0..=1.0).contains(&b),
+                    "output must be clamped: ({r}, {g}, {b})"
+                );
                 let (r, g, b) = apply_grain_pixel(0.99, 0.99, 0.99, x, y, &pre);
-                assert!((0.0..=1.0).contains(&r) && (0.0..=1.0).contains(&g) && (0.0..=1.0).contains(&b),
-                    "output must be clamped: ({r}, {g}, {b})");
+                assert!(
+                    (0.0..=1.0).contains(&r)
+                        && (0.0..=1.0).contains(&g)
+                        && (0.0..=1.0).contains(&b),
+                    "output must be clamped: ({r}, {g}, {b})"
+                );
             }
         }
     }
