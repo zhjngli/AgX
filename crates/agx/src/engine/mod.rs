@@ -1103,6 +1103,7 @@ impl Engine {
         let detail_active = !self.params.detail.is_neutral();
         let dehaze_active = !self.params.dehaze.is_neutral();
         let nr_active = !self.params.noise_reduction.is_neutral();
+        let grain_active = !self.params.grain.is_neutral();
 
         // When dehaze or NR is active, build WB+exposure linear buffer for buffer-level passes.
         let linear_processed_buf: Option<Vec<[f32; 3]>> = if dehaze_active || nr_active {
@@ -1169,7 +1170,7 @@ impl Engine {
             }
         };
 
-        if detail_active {
+        if detail_active || grain_active || vignette_pre.is_some() {
             // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.
             let mut srgb_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
             for y in 0..h {
@@ -1254,14 +1255,6 @@ impl Engine {
                         sb = lb;
                     }
 
-                    // 13. Vignette (sRGB gamma space, position-dependent)
-                    if let Some(pre) = &vignette_pre {
-                        let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
-                        sr = vr;
-                        sg = vg;
-                        sb = vb;
-                    }
-
                     srgb_buf.push([sr, sg, sb]);
                 }
             }
@@ -1274,10 +1267,32 @@ impl Engine {
                 &self.params.detail,
             );
 
-            // Convert each pixel back to linear and build output image.
+            // Post-detail-pass: apply grain and vignette, then convert to linear.
+            let grain_pre = grain_active.then(|| {
+                let seed: u64 = rand::random();
+                adjust::grain::GrainPrecomputed::new(&self.params.grain, seed, w, h)
+            });
+
             Rgb32FImage::from_fn(w, h, |x, y| {
                 let idx = (y * w + x) as usize;
-                let [sr, sg, sb] = detail_buf[idx];
+                let [mut sr, mut sg, mut sb] = detail_buf[idx];
+
+                // Grain (sRGB gamma space)
+                if let Some(ref pre) = grain_pre {
+                    let (gr, gg, gb) = adjust::grain::apply_grain_pixel(sr, sg, sb, x, y, pre);
+                    sr = gr;
+                    sg = gg;
+                    sb = gb;
+                }
+
+                // Vignette (sRGB gamma space, position-dependent)
+                if let Some(pre) = &vignette_pre {
+                    let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
+                    sr = vr;
+                    sg = vg;
+                    sb = vb;
+                }
+
                 let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
                 Rgb([lr, lg, lb])
             })
@@ -1361,15 +1376,7 @@ impl Engine {
                     sb = lb;
                 }
 
-                // 13. Vignette (sRGB gamma space, position-dependent)
-                if let Some(pre) = &vignette_pre {
-                    let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
-                    sr = vr;
-                    sg = vg;
-                    sb = vb;
-                }
-
-                // 14. Convert back to linear space
+                // 13. Convert back to linear space
                 let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
                 Rgb([lr, lg, lb])
@@ -2359,5 +2366,36 @@ mod tests {
                 "default grain should be identity"
             );
         }
+    }
+
+    #[test]
+    fn render_with_grain_changes_output() {
+        // Use a larger image to get meaningful grain variation across pixels
+        let img = ImageBuffer::from_pixel(64, 64, Rgb([0.5f32, 0.5, 0.5]));
+        let mut engine = Engine::new(img);
+        let before = engine.render();
+        engine.params_mut().grain = crate::adjust::GrainParams {
+            grain_type: crate::adjust::GrainType::Silver,
+            amount: 50.0,
+            size: 50.0,
+            chromatic: 0.0,
+        };
+        let after = engine.render();
+        // Check multiple pixels — grain is random so at least some should differ
+        let mut changed = false;
+        for y in 0..64 {
+            for x in 0..64 {
+                let bp = before.get_pixel(x, y);
+                let ap = after.get_pixel(x, y);
+                if (0..3).any(|i| (bp.0[i] - ap.0[i]).abs() > 1e-5) {
+                    changed = true;
+                    break;
+                }
+            }
+            if changed {
+                break;
+            }
+        }
+        assert!(changed, "grain should change render output");
     }
 }
