@@ -10,6 +10,9 @@ pub use dehaze::DehazeParams;
 pub mod denoise;
 pub use denoise::NoiseReductionParams;
 
+pub mod grain;
+pub use grain::{GrainParams, GrainType};
+
 // --- Luminance coefficients (Rec. 709) ---
 
 pub(crate) const LUMA_R: f32 = 0.2126;

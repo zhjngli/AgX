@@ -125,6 +125,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-21 | [Detail Pass Design](docs/plans/2026-03-21-detail-pass-design.md)                                |
 | 2026-03-21 | [Dehaze Design](docs/plans/2026-03-21-dehaze-design.md)                                          |
 | 2026-03-22 | [Noise Reduction Design](docs/plans/2026-03-22-noise-reduction-design.md)                        |
+| 2026-03-23 | [Grain Design](docs/plans/2026-03-23-grain-design.md)                                            |
 
 ### Ideas
 

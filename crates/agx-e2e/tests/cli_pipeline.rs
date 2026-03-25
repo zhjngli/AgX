@@ -30,6 +30,8 @@ const ALL_LOOKS: &[&str] = &[
     "haze_effect",
     "nr_landscape",
     "nr_heavy",
+    "grain_silver",
+    "grain_harsh_chromatic",
 ];
 
 // --- Helpers ---

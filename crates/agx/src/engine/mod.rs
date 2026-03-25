@@ -151,6 +151,9 @@ pub struct Parameters {
     /// Noise reduction: luminance, color, and detail preservation
     #[serde(default)]
     pub noise_reduction: crate::adjust::NoiseReductionParams,
+    /// Film grain simulation
+    #[serde(default)]
+    pub grain: crate::adjust::GrainParams,
 }
 
 impl Default for Parameters {
@@ -171,6 +174,7 @@ impl Default for Parameters {
             detail: crate::adjust::DetailParams::default(),
             dehaze: crate::adjust::DehazeParams::default(),
             noise_reduction: crate::adjust::NoiseReductionParams::default(),
+            grain: crate::adjust::GrainParams::default(),
         }
     }
 }
@@ -762,6 +766,55 @@ impl From<&crate::adjust::NoiseReductionParams> for PartialNoiseReductionParams 
     }
 }
 
+/// Partial grain parameters — `None` means "not specified".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartialGrainParams {
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "type")]
+    pub grain_type: Option<crate::adjust::GrainType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chromatic: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+}
+
+impl PartialGrainParams {
+    pub fn merge(&self, overlay: &Self) -> Self {
+        Self {
+            grain_type: overlay.grain_type.or(self.grain_type),
+            amount: overlay.amount.or(self.amount),
+            size: overlay.size.or(self.size),
+            chromatic: overlay.chromatic.or(self.chromatic),
+            seed: overlay.seed.or(self.seed),
+        }
+    }
+
+    pub fn materialize(&self) -> crate::adjust::GrainParams {
+        crate::adjust::GrainParams {
+            grain_type: self.grain_type.unwrap_or_default(),
+            amount: self.amount.unwrap_or(0.0),
+            size: self.size.unwrap_or(50.0),
+            chromatic: self.chromatic.unwrap_or(0.0),
+            seed: self.seed,
+        }
+    }
+}
+
+impl From<&crate::adjust::GrainParams> for PartialGrainParams {
+    fn from(p: &crate::adjust::GrainParams) -> Self {
+        Self {
+            grain_type: Some(p.grain_type),
+            amount: Some(p.amount),
+            size: Some(p.size),
+            chromatic: Some(p.chromatic),
+            seed: p.seed,
+        }
+    }
+}
+
 /// Partial parameter set — `None` means "not specified by this preset".
 ///
 /// Used for preset deserialization and merging. Convert to concrete
@@ -798,6 +851,8 @@ pub struct PartialParameters {
     pub dehaze: Option<PartialDehazeParams>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noise_reduction: Option<PartialNoiseReductionParams>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grain: Option<PartialGrainParams>,
 }
 
 impl PartialParameters {
@@ -854,6 +909,12 @@ impl PartialParameters {
                 (None, Some(o)) => Some(o.clone()),
                 (Some(b), Some(o)) => Some(b.merge(o)),
             },
+            grain: match (&self.grain, &other.grain) {
+                (None, None) => None,
+                (Some(b), None) => Some(b.clone()),
+                (None, Some(o)) => Some(o.clone()),
+                (Some(b), Some(o)) => Some(b.merge(o)),
+            },
         }
     }
 
@@ -903,6 +964,11 @@ impl PartialParameters {
                 .as_ref()
                 .map(|nr| nr.materialize())
                 .unwrap_or_default(),
+            grain: self
+                .grain
+                .as_ref()
+                .map(|g| g.materialize())
+                .unwrap_or_default(),
         }
     }
 }
@@ -925,6 +991,7 @@ impl From<&Parameters> for PartialParameters {
             detail: Some(PartialDetailParams::from(&params.detail)),
             dehaze: Some(PartialDehazeParams::from(&params.dehaze)),
             noise_reduction: Some(PartialNoiseReductionParams::from(&params.noise_reduction)),
+            grain: Some(PartialGrainParams::from(&params.grain)),
         }
     }
 }
@@ -1041,6 +1108,7 @@ impl Engine {
         let detail_active = !self.params.detail.is_neutral();
         let dehaze_active = !self.params.dehaze.is_neutral();
         let nr_active = !self.params.noise_reduction.is_neutral();
+        let grain_active = !self.params.grain.is_neutral();
 
         // When dehaze or NR is active, build WB+exposure linear buffer for buffer-level passes.
         let linear_processed_buf: Option<Vec<[f32; 3]>> = if dehaze_active || nr_active {
@@ -1107,7 +1175,7 @@ impl Engine {
             }
         };
 
-        if detail_active {
+        if detail_active || grain_active || vignette_pre.is_some() {
             // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.
             let mut srgb_buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
             for y in 0..h {
@@ -1192,30 +1260,49 @@ impl Engine {
                         sb = lb;
                     }
 
-                    // 13. Vignette (sRGB gamma space, position-dependent)
-                    if let Some(pre) = &vignette_pre {
-                        let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
-                        sr = vr;
-                        sg = vg;
-                        sb = vb;
-                    }
-
                     srgb_buf.push([sr, sg, sb]);
                 }
             }
 
             // Detail pass (sharpening, clarity, texture) operates in sRGB gamma space.
-            let detail_buf = adjust::detail::apply_detail_pass(
-                &srgb_buf,
-                w as usize,
-                h as usize,
-                &self.params.detail,
-            );
+            // Skip when detail is neutral to avoid an unnecessary full-image copy.
+            let detail_buf = if detail_active {
+                adjust::detail::apply_detail_pass(
+                    &srgb_buf,
+                    w as usize,
+                    h as usize,
+                    &self.params.detail,
+                )
+            } else {
+                srgb_buf
+            };
 
-            // Convert each pixel back to linear and build output image.
+            // Post-detail-pass: apply grain and vignette, then convert to linear.
+            let grain_pre = grain_active.then(|| {
+                let seed = self.params.grain.seed.unwrap_or_else(rand::random::<u64>);
+                adjust::grain::GrainPrecomputed::new(&self.params.grain, seed, w, h)
+            });
+
             Rgb32FImage::from_fn(w, h, |x, y| {
                 let idx = (y * w + x) as usize;
-                let [sr, sg, sb] = detail_buf[idx];
+                let [mut sr, mut sg, mut sb] = detail_buf[idx];
+
+                // Grain (sRGB gamma space)
+                if let Some(ref pre) = grain_pre {
+                    let (gr, gg, gb) = adjust::grain::apply_grain_pixel(sr, sg, sb, x, y, pre);
+                    sr = gr;
+                    sg = gg;
+                    sb = gb;
+                }
+
+                // Vignette (sRGB gamma space, position-dependent)
+                if let Some(pre) = &vignette_pre {
+                    let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
+                    sr = vr;
+                    sg = vg;
+                    sb = vb;
+                }
+
                 let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
                 Rgb([lr, lg, lb])
             })
@@ -1299,15 +1386,7 @@ impl Engine {
                     sb = lb;
                 }
 
-                // 13. Vignette (sRGB gamma space, position-dependent)
-                if let Some(pre) = &vignette_pre {
-                    let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
-                    sr = vr;
-                    sg = vg;
-                    sb = vb;
-                }
-
-                // 14. Convert back to linear space
+                // 13. Convert back to linear space
                 let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
 
                 Rgb([lr, lg, lb])
@@ -2260,5 +2339,76 @@ mod tests {
                 "default NR should not change output"
             );
         }
+    }
+
+    #[test]
+    fn partial_grain_merge_and_materialize() {
+        let base = PartialGrainParams {
+            grain_type: Some(crate::adjust::GrainType::Silver),
+            amount: Some(30.0),
+            size: None,
+            chromatic: None,
+            seed: None,
+        };
+        let overlay = PartialGrainParams {
+            grain_type: None,
+            amount: None,
+            size: Some(60.0),
+            chromatic: Some(25.0),
+            seed: None,
+        };
+        let merged = base.merge(&overlay);
+        let concrete = merged.materialize();
+        assert_eq!(concrete.grain_type, crate::adjust::GrainType::Silver);
+        assert_eq!(concrete.amount, 30.0);
+        assert_eq!(concrete.size, 60.0);
+        assert_eq!(concrete.chromatic, 25.0);
+    }
+
+    #[test]
+    fn render_default_grain_is_identity() {
+        let img = make_test_image(0.5, 0.3, 0.1);
+        let engine = Engine::new(img);
+        let rendered = engine.render();
+        let orig = engine.original().get_pixel(0, 0);
+        let rend = rendered.get_pixel(0, 0);
+        for i in 0..3 {
+            assert!(
+                (orig.0[i] - rend.0[i]).abs() < 1e-5,
+                "default grain should be identity"
+            );
+        }
+    }
+
+    #[test]
+    fn render_with_grain_changes_output() {
+        // Use a larger image to get meaningful grain variation across pixels
+        let img = ImageBuffer::from_pixel(64, 64, Rgb([0.5f32, 0.5, 0.5]));
+        let mut engine = Engine::new(img);
+        let before = engine.render();
+        engine.params_mut().grain = crate::adjust::GrainParams {
+            grain_type: crate::adjust::GrainType::Silver,
+            amount: 50.0,
+            size: 50.0,
+            chromatic: 0.0,
+            seed: None,
+        };
+        let after = engine.render();
+        // Check multiple pixels — grain is random so at least some should differ
+        let mut changed = false;
+        for y in 0..64 {
+            for x in 0..64 {
+                let bp = before.get_pixel(x, y);
+                let ap = after.get_pixel(x, y);
+                if (0..3).any(|i| (bp.0[i] - ap.0[i]).abs() > 1e-5) {
+                    changed = true;
+                    break;
+                }
+            }
+            if changed {
+                break;
+            }
+        }
+        assert!(changed, "grain should change render output");
     }
 }
