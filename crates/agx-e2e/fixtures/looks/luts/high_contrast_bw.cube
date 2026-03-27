@@ -1,4 +1,4 @@
-TITLE "bw_high_contrast"
+TITLE "high_contrast_bw"
 LUT_3D_SIZE 33
 DOMAIN_MIN 0.0 0.0 0.0
 DOMAIN_MAX 1.0 1.0 1.0
