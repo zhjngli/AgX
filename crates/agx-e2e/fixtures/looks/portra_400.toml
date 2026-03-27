@@ -1,27 +1,41 @@
 [metadata]
 name = "Portra 400"
-author = "agx-e2e"
+author = "agx"
 
 [tone]
-exposure = 0.3
-contrast = 5.0
-highlights = -15.0
-shadows = 10.0
-blacks = 5.0
+exposure = 0.25
+contrast = 6.0
+highlights = -12.0
+shadows = 8.0
+blacks = 4.0
 
 [white_balance]
-temperature = 8.0
-tint = 3.0
+temperature = 7.0
+tint = 2.5
 
 [hsl.orange]
-saturation = -10.0
-luminance = 5.0
+saturation = -8.0
+luminance = 4.0
 
 [hsl.red]
-saturation = -8.0
+saturation = -6.0
+
+[tone_curve.rgb]
+points = [[0.0, 0.0], [0.22, 0.18], [0.5, 0.52], [0.78, 0.82], [1.0, 1.0]]
 
 [vignette]
-amount = -10.0
+amount = -8.0
+
+[grain]
+type = "silver"
+amount = 22.0
+size = 45.0
+seed = 42
+
+[noise_reduction]
+luminance = 12.0
+color = 8.0
+detail = 65.0
 
 [lut]
 path = "luts/portra_400.cube"

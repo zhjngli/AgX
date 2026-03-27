@@ -1,27 +1,45 @@
 [metadata]
 name = "Kodachrome 64"
-author = "agx-e2e"
+author = "agx"
 
 [tone]
-contrast = 20.0
-highlights = -5.0
-shadows = 5.0
-blacks = -10.0
+contrast = 18.0
+highlights = -6.0
+shadows = 3.0
+blacks = -8.0
 
 [white_balance]
-temperature = 5.0
+temperature = 4.0
 
 [hsl.red]
-saturation = 15.0
-luminance = -5.0
+saturation = 14.0
+luminance = -3.0
 
 [hsl.blue]
-saturation = 15.0
-luminance = -5.0
+saturation = 12.0
+luminance = -4.0
 
 [hsl.yellow]
-saturation = 10.0
-luminance = 5.0
+saturation = 8.0
+luminance = 6.0
+
+[detail]
+clarity = 12.0
+
+[detail.sharpening]
+amount = 42.0
+radius = 0.8
+threshold = 35.0
+masking = 20.0
+
+[vignette]
+amount = -6.0
+
+[grain]
+type = "fine"
+amount = 15.0
+size = 30.0
+seed = 42
 
 [lut]
 path = "luts/kodachrome_64.cube"

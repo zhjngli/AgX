@@ -1,8 +1,8 @@
 [metadata]
 name = "Base Cinematic"
-author = "agx-e2e"
+author = "agx"
 
 [tone]
-contrast = 15.0
-highlights = -10.0
-shadows = 10.0
+contrast = 14.0
+highlights = -8.0
+shadows = 12.0

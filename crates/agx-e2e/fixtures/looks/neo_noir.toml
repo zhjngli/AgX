@@ -1,26 +1,47 @@
 [metadata]
 name = "Neo Noir"
-author = "agx-e2e"
+author = "agx"
 
 [tone]
-exposure = -0.3
-contrast = 35.0
-highlights = -25.0
-shadows = -15.0
-blacks = -20.0
+exposure = -0.35
+contrast = 32.0
+highlights = -22.0
+shadows = -18.0
+blacks = -24.0
 
 [white_balance]
-temperature = -10.0
+temperature = -8.0
 
 [hsl.blue]
-saturation = 10.0
-luminance = -10.0
+saturation = 12.0
+luminance = -8.0
 
 [hsl.aqua]
+saturation = 16.0
+
+[color_grading.shadows]
+hue = 215.0
 saturation = 15.0
+luminance = -4.0
+
+[color_grading.midtones]
+hue = 220.0
+saturation = 6.0
 
 [vignette]
-amount = -12.0
+amount = -20.0
+
+[detail.sharpening]
+amount = 38.0
+radius = 1.0
+threshold = 50.0
+masking = 45.0
+
+[grain]
+type = "harsh"
+amount = 28.0
+size = 42.0
+seed = 42
 
 [lut]
 path = "luts/neo_noir.cube"
