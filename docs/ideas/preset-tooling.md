@@ -1,21 +1,20 @@
 # Preset Tooling
 
-**Category:** Preset
-**Status:** Backlog
+Schema versioning, validation, and authoring shortcuts for AgX presets.
 
-## Problem / Opportunity
+## Sub-tasks
 
-As the preset format evolves, users need tools for versioning, validation, and authoring shortcuts. Schema versioning ensures old presets work with new software. Validation catches errors before processing. Variables and shortcuts reduce repetition in preset authoring.
+- [ ] **CLI validation command** — `agx-cli validate preset.toml` to check a preset against the current schema: report unknown fields, out-of-range values, missing required fields
+- [ ] **Schema versioning** — add a schema version field to presets for forward/backward compatibility. Not urgent while all changes are additive (`#[serde(default)]` handles missing fields). Becomes necessary on first breaking change
+- [ ] **Migration tooling** — automatic preset migration between schema versions when breaking changes occur
+- [ ] **Variables / shortcuts** — named shortcuts for common parameter combinations (e.g., `$warm-tone` expands to temperature + tint values). Could use TOML's native table references or a simple variable substitution layer
 
-## Key Considerations
+## Considerations
 
-- **Versioning**: Add a schema version field to presets for forward/backward compatibility. Not urgent while all changes are additive (`#[serde(default)]` handles missing fields). Becomes necessary on first breaking change (field rename, value range change, or structural reorganization)
-- **Validation**: CLI command (`oxiraw validate preset.toml`) to check a preset against the current schema — report unknown fields, out-of-range values, missing required fields
-- **Variables / shortcuts**: Named shortcuts for common parameter combinations (e.g., `$warm-tone` expands to temperature + tint values). Could use TOML's native table references or a simple variable substitution layer
-- Versioning strategy: semver-style (major.minor) where major bumps indicate breaking changes and minor bumps indicate additive changes
-- Migration tooling: automatic preset migration between schema versions
+- Versioning strategy: semver-style (major.minor) where major bumps indicate breaking changes and minor bumps indicate additive changes.
+- Validation is the most immediately useful sub-task — catches errors before processing, helps preset authors iterate.
+- Variables are lower priority — the `extends` mechanism already handles most composition needs.
 
 ## Related
 
-- [Preset Composability](preset-composability.md) — versioning is critical when presets can inherit/compose
-- [Ecosystem Interop](ecosystem-interop.md) — validation helps when importing from other formats
+- [Ecosystem Interop](ecosystem-interop.md) — validation helps catch import errors from other formats

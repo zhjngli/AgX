@@ -1,31 +1,24 @@
 # Algorithm Documentation
 
-**Category:** Documentation
-**Status:** Backlog
+Human-readable reference docs explaining each image processing algorithm's math, paper references, and constant choices.
 
-## Problem / Opportunity
+## Sub-tasks
 
-AgX implements several image processing algorithms drawn from academic literature and industry practice: Dark Channel Prior (dehaze), guided filter, unsharp mask, wavelet denoising, etc. The code implements these algorithms but doesn't explain the math, the papers they come from, or why specific constants were chosen.
+- [ ] **Dark Channel Prior and atmospheric scattering model** (dehaze) — `crates/agx/src/adjust/dehaze.rs`
+- [ ] **Guided filter** (dehaze refinement) — `crates/agx/src/adjust/dehaze.rs`
+- [ ] **Unsharp mask and frequency separation** (detail pass) — `crates/agx/src/adjust/detail.rs`
+- [ ] **À trous wavelet decomposition** (noise reduction) — `crates/agx/src/adjust/denoise.rs`
+- [ ] **Simplex noise and grain modeling** (grain simulation) — `crates/agx/src/adjust/grain.rs`
+- [ ] **Fritsch-Carlson monotone cubic interpolation** (tone curves) — `crates/agx/src/adjust/mod.rs`
+- [ ] **3-way lift/gamma/gain luminance weighting** (color grading) — `crates/agx/src/adjust/mod.rs`
 
-A human-readable reference document (or set of documents) explaining each algorithm would help:
-- Contributors understand *why* the code does what it does, not just *what* it does
-- Users understand what each slider actually controls under the hood
-- Future maintainers evaluate trade-offs when modifying or replacing algorithms
+## Considerations
 
-## Key Considerations
+- One document per algorithm or group of related algorithms. Could live in `docs/algorithms/`.
+- Include: intuition, math (kept accessible), paper references, why specific constants/thresholds were chosen.
+- Reference source code locations where each algorithm is implemented.
+- Keep separate from code comments — this is explanatory prose for contributors, not API docs.
 
-- One document per algorithm or group of related algorithms
-- Include: intuition, math (kept accessible), paper references, why we chose specific constants/thresholds
-- Reference the source code locations where each algorithm is implemented
-- Keep it separate from code comments — this is explanatory prose, not API docs
-- Could live in `docs/algorithms/` or similar
+## Related
 
-## Scope
-
-Cover at minimum:
-- Dark Channel Prior and atmospheric scattering model (dehaze)
-- Guided filter (dehaze refinement)
-- Unsharp mask and frequency separation (detail pass)
-- Wavelet denoising / à trous decomposition (noise reduction, once implemented)
-- Tone curve interpolation (Fritsch-Carlson monotone cubic)
-- Luminance weighting for color grading (3-way lift/gamma/gain)
+- [Processing Parity](processing-parity.md) — algorithm docs help compare our implementations against reference editors

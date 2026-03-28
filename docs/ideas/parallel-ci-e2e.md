@@ -1,10 +1,16 @@
-# Parallel E2E Tests in CI
+# Parallel CI E2E
 
 Parallelize e2e test execution in GitHub Actions to reduce CI wall-clock time.
 
+## Sub-tasks
+
+- [ ] **Add build artifact job** — build `agx-cli --release` and upload the binary for matrix jobs to download
+- [ ] **Fan out per-image tests** — use GitHub Actions matrix strategy to run each image test in parallel
+- [ ] **Verify CI minute consumption** — free-tier GitHub Actions has 2000 min/month; parallel jobs use more total minutes
+
 ## Current State
 
-The `e2e-tests` CI job runs all 9 test functions sequentially in a single job (~5 minutes). Tests are already independent — 6 per-image matrix tests, 1 batch/error test, and 7 library pipeline tests.
+The `e2e-tests` CI job runs all 9 test functions sequentially in a single job. Tests are already independent — 6 per-image matrix tests, 1 batch test, and 7 library pipeline tests.
 
 ## Proposal
 
@@ -27,23 +33,19 @@ e2e-tests:
 
 ### Build artifact sharing
 
-Each matrix job would otherwise rebuild `agx-cli` redundantly. Two options:
-
-1. **Upload/download artifact** — a prior job builds `agx-cli --release`, uploads the binary, and each matrix job downloads it. Saves ~6 redundant builds but adds artifact transfer overhead.
-2. **Rely on `rust-cache`** — with a shared cache key, each job hits the cache and only links. Simpler but still has some redundant work.
-
-Option 1 is cleaner. The build job already exists conceptually (`fast-checks` compiles everything for clippy).
+Each matrix job would otherwise rebuild `agx-cli` redundantly. A prior job builds `agx-cli --release`, uploads the binary, and each matrix job downloads it. Saves ~6 redundant builds.
 
 ### Maintenance
 
-The matrix list must stay in sync with the test functions in `cli_pipeline.rs`. If a new image is added to the e2e suite, a matrix entry must be added to the CI workflow. This could be automated with a script that extracts test names, but manual sync is fine given the low churn rate.
+The matrix list must stay in sync with the test functions in `cli_pipeline.rs`. Manual sync is fine given the low churn rate.
 
-## Expected Impact
+## Considerations
 
-Wall-clock time for e2e CI drops from ~5 min (sequential) to ~1-2 min (limited by the slowest single image, likely `temple_blossoms` with 23 looks).
-
-## Trade-offs
-
-- More CI runner minutes consumed (parallel jobs overlap, each with setup overhead). Free-tier GitHub Actions has 2000 min/month — need to check consumption.
+- Wall-clock time drops from sequential to limited by the slowest single image.
+- More CI runner minutes consumed (parallel jobs overlap, each with setup overhead).
 - Slightly more complex workflow YAML.
-- Matrix entries must stay in sync with test code.
+
+## Related
+
+- [Multi-Preset CLI](multi-preset-cli.md) — reduces per-image decode calls (orthogonal)
+- [Performance](performance.md) — render-level optimizations (orthogonal)

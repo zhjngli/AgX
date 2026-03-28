@@ -1,20 +1,20 @@
 # Advanced Research
 
-**Category:** Advanced
-**Status:** Backlog
+Research-heavy features with significant implementation complexity: AI editing, HDR merge, panorama, focus stacking, tethered shooting.
 
-## Problem / Opportunity
+## Sub-tasks
 
-AI-assisted editing, HDR merge, panorama stitching, focus stacking, and tethered shooting are advanced capabilities that would position oxiraw as a complete photography solution. These are research-heavy features with significant implementation complexity but high user value.
+- [ ] **AI-assisted editing** — suggest preset adjustments based on image content (scene detection, subject recognition). Large dependency footprint (ML runtime)
+- [ ] **HDR merge** — combine multiple exposures into a single HDR image. Well-studied algorithms (Debevec, Mertens exposure fusion). Requires alignment and ghost removal
+- [ ] **Panorama stitching** — combine overlapping images into a wide-field composite. Requires feature detection, homography estimation, seam blending. OpenCV via FFI could provide the heavy lifting
+- [ ] **Focus stacking** — combine images with different focus planes for extended depth of field. Common in macro and landscape photography
+- [ ] **Tethered shooting** — direct camera control and live preview via USB. Platform-specific (libgphoto2 on Linux, proprietary SDKs on macOS/Windows). High complexity, niche use case
 
-## Key Considerations
+## Considerations
 
-- **AI-assisted editing**: Suggest preset adjustments based on image content (scene detection, subject recognition). Could use pre-trained models for scene classification and parameter suggestion. Large dependency footprint (ML runtime)
-- **HDR merge**: Combine multiple exposures into a single high-dynamic-range image. Requires alignment (for handheld shots), tone mapping, and ghost removal (for moving subjects). Well-studied algorithms (Debevec, Mertens exposure fusion)
-- **Panorama stitching**: Combine overlapping images into a wide-field composite. Requires feature detection, homography estimation, seam blending. Existing libraries (OpenCV via FFI) could provide the heavy lifting
-- **Focus stacking**: Combine images with different focus planes for extended depth of field. Requires alignment, focus detection per-region, and blending. Common in macro and landscape photography
-- **Tethered shooting**: Direct camera control and live preview via USB. Platform-specific (libgphoto2 on Linux, proprietary SDKs on macOS/Windows). High complexity, niche use case
-- All of these are standalone features that don't affect the core editing pipeline — they produce input images that then go through the normal adjustment workflow
+- All of these are standalone features that produce input images, which then go through the normal adjustment workflow — they don't affect the core editing pipeline.
+- Each feature has significant implementation complexity and external dependencies.
+- Priority should be driven by user demand. HDR merge and panorama stitching are the most commonly requested.
 
 ## Related
 

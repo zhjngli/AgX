@@ -1,24 +1,24 @@
 # Color Management
 
-**Category:** Color
-**Status:** Backlog
+Wide gamut support, ICC profiles, and per-camera color matrices for AgX.
 
-## Problem / Opportunity
+## Sub-tasks
 
-oxiraw currently works exclusively in sRGB. Professional workflows require wider gamuts (Adobe RGB for print, ProPhoto RGB for lossless editing, Display P3 for Apple displays), ICC profile handling, and accurate per-camera color rendering. Full color management is the difference between a consumer tool and a professional one.
+- [ ] **ICC profile reading** — read embedded ICC profiles from input images to determine their actual color space
+- [ ] **ICC profile embedding** — embed correct ICC profiles in output images so downstream software interprets colors correctly
+- [ ] **Color space conversion** — convert between working spaces (sRGB, Adobe RGB, ProPhoto RGB, Display P3)
+- [ ] **lcms2 integration** — the `lcms2` Rust crate provides production-quality ICC profile handling (major external dependency)
+- [ ] **Per-camera color matrices** — custom color matrices for each camera model (DCP/ICC camera profiles) to improve raw color accuracy
+- [ ] **Soft proofing** — preview how an image will look in a different color space (e.g., CMYK for print)
+- [ ] **Relax sRGB-only invariant** — update ARCHITECTURE.md core invariant #3 when this work begins
 
-## Key Considerations
+## Considerations
 
-- **Adobe RGB**: Wider gamut for professional print workflows — more greens and cyans than sRGB
-- **ProPhoto RGB**: Very wide gamut used internally by Lightroom for lossless editing. Avoids clipping colors during aggressive adjustments
-- **Display P3**: Apple's wide-gamut display standard for modern monitors
-- **ICC profile reading**: Read embedded ICC profiles from input images to determine their actual color space
-- **ICC profile embedding**: Embed correct ICC profiles in output images so downstream software interprets colors correctly
-- **Color space conversion**: Convert between working spaces (sRGB, Adobe RGB, ProPhoto RGB, etc.)
-- **Soft proofing**: Preview how an image will look in a different color space (e.g., CMYK for print) — useful for print preparation
-- **lcms2 integration**: The `lcms2` Rust crate provides production-quality ICC profile handling. Major external dependency but the standard approach
-- **Per-camera color matrices**: Custom color matrices for each camera model to improve color accuracy from raw files. DCP (DNG Camera Profile) and ICC camera profiles provide this data
-- Current sRGB-only invariant (ARCHITECTURE.md core invariant #3) must be relaxed when this work begins
+- **Adobe RGB**: wider gamut for professional print — more greens and cyans than sRGB.
+- **ProPhoto RGB**: very wide gamut used internally by Lightroom for lossless editing. Avoids clipping during aggressive adjustments.
+- **Display P3**: Apple's wide-gamut display standard for modern monitors.
+- lcms2 is the industry standard but adds a significant external dependency.
+- Per-camera profiles are what make raw converters produce different results — this is a deep rabbit hole.
 
 ## Related
 

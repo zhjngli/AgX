@@ -1,47 +1,87 @@
 # Ideas Backlog
 
-Future features and ideas for AgX. Nothing here is committed — pick an idea file to explore. When an idea is picked up for implementation, remove its file from this directory.
+Future features and improvements for AgX. Each idea file is an "epic" with sub-tasks that can be worked on independently. When all sub-tasks in an idea are complete, remove the file from this directory.
 
-Ideas are roughly ordered by alignment with the project philosophy: preset-first batch editing via CLI and API. Features that make presets more expressive or batch workflows faster come first.
+## Roadmap
 
-## Editing — Per-Pixel Features
+Prioritized by alignment with the project philosophy: preset-first batch editing via CLI and API. Features that make presets more expressive or batch workflows faster come first. Developer velocity improvements are also high priority.
 
-All per-pixel editing features are now implemented: exposure, contrast, highlights, shadows, whites, blacks, white balance, HSL adjustments, vignette, color grading, and tone curves. No remaining ideas in this category.
+### Near-term
 
-## Editing — Neighborhood Operations
+These are practical improvements to existing functionality — small scope, clear value.
 
-These need access to surrounding pixels and require a multi-pass approach (separate pass over the full image buffer after per-pixel adjustments). The detail pass (sharpening, clarity, texture), dehaze (Dark Channel Prior), noise reduction (à trous wavelet), and grain (simplex noise) are now implemented. We now have 4 neighborhood/buffer-level ops — consider formalizing into a pluggable stage-based pipeline.
+| Priority | Idea | Why now |
+|----------|------|---------|
+| 1 | [Grain Size Algorithm](grain-size-algorithm.md) | Known visual artifact; small, focused fix |
+| 2 | [Multi-Preset CLI](multi-preset-cli.md) | Cuts e2e test time in half; improves batch workflows |
+| 3 | [Parallel CI E2E](parallel-ci-e2e.md) | Reduces CI wall-clock time; improves developer velocity |
+| 4 | [Preset Tooling](preset-tooling.md) | Validation command catches preset errors before processing |
+| 5 | [Performance](performance.md) | Profile first, then tackle buffer reduction and render parallelization |
 
-| File | Summary | Notes |
-|------|---------|-------|
-| [local-adjustments.md](local-adjustments.md) | Brushes, gradients, and radial filters for per-region edits | Photo-specific, lower priority |
-| [geometric-corrections.md](geometric-corrections.md) | Lens corrections, perspective, crop and rotation | Photo-specific, lower priority |
-| [grain-size-algorithm.md](grain-size-algorithm.md) | Rework grain size mapping to produce fine grain at all sizes, not low-frequency blobs | |
+### Mid-term
 
-## Pipeline & Infrastructure
+Larger efforts that expand AgX's capabilities or improve code quality.
+
+| Priority | Idea | Why next |
+|----------|------|----------|
+| 6 | [Algorithm Documentation](algorithm-documentation.md) | Helps contributors understand and improve algorithms |
+| 7 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
+| 8 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
+| 9 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
+| 10 | [Color Management](color-management.md) | Wide gamut and ICC profiles are the gap between consumer and professional |
+
+### Long-term
+
+Major features that require significant design work or change the project's scope.
+
+| Priority | Idea | Notes |
+|----------|------|-------|
+| 11 | [Processing Parity](processing-parity.md) | Cross-cutting effort across all editing features |
+| 12 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
+| 13 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
+| 14 | [Platform and Distribution](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
+| 15 | [UI](ui.md) | Desktop and web interfaces |
+| 16 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
+
+## By Category
+
+### Editing
 
 | File | Summary |
 |------|---------|
-| [performance.md](performance.md) | Render parallelization, buffer reduction, and other potential optimizations (needs profiling) |
-| [preset-tooling.md](preset-tooling.md) | Schema versioning, validation, and authoring shortcuts |
-| [multi-preset-cli.md](multi-preset-cli.md) | Decode once, apply N presets per CLI invocation (cuts e2e test time) |
-| [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness (build after 3+ neighborhood ops) |
-| [algorithm-documentation.md](algorithm-documentation.md) | Human-readable docs explaining each algorithm's math, paper references, and constant choices |
-| [parallel-ci-e2e.md](parallel-ci-e2e.md) | Parallelize e2e tests in GitHub Actions via matrix strategy to reduce CI wall-clock time |
+| [grain-size-algorithm.md](grain-size-algorithm.md) | Fix grain size mapping to produce fine grain at all sizes |
+| [local-adjustments.md](local-adjustments.md) | Brushes, gradients, and radial filters for per-region edits |
+| [geometric-corrections.md](geometric-corrections.md) | Lens corrections, perspective, crop and rotation |
 
-## Color & Ecosystem
+### Pipeline and Infrastructure
+
+| File | Summary |
+|------|---------|
+| [performance.md](performance.md) | Render parallelization, buffer reduction, profiling |
+| [multi-preset-cli.md](multi-preset-cli.md) | Decode once, apply N presets per CLI invocation |
+| [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness |
+| [parallel-ci-e2e.md](parallel-ci-e2e.md) | Parallelize e2e tests in GitHub Actions via matrix strategy |
+| [preset-tooling.md](preset-tooling.md) | Schema versioning, validation, and authoring shortcuts |
+
+### Color and Formats
 
 | File | Summary |
 |------|---------|
 | [color-management.md](color-management.md) | Wide gamut, ICC profiles, per-camera color matrices |
+| [heic-support.md](heic-support.md) | HEIC/HEIF format decoding for Apple devices |
 | [ecosystem-interop.md](ecosystem-interop.md) | XMP/costyle/pp3 import/export and sidecar files |
-| [heic-support.md](heic-support.md) | HEIC/HEIF format decoding support |
 | [processing-parity.md](processing-parity.md) | Understanding and reducing rendering differences vs other editors |
 
-## Platform & UI
+### Documentation
+
+| File | Summary |
+|------|---------|
+| [algorithm-documentation.md](algorithm-documentation.md) | Human-readable docs for each algorithm's math and paper references |
+
+### Platform and UI
 
 | File | Summary |
 |------|---------|
 | [platform-and-distribution.md](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
 | [ui.md](ui.md) | Desktop and web UI, histogram, before/after, undo/redo |
-| [advanced-research.md](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking, tethered shooting |
+| [advanced-research.md](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
