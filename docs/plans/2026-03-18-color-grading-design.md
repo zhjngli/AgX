@@ -136,7 +136,7 @@ Balance remaps luminance before weight computation:
 
 These always sum to 1.0. The quadratic curves provide smooth crossfades with no hard transitions.
 
-**Open question:** The quadratic exponent is a starting point. The exact curve shape should be refined during the processing parity work (see `docs/ideas/processing-parity.md`) by visual comparison against Lightroom/Capture One output.
+**Open question:** The quadratic exponent is a starting point. The exact curve shape should be refined during the processing parity work (see `docs/backlog/processing-parity.md`) by visual comparison against Lightroom/Capture One output.
 
 ### Step 3: Blend and Apply (per pixel)
 

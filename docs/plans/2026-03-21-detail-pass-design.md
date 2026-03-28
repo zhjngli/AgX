@@ -227,7 +227,7 @@ Keeps `adjust/mod.rs` from growing further (already ~1800 lines with tone curves
 | `crates/agx-cli/src/main.rs` | Add 6 CLI flags |
 | `crates/agx/src/lib.rs` | Re-export new types |
 | `ARCHITECTURE.md` | Add design doc link |
-| `docs/ideas/README.md` | Remove completed per-pixel idea files (`tone-curves.md`, `color-grading.md`), update neighborhood ops section |
+| `docs/backlog/README.md` | Remove completed per-pixel backlog files (`tone-curves.md`, `color-grading.md`), update neighborhood ops section |
 
 ## Testing Strategy
 

@@ -95,7 +95,7 @@ run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
 # 5. Documentation link validation
 check_all_doc_links() {
-    check_md_links ARCHITECTURE.md docs/ideas/ || return 1
+    check_md_links ARCHITECTURE.md docs/backlog/ || return 1
     echo "All documentation links valid"
 }
 run_check "Documentation links" check_all_doc_links

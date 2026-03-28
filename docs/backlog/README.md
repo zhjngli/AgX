@@ -1,12 +1,12 @@
-# Ideas Backlog
+# Backlog
 
-Future features and improvements for AgX. Each idea file is an "epic" with sub-tasks that can be worked on independently. When all sub-tasks in an idea are complete, remove the file from this directory.
+Future work for AgX — epics, sub-tasks, and bugs. Each file is an "epic" with sub-tasks that can be worked on independently. When all sub-tasks in an epic are complete, remove the file from this directory.
 
 Some epics have detailed sub-task docs (e.g., `grain-size-algorithm.md` is a sub-task of `processing-parity.md`). These live as their own files when the investigation is deep enough to warrant it, but are tracked under their parent epic in the roadmap.
 
-## Adding New Ideas
+## Adding New Items
 
-Ideas come in different sizes. Use the right level for what you're capturing:
+Items come in different sizes. Use the right level for what you're capturing:
 
 ### Epic (top-level idea file)
 

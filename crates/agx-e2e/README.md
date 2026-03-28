@@ -33,7 +33,7 @@ The suite does heavy pixel processing (decode + render + encode for 65 images). 
 
 ### Known bottleneck
 
-Each CLI subprocess call independently decodes the image, even when the same image is processed with multiple presets. For a RAW file, this means 12 separate LibRaw decode operations per image. A `--multi-preset` CLI flag (see `docs/ideas/multi-preset-cli.md`) would decode once and apply N presets per invocation, reducing RAW decode calls from 48 to 4.
+Each CLI subprocess call independently decodes the image, even when the same image is processed with multiple presets. For a RAW file, this means 12 separate LibRaw decode operations per image. A `--multi-preset` CLI flag (see `docs/backlog/multi-preset-cli.md`) would decode once and apply N presets per invocation, reducing RAW decode calls from 48 to 4.
 
 ## Running
 
