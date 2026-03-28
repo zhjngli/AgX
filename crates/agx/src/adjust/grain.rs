@@ -261,6 +261,46 @@ fn multi_octave_noise(
     value * config.contrast
 }
 
+/// Fixed base frequency for noise generation. Size is controlled by post-blur, not frequency.
+const GRAIN_BASE_FREQ: f32 = 0.08;
+
+/// Minimum blur sigma below which the per-pixel fast path is used.
+const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.5;
+
+/// Maximum blur sigma at size=100.
+const GRAIN_MAX_SIGMA: f32 = 2.5;
+
+/// Compute blur sigma from the size parameter (0-100).
+/// Non-linear curve: low sizes stay sharp, higher sizes spread more.
+fn grain_sigma(size: f32) -> f32 {
+    let t = (size / 100.0).clamp(0.0, 1.0);
+    t.powf(1.5) * GRAIN_MAX_SIGMA
+}
+
+/// Generate a single-channel noise buffer at fixed high frequency.
+///
+/// Each pixel gets multi-octave simplex noise scaled by `res_scale`
+/// (for resolution independence) and the grain type's contrast.
+fn generate_noise_buffer(
+    width: usize,
+    height: usize,
+    perm: &[u8; 512],
+    config: &GrainTypeConfig,
+    res_scale: f32,
+) -> Vec<f32> {
+    let octave_freqs = [GRAIN_BASE_FREQ, GRAIN_BASE_FREQ * 2.0, GRAIN_BASE_FREQ * 4.0];
+    let mut buf = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let xf = x as f32 * res_scale;
+            let yf = y as f32 * res_scale;
+            let noise = multi_octave_noise(xf, yf, perm, config, &octave_freqs);
+            buf.push(noise);
+        }
+    }
+    buf
+}
+
 /// Precomputed grain state — create once per render, then call
 /// [`apply_grain_pixel`] per pixel.
 #[derive(Debug, Clone)]
@@ -641,6 +681,33 @@ mod tests {
         for v in &output {
             assert!((v - 1.0).abs() < 1e-5, "uniform blur should be identity: got {v}");
         }
+    }
+
+    #[test]
+    fn generate_noise_buffer_correct_length() {
+        let perm = build_permutation_table(42);
+        let config = GrainTypeConfig::from_type(GrainType::Silver);
+        let buf = generate_noise_buffer(10, 8, &perm, &config, 1.0);
+        assert_eq!(buf.len(), 80);
+    }
+
+    #[test]
+    fn generate_noise_buffer_has_variance() {
+        let perm = build_permutation_table(42);
+        let config = GrainTypeConfig::from_type(GrainType::Silver);
+        let buf = generate_noise_buffer(64, 64, &perm, &config, 1.0);
+        let mean: f32 = buf.iter().sum::<f32>() / buf.len() as f32;
+        let variance: f32 = buf.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / buf.len() as f32;
+        assert!(variance > 0.001, "noise buffer should have meaningful variance: {variance}");
+    }
+
+    #[test]
+    fn generate_noise_buffer_deterministic() {
+        let perm = build_permutation_table(42);
+        let config = GrainTypeConfig::from_type(GrainType::Silver);
+        let buf1 = generate_noise_buffer(16, 16, &perm, &config, 1.0);
+        let buf2 = generate_noise_buffer(16, 16, &perm, &config, 1.0);
+        assert_eq!(buf1, buf2);
     }
 
     #[test]
