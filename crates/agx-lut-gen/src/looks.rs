@@ -224,7 +224,9 @@ fn tmax_100(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 
     // Neutral-cool split tone: very subtle, keeping the technical character
     let (r, g, b) = split_tone(
-        r, g, b,
+        r,
+        g,
+        b,
         [0.12, 0.13, 0.14], // barely cool shadows
         [0.92, 0.92, 0.93], // neutral-cool highlights
         0.12,
