@@ -301,6 +301,124 @@ fn generate_noise_buffer(
     buf
 }
 
+/// Apply grain to an sRGB gamma buffer using blur-based sizing.
+///
+/// When sigma is below threshold, uses per-pixel noise (no buffer allocation).
+/// When sigma >= threshold, generates noise into a buffer, blurs it, then
+/// reads per-pixel from the blurred noise.
+///
+/// Mutates `buf` in-place. Each pixel is `[r, g, b]` in sRGB gamma [0.0, 1.0].
+pub fn apply_grain_buffer(
+    buf: &mut [[f32; 3]],
+    width: usize,
+    height: usize,
+    params: &GrainParams,
+    seed: u64,
+) {
+    if params.amount == 0.0 {
+        return;
+    }
+
+    let config = GrainTypeConfig::from_type(params.grain_type);
+    let reference_dim = 3000.0f32;
+    let dim = width.max(height) as f32;
+    let res_scale = reference_dim / dim;
+    let strength = params.amount / 100.0 * 0.15;
+    let chroma_blend = params.chromatic / 100.0;
+    let sigma = grain_sigma(params.size);
+
+    let perm = build_permutation_table(seed);
+
+    if sigma < GRAIN_BLUR_SIGMA_THRESHOLD {
+        // Fast path: per-pixel noise, no buffer allocation
+        let octave_freqs = [GRAIN_BASE_FREQ, GRAIN_BASE_FREQ * 2.0, GRAIN_BASE_FREQ * 4.0];
+        let perm_r = build_permutation_table(seed.wrapping_add(1));
+        let perm_g = build_permutation_table(seed.wrapping_add(2));
+        let perm_b = build_permutation_table(seed.wrapping_add(3));
+
+        for y in 0..height {
+            for x in 0..width {
+                let xf = x as f32 * res_scale;
+                let yf = y as f32 * res_scale;
+                let idx = y * width + x;
+                let [r, g, b] = buf[idx];
+                let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+                let luma_w = luminance_weight(luma, config.luma_falloff);
+                let scale = strength * luma_w;
+
+                if chroma_blend == 0.0 {
+                    let noise = multi_octave_noise(xf, yf, &perm, &config, &octave_freqs);
+                    let shift = noise * scale;
+                    buf[idx] = [
+                        (r + shift).clamp(0.0, 1.0),
+                        (g + shift).clamp(0.0, 1.0),
+                        (b + shift).clamp(0.0, 1.0),
+                    ];
+                } else {
+                    let shared = multi_octave_noise(xf, yf, &perm, &config, &octave_freqs);
+                    let nr = multi_octave_noise(xf, yf, &perm_r, &config, &octave_freqs);
+                    let ng = multi_octave_noise(xf, yf, &perm_g, &config, &octave_freqs);
+                    let nb = multi_octave_noise(xf, yf, &perm_b, &config, &octave_freqs);
+                    let blend = chroma_blend;
+                    buf[idx] = [
+                        (r + (shared * (1.0 - blend) + nr * blend) * scale).clamp(0.0, 1.0),
+                        (g + (shared * (1.0 - blend) + ng * blend) * scale).clamp(0.0, 1.0),
+                        (b + (shared * (1.0 - blend) + nb * blend) * scale).clamp(0.0, 1.0),
+                    ];
+                }
+            }
+        }
+    } else {
+        // Buffer path: generate noise, blur, apply
+        let shared_noise = generate_noise_buffer(width, height, &perm, &config, res_scale);
+        let shared_blurred = super::detail::gaussian_blur(&shared_noise, width, height, sigma);
+
+        if chroma_blend == 0.0 {
+            for y in 0..height {
+                for x in 0..width {
+                    let idx = y * width + x;
+                    let [r, g, b] = buf[idx];
+                    let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+                    let luma_w = luminance_weight(luma, config.luma_falloff);
+                    let scale = strength * luma_w;
+                    let shift = shared_blurred[idx] * scale;
+                    buf[idx] = [
+                        (r + shift).clamp(0.0, 1.0),
+                        (g + shift).clamp(0.0, 1.0),
+                        (b + shift).clamp(0.0, 1.0),
+                    ];
+                }
+            }
+        } else {
+            let perm_r = build_permutation_table(seed.wrapping_add(1));
+            let perm_g = build_permutation_table(seed.wrapping_add(2));
+            let perm_b = build_permutation_table(seed.wrapping_add(3));
+            let noise_r = generate_noise_buffer(width, height, &perm_r, &config, res_scale);
+            let blurred_r = super::detail::gaussian_blur(&noise_r, width, height, sigma);
+            let noise_g = generate_noise_buffer(width, height, &perm_g, &config, res_scale);
+            let blurred_g = super::detail::gaussian_blur(&noise_g, width, height, sigma);
+            let noise_b = generate_noise_buffer(width, height, &perm_b, &config, res_scale);
+            let blurred_b = super::detail::gaussian_blur(&noise_b, width, height, sigma);
+
+            for y in 0..height {
+                for x in 0..width {
+                    let idx = y * width + x;
+                    let [r, g, b] = buf[idx];
+                    let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+                    let luma_w = luminance_weight(luma, config.luma_falloff);
+                    let scale = strength * luma_w;
+                    let blend = chroma_blend;
+                    buf[idx] = [
+                        (r + (shared_blurred[idx] * (1.0 - blend) + blurred_r[idx] * blend) * scale).clamp(0.0, 1.0),
+                        (g + (shared_blurred[idx] * (1.0 - blend) + blurred_g[idx] * blend) * scale).clamp(0.0, 1.0),
+                        (b + (shared_blurred[idx] * (1.0 - blend) + blurred_b[idx] * blend) * scale).clamp(0.0, 1.0),
+                    ];
+                }
+            }
+        }
+    }
+}
+
 /// Precomputed grain state — create once per render, then call
 /// [`apply_grain_pixel`] per pixel.
 #[derive(Debug, Clone)]
@@ -737,6 +855,150 @@ mod tests {
                     "output must be clamped: ({r}, {g}, {b})"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn apply_grain_buffer_modifies_image() {
+        let params = GrainParams {
+            grain_type: GrainType::Silver,
+            amount: 50.0,
+            size: 50.0,
+            chromatic: 0.0,
+            seed: None,
+        };
+        let width = 64;
+        let height = 64;
+        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; width * height];
+        apply_grain_buffer(&mut buf, width, height, &params, 42);
+        let changed = buf.iter().any(|px| (px[0] - 0.5).abs() > 1e-6);
+        assert!(changed, "grain buffer should modify image pixels");
+    }
+
+    #[test]
+    fn apply_grain_buffer_zero_amount_is_identity() {
+        let params = GrainParams {
+            grain_type: GrainType::Silver,
+            amount: 0.0,
+            size: 50.0,
+            chromatic: 0.0,
+            seed: None,
+        };
+        let width = 16;
+        let height = 16;
+        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.3, 0.1]; width * height];
+        let original = buf.clone();
+        apply_grain_buffer(&mut buf, width, height, &params, 42);
+        assert_eq!(buf, original);
+    }
+
+    #[test]
+    fn apply_grain_buffer_chromatic_shifts_channels_differently() {
+        let params = GrainParams {
+            grain_type: GrainType::Silver,
+            amount: 50.0,
+            size: 50.0,
+            chromatic: 100.0,
+            seed: None,
+        };
+        let width = 32;
+        let height = 32;
+        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; width * height];
+        apply_grain_buffer(&mut buf, width, height, &params, 42);
+        let found_diff = buf.iter().any(|px| {
+            let dr = px[0] - 0.5;
+            let dg = px[1] - 0.5;
+            let db = px[2] - 0.5;
+            (dr - dg).abs() > 1e-4 || (dg - db).abs() > 1e-4
+        });
+        assert!(found_diff, "chromatic grain should produce different per-channel shifts");
+    }
+
+    #[test]
+    fn apply_grain_buffer_variance_across_sizes() {
+        // Verify grain has meaningful variance at all sizes (doesn't wash out)
+        for size in [0.0, 25.0, 50.0, 75.0, 100.0] {
+            let params = GrainParams {
+                grain_type: GrainType::Silver,
+                amount: 80.0,
+                size,
+                chromatic: 0.0,
+                seed: None,
+            };
+            let width = 64;
+            let height = 64;
+            let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; width * height];
+            apply_grain_buffer(&mut buf, width, height, &params, 42);
+            let deltas: Vec<f32> = buf.iter().map(|px| (px[0] - 0.5).abs()).collect();
+            let mean_delta: f32 = deltas.iter().sum::<f32>() / deltas.len() as f32;
+            assert!(
+                mean_delta > 0.001,
+                "grain at size={size} should have visible effect: mean_delta={mean_delta}"
+            );
+        }
+    }
+
+    #[test]
+    fn apply_grain_buffer_luminance_aware_falloff() {
+        let params = GrainParams {
+            grain_type: GrainType::Silver,
+            amount: 80.0,
+            size: 50.0,
+            chromatic: 0.0,
+            seed: None,
+        };
+        let width = 128;
+        let height = 1;
+        let measure = |lum: f32| -> f32 {
+            let mut buf: Vec<[f32; 3]> = vec![[lum, lum, lum]; width * height];
+            apply_grain_buffer(&mut buf, width, height, &params, 42);
+            buf.iter().map(|px| (px[0] - lum).abs()).sum::<f32>() / buf.len() as f32
+        };
+        let mid = measure(0.5);
+        let dark = measure(0.02);
+        let bright = measure(0.98);
+        assert!(mid > dark, "midtones should have more grain than shadows: mid={mid}, dark={dark}");
+        assert!(mid > bright, "midtones should have more grain than highlights: mid={mid}, bright={bright}");
+    }
+
+    #[test]
+    fn apply_grain_buffer_resolution_independent() {
+        let params = GrainParams {
+            grain_type: GrainType::Silver,
+            amount: 50.0,
+            size: 50.0,
+            chromatic: 0.0,
+            seed: None,
+        };
+        // Both images should produce non-zero grain
+        let mut buf_small: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; 32 * 32];
+        apply_grain_buffer(&mut buf_small, 32, 32, &params, 42);
+        let shift_small: f32 = buf_small.iter().map(|px| (px[0] - 0.5).abs()).sum::<f32>() / buf_small.len() as f32;
+
+        let mut buf_large: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; 128 * 128];
+        apply_grain_buffer(&mut buf_large, 128, 128, &params, 42);
+        let shift_large: f32 = buf_large.iter().map(|px| (px[0] - 0.5).abs()).sum::<f32>() / buf_large.len() as f32;
+
+        assert!(shift_small > 0.0 && shift_large > 0.0,
+            "both resolutions should have grain: small={shift_small}, large={shift_large}");
+    }
+
+    #[test]
+    fn apply_grain_buffer_output_clamped() {
+        let params = GrainParams {
+            grain_type: GrainType::Harsh,
+            amount: 100.0,
+            size: 50.0,
+            chromatic: 100.0,
+            seed: None,
+        };
+        let width = 32;
+        let height = 32;
+        let mut buf: Vec<[f32; 3]> = vec![[0.01, 0.01, 0.01]; width * height];
+        apply_grain_buffer(&mut buf, width, height, &params, 42);
+        for px in &buf {
+            assert!((0.0..=1.0).contains(&px[0]) && (0.0..=1.0).contains(&px[1]) && (0.0..=1.0).contains(&px[2]),
+                "output must be clamped: ({}, {}, {})", px[0], px[1], px[2]);
         }
     }
 }
