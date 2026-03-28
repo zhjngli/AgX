@@ -592,10 +592,9 @@ mod tests {
         );
     }
 
-    /// Helper: compute octave_freqs from a size value (for tests).
-    fn octave_freqs_for_size(size: f32) -> [f32; 3] {
-        let base = 0.1 * (0.02f32).powf(size / 100.0);
-        [base, base * 2.0, base * 4.0]
+    /// Helper: compute octave_freqs at fixed base frequency (for tests).
+    fn fixed_octave_freqs() -> [f32; 3] {
+        [GRAIN_BASE_FREQ, GRAIN_BASE_FREQ * 2.0, GRAIN_BASE_FREQ * 4.0]
     }
 
     #[test]
@@ -609,7 +608,7 @@ mod tests {
             GrainType::Harsh,
         ];
         let perm = build_permutation_table(42);
-        let freqs = octave_freqs_for_size(50.0);
+        let freqs = fixed_octave_freqs();
         let mut variances = Vec::new();
         for gt in &types {
             let config = GrainTypeConfig::from_type(*gt);
@@ -633,26 +632,33 @@ mod tests {
     }
 
     #[test]
-    fn size_affects_frequency() {
+    fn size_affects_spatial_frequency() {
+        // Higher size should produce smoother (lower spatial frequency) grain
+        // by blurring the noise buffer, reducing adjacent-pixel deltas.
         let perm = build_permutation_table(42);
         let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let freqs_small = octave_freqs_for_size(10.0);
-        let mut delta_small = 0.0f32;
-        for i in 0..99 {
-            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, &freqs_small);
-            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, &freqs_small);
-            delta_small += (a - b).abs();
+        let width = 128;
+        let height = 1;
+
+        let noise = generate_noise_buffer(width, height, &perm, &config, 1.0);
+
+        // No blur (size=0 equivalent)
+        let mut delta_raw = 0.0f32;
+        for i in 0..width - 1 {
+            delta_raw += (noise[i] - noise[i + 1]).abs();
         }
-        let freqs_large = octave_freqs_for_size(90.0);
-        let mut delta_large = 0.0f32;
-        for i in 0..99 {
-            let a = multi_octave_noise(i as f32, 0.0, &perm, &config, &freqs_large);
-            let b = multi_octave_noise((i + 1) as f32, 0.0, &perm, &config, &freqs_large);
-            delta_large += (a - b).abs();
+
+        // Blurred (size=100 equivalent)
+        let sigma = grain_sigma(100.0);
+        let blurred = super::super::detail::gaussian_blur(&noise, width, height, sigma);
+        let mut delta_blurred = 0.0f32;
+        for i in 0..width - 1 {
+            delta_blurred += (blurred[i] - blurred[i + 1]).abs();
         }
+
         assert!(
-            delta_small > delta_large,
-            "fine grain should vary more between adjacent pixels: small={delta_small}, large={delta_large}"
+            delta_raw > delta_blurred,
+            "blurred grain should have lower spatial frequency: raw={delta_raw}, blurred={delta_blurred}"
         );
     }
 
