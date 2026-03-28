@@ -288,7 +288,11 @@ fn generate_noise_buffer(
     config: &GrainTypeConfig,
     res_scale: f32,
 ) -> Vec<f32> {
-    let octave_freqs = [GRAIN_BASE_FREQ, GRAIN_BASE_FREQ * 2.0, GRAIN_BASE_FREQ * 4.0];
+    let octave_freqs = [
+        GRAIN_BASE_FREQ,
+        GRAIN_BASE_FREQ * 2.0,
+        GRAIN_BASE_FREQ * 4.0,
+    ];
     let mut buf = Vec::with_capacity(width * height);
     for y in 0..height {
         for x in 0..width {
@@ -331,7 +335,11 @@ pub fn apply_grain_buffer(
 
     if sigma < GRAIN_BLUR_SIGMA_THRESHOLD {
         // Fast path: per-pixel noise, no buffer allocation
-        let octave_freqs = [GRAIN_BASE_FREQ, GRAIN_BASE_FREQ * 2.0, GRAIN_BASE_FREQ * 4.0];
+        let octave_freqs = [
+            GRAIN_BASE_FREQ,
+            GRAIN_BASE_FREQ * 2.0,
+            GRAIN_BASE_FREQ * 4.0,
+        ];
         let perm_r = build_permutation_table(seed.wrapping_add(1));
         let perm_g = build_permutation_table(seed.wrapping_add(2));
         let perm_b = build_permutation_table(seed.wrapping_add(3));
@@ -409,9 +417,15 @@ pub fn apply_grain_buffer(
                     let scale = strength * luma_w;
                     let blend = chroma_blend;
                     buf[idx] = [
-                        (r + (shared_blurred[idx] * (1.0 - blend) + blurred_r[idx] * blend) * scale).clamp(0.0, 1.0),
-                        (g + (shared_blurred[idx] * (1.0 - blend) + blurred_g[idx] * blend) * scale).clamp(0.0, 1.0),
-                        (b + (shared_blurred[idx] * (1.0 - blend) + blurred_b[idx] * blend) * scale).clamp(0.0, 1.0),
+                        (r + (shared_blurred[idx] * (1.0 - blend) + blurred_r[idx] * blend)
+                            * scale)
+                            .clamp(0.0, 1.0),
+                        (g + (shared_blurred[idx] * (1.0 - blend) + blurred_g[idx] * blend)
+                            * scale)
+                            .clamp(0.0, 1.0),
+                        (b + (shared_blurred[idx] * (1.0 - blend) + blurred_b[idx] * blend)
+                            * scale)
+                            .clamp(0.0, 1.0),
                     ];
                 }
             }
@@ -425,7 +439,6 @@ fn luminance_weight(luma: f32, falloff: f32) -> f32 {
     let base = (4.0 * luma.clamp(0.0, 1.0) * (1.0 - luma.clamp(0.0, 1.0))).clamp(0.0, 1.0);
     base.powf(falloff)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -509,7 +522,11 @@ mod tests {
 
     /// Helper: compute octave_freqs at fixed base frequency (for tests).
     fn fixed_octave_freqs() -> [f32; 3] {
-        [GRAIN_BASE_FREQ, GRAIN_BASE_FREQ * 2.0, GRAIN_BASE_FREQ * 4.0]
+        [
+            GRAIN_BASE_FREQ,
+            GRAIN_BASE_FREQ * 2.0,
+            GRAIN_BASE_FREQ * 4.0,
+        ]
     }
 
     #[test]
@@ -585,7 +602,10 @@ mod tests {
         assert_eq!(output.len(), 9);
         // Uniform input blurred should stay uniform (within float tolerance)
         for v in &output {
-            assert!((v - 1.0).abs() < 1e-5, "uniform blur should be identity: got {v}");
+            assert!(
+                (v - 1.0).abs() < 1e-5,
+                "uniform blur should be identity: got {v}"
+            );
         }
     }
 
@@ -604,7 +624,10 @@ mod tests {
         let buf = generate_noise_buffer(64, 64, &perm, &config, 1.0);
         let mean: f32 = buf.iter().sum::<f32>() / buf.len() as f32;
         let variance: f32 = buf.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / buf.len() as f32;
-        assert!(variance > 0.001, "noise buffer should have meaningful variance: {variance}");
+        assert!(
+            variance > 0.001,
+            "noise buffer should have meaningful variance: {variance}"
+        );
     }
 
     #[test]
@@ -669,7 +692,10 @@ mod tests {
             let db = px[2] - 0.5;
             (dr - dg).abs() > 1e-4 || (dg - db).abs() > 1e-4
         });
-        assert!(found_diff, "chromatic grain should produce different per-channel shifts");
+        assert!(
+            found_diff,
+            "chromatic grain should produce different per-channel shifts"
+        );
     }
 
     #[test]
@@ -715,8 +741,14 @@ mod tests {
         let mid = measure(0.5);
         let dark = measure(0.02);
         let bright = measure(0.98);
-        assert!(mid > dark, "midtones should have more grain than shadows: mid={mid}, dark={dark}");
-        assert!(mid > bright, "midtones should have more grain than highlights: mid={mid}, bright={bright}");
+        assert!(
+            mid > dark,
+            "midtones should have more grain than shadows: mid={mid}, dark={dark}"
+        );
+        assert!(
+            mid > bright,
+            "midtones should have more grain than highlights: mid={mid}, bright={bright}"
+        );
     }
 
     #[test]
@@ -731,14 +763,18 @@ mod tests {
         // Both images should produce non-zero grain
         let mut buf_small: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; 32 * 32];
         apply_grain_buffer(&mut buf_small, 32, 32, &params, 42);
-        let shift_small: f32 = buf_small.iter().map(|px| (px[0] - 0.5).abs()).sum::<f32>() / buf_small.len() as f32;
+        let shift_small: f32 =
+            buf_small.iter().map(|px| (px[0] - 0.5).abs()).sum::<f32>() / buf_small.len() as f32;
 
         let mut buf_large: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; 128 * 128];
         apply_grain_buffer(&mut buf_large, 128, 128, &params, 42);
-        let shift_large: f32 = buf_large.iter().map(|px| (px[0] - 0.5).abs()).sum::<f32>() / buf_large.len() as f32;
+        let shift_large: f32 =
+            buf_large.iter().map(|px| (px[0] - 0.5).abs()).sum::<f32>() / buf_large.len() as f32;
 
-        assert!(shift_small > 0.0 && shift_large > 0.0,
-            "both resolutions should have grain: small={shift_small}, large={shift_large}");
+        assert!(
+            shift_small > 0.0 && shift_large > 0.0,
+            "both resolutions should have grain: small={shift_small}, large={shift_large}"
+        );
     }
 
     #[test]
@@ -755,8 +791,15 @@ mod tests {
         let mut buf: Vec<[f32; 3]> = vec![[0.01, 0.01, 0.01]; width * height];
         apply_grain_buffer(&mut buf, width, height, &params, 42);
         for px in &buf {
-            assert!((0.0..=1.0).contains(&px[0]) && (0.0..=1.0).contains(&px[1]) && (0.0..=1.0).contains(&px[2]),
-                "output must be clamped: ({}, {}, {})", px[0], px[1], px[2]);
+            assert!(
+                (0.0..=1.0).contains(&px[0])
+                    && (0.0..=1.0).contains(&px[1])
+                    && (0.0..=1.0).contains(&px[2]),
+                "output must be clamped: ({}, {}, {})",
+                px[0],
+                px[1],
+                px[2]
+            );
         }
     }
 }
