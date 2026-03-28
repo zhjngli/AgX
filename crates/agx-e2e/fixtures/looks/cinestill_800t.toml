@@ -4,7 +4,7 @@ author = "agx"
 
 [tone]
 exposure = 0.15
-contrast = -3.0
+contrast = 3.0
 highlights = 8.0
 shadows = 6.0
 
@@ -34,12 +34,12 @@ saturation = 12.0
 luminance = 2.0
 
 [dehaze]
-amount = -18.0
+amount = -10.0
 
 [grain]
 type = "harsh"
-amount = 35.0
-size = 48.0
+amount = 25.0
+size = 28.0
 chromatic = 25.0
 seed = 42
 

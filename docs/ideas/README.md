@@ -16,6 +16,7 @@ These need access to surrounding pixels and require a multi-pass approach (separ
 |------|---------|-------|
 | [local-adjustments.md](local-adjustments.md) | Brushes, gradients, and radial filters for per-region edits | Photo-specific, lower priority |
 | [geometric-corrections.md](geometric-corrections.md) | Lens corrections, perspective, crop and rotation | Photo-specific, lower priority |
+| [grain-size-algorithm.md](grain-size-algorithm.md) | Rework grain size mapping to produce fine grain at all sizes, not low-frequency blobs | |
 
 ## Pipeline & Infrastructure
 

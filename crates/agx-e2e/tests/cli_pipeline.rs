@@ -19,6 +19,13 @@ const ALL_LOOKS: &[&str] = &[
     "dune",
 ];
 
+const BW_LOOKS: &[&str] = &[
+    "tri_x_400",
+    "tmax_100",
+    "high_contrast_bw",
+    "faded_bw",
+];
+
 // --- Helpers ---
 
 fn cli_bin() -> Command {
@@ -200,7 +207,7 @@ fn cli_night_architecture() {
         "jpeg",
         2,
         0.0,
-        ALL_LOOKS,
+        BW_LOOKS,
     );
 }
 

@@ -14,15 +14,15 @@ temperature = 22.0
 tint = 6.0
 
 [hsl.green]
-saturation = -20.0
+saturation = -14.0
 luminance = -4.0
 
 [hsl.blue]
-saturation = -18.0
+saturation = -12.0
 luminance = -6.0
 
 [hsl.aqua]
-saturation = -22.0
+saturation = -15.0
 
 [hsl.orange]
 saturation = 8.0
@@ -54,12 +54,12 @@ amount = 32.0
 texture = 12.0
 
 [vignette]
-amount = -15.0
+amount = -7.0
 
 [grain]
 type = "tabular"
-amount = 24.0
-size = 46.0
+amount = 18.0
+size = 26.0
 seed = 42
 
 [lut]

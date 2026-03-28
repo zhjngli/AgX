@@ -33,7 +33,7 @@ threshold = 35.0
 masking = 20.0
 
 [vignette]
-amount = -6.0
+amount = -3.0
 
 [grain]
 type = "fine"

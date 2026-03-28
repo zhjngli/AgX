@@ -17,7 +17,7 @@ saturation = 12.0
 luminance = -8.0
 
 [hsl.aqua]
-saturation = 16.0
+saturation = 10.0
 
 [color_grading.shadows]
 hue = 215.0
@@ -29,7 +29,7 @@ hue = 220.0
 saturation = 6.0
 
 [vignette]
-amount = -20.0
+amount = -10.0
 
 [detail.sharpening]
 amount = 38.0
@@ -39,8 +39,8 @@ masking = 45.0
 
 [grain]
 type = "harsh"
-amount = 28.0
-size = 42.0
+amount = 20.0
+size = 26.0
 seed = 42
 
 [lut]

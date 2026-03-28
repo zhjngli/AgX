@@ -20,7 +20,7 @@ threshold = 25.0
 masking = 15.0
 
 [vignette]
-amount = -25.0
+amount = -12.0
 
 [lut]
 path = "luts/high_contrast_bw.cube"
