@@ -7,7 +7,7 @@ Open-source photo editing library + CLI in Rust with a portable, human-readable 
 Cargo workspace with four crates:
 - `crates/agx/` -- core library (decode, engine, adjustments, presets, encode)
 - `crates/agx-cli/` -- thin CLI wrapper (edit, apply, batch-edit)
-- `crates/agx-e2e/` -- e2e test suite (golden file comparison, 54 image x look tests)
+- `crates/agx-e2e/` -- e2e test suite (golden file comparison, 65 image x look tests)
 - `crates/agx-lut-gen/` -- dev-only tool for generating .cube LUT files
 
 ## Architecture
@@ -60,9 +60,21 @@ Before merging, verify:
 5. Affected module `README.md` files updated
 6. Design doc cross-linked from `ARCHITECTURE.md` (if applicable)
 
+## Ideas Backlog
+
+The ideas backlog in `docs/ideas/` tracks future work at three levels. See `docs/ideas/README.md` for the full roadmap and format guide.
+
+When adding a new idea, always state what type it is:
+
+- **Epic** (new `.md` file): A broad feature area with multiple sub-tasks. Add it to the roadmap and category tables in `README.md`. Format: overview, sub-tasks checklist, considerations, related links.
+- **Sub-task** (checkbox in an epic): A concrete work item within an existing epic. Add a `- [ ]` line to the parent epic's sub-tasks. If it needs detailed investigation, give it its own `.md` file linked from the parent with a "Parent epic" blockquote at the top.
+- **Bug** (checkbox under "Bug fixes" in an epic): A known defect in an existing feature. Add under a "Bug fixes" heading in the relevant epic's sub-tasks.
+
+When implementing an idea, check off its sub-tasks as they're completed. When all sub-tasks are done, remove the file from `docs/ideas/`. All markdown links in idea files are validated by `verify.sh`.
+
 ## Key Docs
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) -- module layering, dependency rules, invariants
 - [`docs/plans/`](docs/plans/) -- design docs (committed); `docs/plans/impl/` -- implementation plans (local-only, gitignored)
-- [`docs/ideas/`](docs/ideas/) -- future feature ideas
+- [`docs/ideas/`](docs/ideas/) -- ideas backlog (epics, sub-tasks, bugs); see below
 - [`docs/contributing/`](docs/contributing/) -- developer workflow, evolving architecture

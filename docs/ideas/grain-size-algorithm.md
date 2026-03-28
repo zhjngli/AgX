@@ -1,5 +1,7 @@
 # Grain Size Algorithm Rework
 
+> **Parent epic:** [Processing Parity](processing-parity.md)
+
 Fix the grain size frequency mapping so larger sizes produce coarser grain particles, not low-frequency blobs.
 
 ## Sub-tasks
