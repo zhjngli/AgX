@@ -1,0 +1,52 @@
+[metadata]
+name = "Cinestill 800T"
+author = "agx"
+
+[tone]
+exposure = 0.15
+contrast = 3.0
+highlights = 8.0
+shadows = 6.0
+
+[white_balance]
+temperature = -14.0
+tint = -2.0
+
+[hsl.orange]
+saturation = 6.0
+luminance = 3.0
+
+[hsl.aqua]
+saturation = 10.0
+luminance = -3.0
+
+[color_grading]
+balance = -8.0
+
+[color_grading.shadows]
+hue = 210.0
+saturation = 18.0
+luminance = -3.0
+
+[color_grading.highlights]
+hue = 38.0
+saturation = 12.0
+luminance = 2.0
+
+[dehaze]
+amount = -10.0
+
+[grain]
+type = "harsh"
+amount = 25.0
+size = 28.0
+chromatic = 25.0
+seed = 42
+
+[noise_reduction]
+luminance = 18.0
+color = 14.0
+detail = 55.0
+
+[lut]
+path = "luts/cinestill_800t.cube"

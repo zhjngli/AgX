@@ -1,0 +1,24 @@
+[metadata]
+name = "Faded B&W"
+author = "agx"
+
+[tone]
+contrast = -4.0
+shadows = 8.0
+blacks = 18.0
+whites = -8.0
+
+[tone_curve.rgb]
+points = [[0.0, 0.06], [0.25, 0.22], [0.75, 0.78], [1.0, 0.94]]
+
+[detail]
+texture = -18.0
+
+[grain]
+type = "soft"
+amount = 22.0
+size = 30.0
+seed = 42
+
+[lut]
+path = "luts/faded_bw.cube"

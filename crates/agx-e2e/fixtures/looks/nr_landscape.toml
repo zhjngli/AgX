@@ -1,9 +1,0 @@
-[metadata]
-name = "NR Landscape"
-version = "1.0"
-author = "agx"
-
-[noise_reduction]
-luminance = 30.0
-color = 20.0
-detail = 50.0

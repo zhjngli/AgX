@@ -1,0 +1,33 @@
+[metadata]
+name = "T-Max 100"
+author = "agx"
+
+[tone]
+contrast = 4.0
+highlights = -3.0
+
+[tone_curve.rgb]
+points = [[0.0, 0.0], [0.15, 0.18], [0.5, 0.52], [0.85, 0.84], [1.0, 1.0]]
+
+[detail]
+texture = 8.0
+
+[detail.sharpening]
+amount = 30.0
+radius = 0.6
+threshold = 45.0
+masking = 35.0
+
+[grain]
+type = "fine"
+amount = 10.0
+size = 25.0
+seed = 42
+
+[noise_reduction]
+luminance = 10.0
+color = 6.0
+detail = 70.0
+
+[lut]
+path = "luts/tmax_100.cube"

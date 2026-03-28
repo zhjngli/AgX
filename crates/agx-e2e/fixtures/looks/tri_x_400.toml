@@ -1,0 +1,29 @@
+[metadata]
+name = "Tri-X 400"
+author = "agx"
+
+[tone]
+contrast = 16.0
+shadows = 4.0
+blacks = -12.0
+
+[detail]
+clarity = 14.0
+
+[detail.sharpening]
+amount = 48.0
+radius = 0.9
+threshold = 30.0
+masking = 25.0
+
+[vignette]
+amount = -7.0
+
+[grain]
+type = "cubic"
+amount = 32.0
+size = 28.0
+seed = 42
+
+[lut]
+path = "luts/tri_x_400.cube"

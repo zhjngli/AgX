@@ -1,0 +1,26 @@
+[metadata]
+name = "High-Contrast B&W"
+author = "agx"
+
+[tone]
+contrast = 28.0
+highlights = -8.0
+blacks = -22.0
+
+[tone_curve.rgb]
+points = [[0.0, 0.0], [0.2, 0.08], [0.5, 0.5], [0.8, 0.92], [1.0, 1.0]]
+
+[detail]
+clarity = 22.0
+
+[detail.sharpening]
+amount = 55.0
+radius = 1.2
+threshold = 25.0
+masking = 15.0
+
+[vignette]
+amount = -12.0
+
+[lut]
+path = "luts/high_contrast_bw.cube"

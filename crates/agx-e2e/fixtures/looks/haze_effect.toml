@@ -1,7 +1,0 @@
-[metadata]
-name = "Haze Effect"
-version = "1.0"
-author = "agx"
-
-[dehaze]
-amount = -30.0

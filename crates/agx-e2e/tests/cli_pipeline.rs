@@ -5,34 +5,21 @@ use agx_e2e::{assert_golden, assert_valid_output, fixture_path};
 
 // --- Constants ---
 
-const BW_LOOKS: &[&str] = &["bw_high_contrast", "bw_street", "bw_lofi"];
-
 const ALL_LOOKS: &[&str] = &[
     "portra_400",
-    "neo_noir",
-    "blade_runner",
-    "cinema_warm",
     "kodachrome_64",
-    "nordic_fade",
-    "bw_high_contrast",
-    "bw_street",
-    "bw_lofi",
-    "vignette_test",
-    "teal_orange",
-    "cool_shadows",
-    "s_curve_contrast",
-    "faded_film",
-    "cross_process",
-    "sharp_landscape",
-    "soft_portrait",
-    "detail_boost",
-    "dehaze_landscape",
-    "haze_effect",
-    "nr_landscape",
-    "nr_heavy",
-    "grain_silver",
-    "grain_harsh_chromatic",
+    "cinestill_800t",
+    "tri_x_400",
+    "tmax_100",
+    "high_contrast_bw",
+    "faded_bw",
+    "blade_runner",
+    "neo_noir",
+    "cinema_warm",
+    "dune",
 ];
+
+const BW_LOOKS: &[&str] = &["tri_x_400", "tmax_100", "high_contrast_bw", "faded_bw"];
 
 // --- Helpers ---
 

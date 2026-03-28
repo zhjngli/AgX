@@ -1,0 +1,66 @@
+[metadata]
+name = "Dune"
+author = "agx"
+
+[tone]
+contrast = 8.0
+highlights = -10.0
+shadows = -6.0
+blacks = 5.0
+whites = -8.0
+
+[white_balance]
+temperature = 22.0
+tint = 6.0
+
+[hsl.green]
+saturation = -14.0
+luminance = -4.0
+
+[hsl.blue]
+saturation = -12.0
+luminance = -6.0
+
+[hsl.aqua]
+saturation = -15.0
+
+[hsl.orange]
+saturation = 8.0
+luminance = 4.0
+
+[hsl.yellow]
+saturation = 6.0
+
+[color_grading]
+balance = 4.0
+
+[color_grading.shadows]
+hue = 35.0
+saturation = 12.0
+
+[color_grading.midtones]
+hue = 40.0
+saturation = 6.0
+
+[color_grading.highlights]
+hue = 45.0
+saturation = 10.0
+luminance = -2.0
+
+[dehaze]
+amount = 32.0
+
+[detail]
+texture = 12.0
+
+[vignette]
+amount = -7.0
+
+[grain]
+type = "tabular"
+amount = 18.0
+size = 26.0
+seed = 42
+
+[lut]
+path = "luts/dune.cube"

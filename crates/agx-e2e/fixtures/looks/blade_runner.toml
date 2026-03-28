@@ -1,28 +1,46 @@
 [metadata]
 name = "Blade Runner"
-author = "agx-e2e"
+author = "agx"
 extends = "base_cinematic.toml"
 
 [tone]
-contrast = 25.0
-highlights = -20.0
-shadows = 5.0
-blacks = -10.0
+contrast = 22.0
+highlights = -18.0
+shadows = 6.0
+blacks = -8.0
 
 [white_balance]
-temperature = 12.0
-tint = -3.0
+temperature = 11.0
+tint = -4.0
 
 [hsl.orange]
-saturation = 15.0
-luminance = 5.0
+saturation = 10.0
+luminance = 4.0
 
 [hsl.aqua]
-saturation = 20.0
-luminance = -5.0
+saturation = 12.0
+luminance = -6.0
 
 [hsl.blue]
-saturation = 15.0
+saturation = 9.0
+
+[color_grading.shadows]
+hue = 195.0
+saturation = 22.0
+
+[color_grading.highlights]
+hue = 32.0
+saturation = 18.0
+luminance = 3.0
+
+[detail]
+clarity = 10.0
+
+[grain]
+type = "tabular"
+amount = 14.0
+size = 24.0
+seed = 42
 
 [lut]
 path = "luts/blade_runner.cube"

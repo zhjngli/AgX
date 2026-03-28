@@ -1,9 +1,0 @@
-[metadata]
-name = "NR Heavy"
-version = "1.0"
-author = "agx"
-
-[noise_reduction]
-luminance = 80.0
-color = 60.0
-detail = 30.0

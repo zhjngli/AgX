@@ -24,36 +24,44 @@ pub fn all_looks() -> Vec<Look> {
             transform: portra_400,
         },
         Look {
-            name: "neo_noir",
-            transform: neo_noir,
+            name: "kodachrome_64",
+            transform: kodachrome_64,
+        },
+        Look {
+            name: "cinestill_800t",
+            transform: cinestill_800t,
+        },
+        Look {
+            name: "tri_x_400",
+            transform: tri_x_400,
+        },
+        Look {
+            name: "tmax_100",
+            transform: tmax_100,
+        },
+        Look {
+            name: "high_contrast_bw",
+            transform: high_contrast_bw,
+        },
+        Look {
+            name: "faded_bw",
+            transform: faded_bw,
         },
         Look {
             name: "blade_runner",
             transform: blade_runner,
         },
         Look {
+            name: "neo_noir",
+            transform: neo_noir,
+        },
+        Look {
             name: "cinema_warm",
             transform: cinema_warm,
         },
         Look {
-            name: "kodachrome_64",
-            transform: kodachrome_64,
-        },
-        Look {
-            name: "nordic_fade",
-            transform: nordic_fade,
-        },
-        Look {
-            name: "bw_high_contrast",
-            transform: bw_high_contrast,
-        },
-        Look {
-            name: "bw_street",
-            transform: bw_street,
-        },
-        Look {
-            name: "bw_lofi",
-            transform: bw_lofi,
+            name: "dune",
+            transform: dune,
         },
     ]
 }
@@ -147,9 +155,29 @@ fn kodachrome_64(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     clamp_rgb(r, g, b)
 }
 
-/// Nordic Fade — lifted blacks, compressed highlights, cool hue rotation,
-/// heavy desaturation, slight green midtone elevation.
-fn nordic_fade(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+/// Cinestill 800T — tungsten cinema stock. Cool blue-green overall cast,
+/// soft highlight bloom (reduced shoulder), gentle S-curve, slight shadow lift.
+fn cinestill_800t(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    // Gentle S-curve for cinema-like contrast
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.28, 0.48));
+
+    // Reduced shoulder simulates halation glow in highlights
+    let (r, g, b) = map_channels(r, g, b, |x| film_shoulder(x, 0.12));
+
+    // Tungsten cast: cool blue-green shadows, slightly warm highlights
+    let r = lift_gamma_gain(r, 0.01, 1.02, 0.96);
+    let g = lift_gamma_gain(g, 0.025, 0.98, 0.99);
+    let b = lift_gamma_gain(b, 0.04, 0.96, 1.01);
+
+    // Slight desaturation for the cinema look
+    let (r, g, b) = scale_saturation(r, g, b, 0.82);
+
+    clamp_rgb(r, g, b)
+}
+
+/// Dune — lifted blacks, compressed highlights, cool hue rotation,
+/// heavy desaturation, slight green midtone elevation. Desert-faded aesthetic.
+fn dune(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Lifted blacks + compressed highlights
     let (r, g, b) = map_channels(r, g, b, |x| lift_gamma_gain(x, 0.10, 1.0, 0.88));
 
@@ -169,7 +197,7 @@ fn nordic_fade(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 
 /// High Contrast B&W — strong S-curve, deep blacks, luminance desaturation.
 /// Classic darkroom high-contrast print.
-fn bw_high_contrast(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+fn high_contrast_bw(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Strong S-curve for punchy contrast
     let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.6, 0.45));
 
@@ -182,9 +210,34 @@ fn bw_high_contrast(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     clamp_rgb(r, g, b)
 }
 
-/// Street Documentary B&W — medium contrast, warm sepia-toned highlights,
-/// slightly lifted shadows. Classic street photography / photojournalism feel.
-fn bw_street(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+/// T-Max 100 — Kodak's technical fine-grain B&W. Smooth tonal gradations,
+/// minimal contrast, clean shadow rendering, neutral-cool tone.
+fn tmax_100(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    // Very mild S-curve — T-Max is known for smooth tones, not punchy contrast
+    let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.15, 0.5));
+
+    // Gentle film shoulder for natural highlight rolloff
+    let (r, g, b) = map_channels(r, g, b, |x| film_shoulder(x, 0.10));
+
+    // Full luminance desaturation
+    let (r, g, b) = desaturate_luminance(r, g, b, 1.0);
+
+    // Neutral-cool split tone: very subtle, keeping the technical character
+    let (r, g, b) = split_tone(
+        r,
+        g,
+        b,
+        [0.12, 0.13, 0.14], // barely cool shadows
+        [0.92, 0.92, 0.93], // neutral-cool highlights
+        0.12,
+    );
+
+    clamp_rgb(r, g, b)
+}
+
+/// Tri-X 400 — medium contrast, warm sepia-toned highlights,
+/// slightly lifted shadows. Classic Kodak Tri-X street photography feel.
+fn tri_x_400(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Medium S-curve
     let (r, g, b) = map_channels(r, g, b, |x| s_curve(x, 0.35, 0.5));
 
@@ -207,9 +260,9 @@ fn bw_street(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     clamp_rgb(r, g, b)
 }
 
-/// Lo-fi Documentary B&W — heavily lifted blacks, compressed dynamic range,
-/// cool blue tone. Faded surveillance/indie film aesthetic.
-fn bw_lofi(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+/// Faded B&W — heavily lifted blacks, compressed dynamic range,
+/// cool blue tone. Faded vintage film aesthetic.
+fn faded_bw(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     // Heavy black lift + compressed highlights (matte/faded look)
     let (r, g, b) = map_channels(r, g, b, |x| lift_gamma_gain(x, 0.15, 1.0, 0.82));
 
