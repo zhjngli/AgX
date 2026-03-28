@@ -419,45 +419,6 @@ pub fn apply_grain_buffer(
     }
 }
 
-/// Precomputed grain state — create once per render, then call
-/// [`apply_grain_pixel`] per pixel.
-#[derive(Debug, Clone)]
-pub struct GrainPrecomputed {
-    perm: [u8; 512],
-    perm_r: [u8; 512],
-    perm_g: [u8; 512],
-    perm_b: [u8; 512],
-    config: GrainTypeConfig,
-    strength: f32,
-    /// Precomputed per-octave frequencies (avoids powf in hot loop).
-    octave_freqs: [f32; 3],
-    chroma_blend: f32,
-    res_scale: f32,
-}
-
-impl GrainPrecomputed {
-    pub fn new(params: &GrainParams, seed: u64, width: u32, height: u32) -> Self {
-        let config = GrainTypeConfig::from_type(params.grain_type);
-        let reference_dim = 3000.0f32;
-        let dim = width.max(height) as f32;
-        let res_scale = reference_dim / dim;
-        // Map size 0–100 to frequency: size=0 → freq=0.1 (very fine), size=100 → freq=0.002 (very coarse)
-        let base_freq = 0.1 * (0.02f32).powf(params.size / 100.0);
-        let octave_freqs = [base_freq, base_freq * 2.0, base_freq * 4.0];
-        Self {
-            perm: build_permutation_table(seed),
-            perm_r: build_permutation_table(seed.wrapping_add(1)),
-            perm_g: build_permutation_table(seed.wrapping_add(2)),
-            perm_b: build_permutation_table(seed.wrapping_add(3)),
-            config,
-            strength: params.amount / 100.0 * 0.15,
-            octave_freqs,
-            chroma_blend: params.chromatic / 100.0,
-            res_scale,
-        }
-    }
-}
-
 /// Compute luminance-aware weight.
 #[inline]
 fn luminance_weight(luma: f32, falloff: f32) -> f32 {
@@ -465,52 +426,6 @@ fn luminance_weight(luma: f32, falloff: f32) -> f32 {
     base.powf(falloff)
 }
 
-/// Apply grain to a single pixel. Output is clamped to [0.0, 1.0].
-pub fn apply_grain_pixel(
-    r: f32,
-    g: f32,
-    b: f32,
-    x: u32,
-    y: u32,
-    pre: &GrainPrecomputed,
-) -> (f32, f32, f32) {
-    if pre.strength == 0.0 {
-        return (r, g, b);
-    }
-
-    let xf = x as f32 * pre.res_scale;
-    let yf = y as f32 * pre.res_scale;
-
-    let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-    let luma_w = luminance_weight(luma, pre.config.luma_falloff);
-    let scale = pre.strength * luma_w;
-
-    if pre.chroma_blend == 0.0 {
-        let noise = multi_octave_noise(xf, yf, &pre.perm, &pre.config, &pre.octave_freqs);
-        let shift = noise * scale;
-        (
-            (r + shift).clamp(0.0, 1.0),
-            (g + shift).clamp(0.0, 1.0),
-            (b + shift).clamp(0.0, 1.0),
-        )
-    } else {
-        let shared = multi_octave_noise(xf, yf, &pre.perm, &pre.config, &pre.octave_freqs);
-        let nr = multi_octave_noise(xf, yf, &pre.perm_r, &pre.config, &pre.octave_freqs);
-        let ng = multi_octave_noise(xf, yf, &pre.perm_g, &pre.config, &pre.octave_freqs);
-        let nb = multi_octave_noise(xf, yf, &pre.perm_b, &pre.config, &pre.octave_freqs);
-
-        let blend = pre.chroma_blend;
-        let shift_r = (shared * (1.0 - blend) + nr * blend) * scale;
-        let shift_g = (shared * (1.0 - blend) + ng * blend) * scale;
-        let shift_b = (shared * (1.0 - blend) + nb * blend) * scale;
-
-        (
-            (r + shift_r).clamp(0.0, 1.0),
-            (g + shift_g).clamp(0.0, 1.0),
-            (b + shift_b).clamp(0.0, 1.0),
-        )
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -663,139 +578,6 @@ mod tests {
     }
 
     #[test]
-    fn apply_grain_pixel_identity_when_amount_zero() {
-        let params = GrainParams::default();
-        let pre = GrainPrecomputed::new(&params, 42, 100, 100);
-        let (r, g, b) = apply_grain_pixel(0.5, 0.3, 0.1, 10, 10, &pre);
-        assert_eq!(r, 0.5);
-        assert_eq!(g, 0.3);
-        assert_eq!(b, 0.1);
-    }
-
-    #[test]
-    fn apply_grain_pixel_modifies_output() {
-        let params = GrainParams {
-            grain_type: GrainType::Silver,
-            amount: 50.0,
-            size: 50.0,
-            chromatic: 0.0,
-            seed: None,
-        };
-        let pre = GrainPrecomputed::new(&params, 42, 100, 100);
-        let (r, g, b) = apply_grain_pixel(0.5, 0.5, 0.5, 10, 10, &pre);
-        let changed = (r - 0.5).abs() > 1e-6 || (g - 0.5).abs() > 1e-6 || (b - 0.5).abs() > 1e-6;
-        assert!(
-            changed,
-            "grain should modify pixel values: got ({r}, {g}, {b})"
-        );
-    }
-
-    #[test]
-    fn apply_grain_pixel_luminance_only_shifts_channels_equally() {
-        let params = GrainParams {
-            grain_type: GrainType::Silver,
-            amount: 50.0,
-            size: 50.0,
-            chromatic: 0.0,
-            seed: None,
-        };
-        let pre = GrainPrecomputed::new(&params, 42, 100, 100);
-        let (r, g, b) = apply_grain_pixel(0.5, 0.5, 0.5, 10, 10, &pre);
-        let dr = r - 0.5;
-        let dg = g - 0.5;
-        let db = b - 0.5;
-        assert!(
-            (dr - dg).abs() < 1e-6 && (dg - db).abs() < 1e-6,
-            "luminance-only grain should shift all channels equally: dr={dr}, dg={dg}, db={db}"
-        );
-    }
-
-    #[test]
-    fn apply_grain_pixel_chromatic_shifts_channels_differently() {
-        let params = GrainParams {
-            grain_type: GrainType::Silver,
-            amount: 50.0,
-            size: 50.0,
-            chromatic: 100.0,
-            seed: None,
-        };
-        let pre = GrainPrecomputed::new(&params, 42, 100, 100);
-        let mut found_diff = false;
-        for x in 0..20u32 {
-            for y in 0..20u32 {
-                let (r, g, b) = apply_grain_pixel(0.5, 0.5, 0.5, x, y, &pre);
-                let dr = r - 0.5;
-                let dg = g - 0.5;
-                let db = b - 0.5;
-                if (dr - dg).abs() > 1e-4 || (dg - db).abs() > 1e-4 {
-                    found_diff = true;
-                    break;
-                }
-            }
-            if found_diff {
-                break;
-            }
-        }
-        assert!(
-            found_diff,
-            "chromatic grain should produce different per-channel shifts"
-        );
-    }
-
-    #[test]
-    fn apply_grain_pixel_luminance_aware_falloff() {
-        let params = GrainParams {
-            grain_type: GrainType::Silver,
-            amount: 80.0,
-            size: 50.0,
-            chromatic: 0.0,
-            seed: None,
-        };
-        let pre = GrainPrecomputed::new(&params, 42, 200, 200);
-        let measure = |lum: f32| -> f32 {
-            let mut total = 0.0f32;
-            let n = 100;
-            for x in 0..n {
-                let (r, _g, _b) = apply_grain_pixel(lum, lum, lum, x, 50, &pre);
-                total += (r - lum).abs();
-            }
-            total / n as f32
-        };
-        let mid = measure(0.5);
-        let dark = measure(0.02);
-        let bright = measure(0.98);
-        assert!(
-            mid > dark,
-            "midtones should have more grain than shadows: mid={mid}, dark={dark}"
-        );
-        assert!(
-            mid > bright,
-            "midtones should have more grain than highlights: mid={mid}, bright={bright}"
-        );
-    }
-
-    #[test]
-    fn apply_grain_pixel_resolution_independent() {
-        let params = GrainParams {
-            grain_type: GrainType::Silver,
-            amount: 50.0,
-            size: 50.0,
-            chromatic: 0.0,
-            seed: None,
-        };
-        let pre_small = GrainPrecomputed::new(&params, 42, 1000, 1000);
-        let pre_large = GrainPrecomputed::new(&params, 42, 3000, 3000);
-        let (r1, _, _) = apply_grain_pixel(0.5, 0.5, 0.5, 500, 500, &pre_small);
-        let (r2, _, _) = apply_grain_pixel(0.5, 0.5, 0.5, 1500, 1500, &pre_large);
-        let shift1 = (r1 - 0.5).abs();
-        let shift2 = (r2 - 0.5).abs();
-        assert!(
-            shift1 > 0.0 && shift2 > 0.0,
-            "both images should have grain: shift1={shift1}, shift2={shift2}"
-        );
-    }
-
-    #[test]
     fn can_access_detail_gaussian_blur() {
         // Verify we can call the shared gaussian_blur from grain module.
         let input = vec![1.0f32; 9]; // 3x3 uniform
@@ -832,36 +614,6 @@ mod tests {
         let buf1 = generate_noise_buffer(16, 16, &perm, &config, 1.0);
         let buf2 = generate_noise_buffer(16, 16, &perm, &config, 1.0);
         assert_eq!(buf1, buf2);
-    }
-
-    #[test]
-    fn apply_grain_pixel_output_clamped() {
-        let params = GrainParams {
-            grain_type: GrainType::Harsh,
-            amount: 100.0,
-            size: 50.0,
-            chromatic: 100.0,
-            seed: None,
-        };
-        let pre = GrainPrecomputed::new(&params, 42, 100, 100);
-        for x in 0..50u32 {
-            for y in 0..50u32 {
-                let (r, g, b) = apply_grain_pixel(0.01, 0.01, 0.01, x, y, &pre);
-                assert!(
-                    (0.0..=1.0).contains(&r)
-                        && (0.0..=1.0).contains(&g)
-                        && (0.0..=1.0).contains(&b),
-                    "output must be clamped: ({r}, {g}, {b})"
-                );
-                let (r, g, b) = apply_grain_pixel(0.99, 0.99, 0.99, x, y, &pre);
-                assert!(
-                    (0.0..=1.0).contains(&r)
-                        && (0.0..=1.0).contains(&g)
-                        && (0.0..=1.0).contains(&b),
-                    "output must be clamped: ({r}, {g}, {b})"
-                );
-            }
-        }
     }
 
     #[test]
