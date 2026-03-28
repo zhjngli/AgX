@@ -38,7 +38,7 @@ amount = -3.0
 [grain]
 type = "fine"
 amount = 15.0
-size = 30.0
+size = 35.0
 seed = 42
 
 [lut]

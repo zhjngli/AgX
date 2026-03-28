@@ -29,7 +29,7 @@ amount = -4.0
 [grain]
 type = "silver"
 amount = 18.0
-size = 25.0
+size = 40.0
 seed = 42
 
 [noise_reduction]

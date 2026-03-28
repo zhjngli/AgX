@@ -59,7 +59,7 @@ amount = -7.0
 [grain]
 type = "tabular"
 amount = 18.0
-size = 26.0
+size = 55.0
 seed = 42
 
 [lut]

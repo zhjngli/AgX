@@ -17,7 +17,7 @@ texture = -18.0
 [grain]
 type = "soft"
 amount = 22.0
-size = 30.0
+size = 50.0
 seed = 42
 
 [lut]
