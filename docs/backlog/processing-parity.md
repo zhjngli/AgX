@@ -6,7 +6,7 @@ Understanding and reducing rendering differences between AgX and other photo edi
 
 ### Bug fixes
 
-- [ ] **[Grain size algorithm rework](grain-size-algorithm.md)** — grain size mapping produces low-frequency blobs at moderate sizes instead of fine grain particles (detailed investigation and proposed fixes in linked doc)
+- [x] **[Grain size algorithm rework](grain-size-algorithm.md)** — fixed: replaced frequency-based sizing with blur-based approach (fixed high-frequency noise + Gaussian blur for particle size)
 
 ### Per-feature verification
 

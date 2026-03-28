@@ -6,10 +6,10 @@ Fix the grain size frequency mapping so larger sizes produce coarser grain parti
 
 ## Sub-tasks
 
-- [ ] **Narrow the frequency range** — change `base_freq = 0.1 * (0.02).powf(size / 100.0)` to keep even size=100 in "visible grain" territory (e.g., `0.1 * (0.15).powf(size / 100.0)`)
-- [ ] **Evaluate blur-based approach** — keep base frequency high and control particle size by blurring the noise output with a small kernel (1-3px radius), mimicking real film grain scaling
-- [ ] **Add visual/behavioral tests** — verify grain at all sizes looks like grain, not clouds; test on uniform areas (sky, walls) where blob artifacts are most visible
-- [ ] **Update e2e presets** — remove the grain size ≤30 cap once the algorithm produces good results at higher sizes
+- [x] **Narrow the frequency range** — replaced with blur-based approach (fixed high frequency + Gaussian blur for particle size)
+- [x] **Evaluate blur-based approach** — implemented: generate noise at fixed frequency, blur to control particle size
+- [x] **Add visual/behavioral tests** — variance tests at all size values, visual verification of goldens
+- [x] **Update e2e presets** — grain sizes raised to 35-65 range, goldens regenerated
 
 ## Problem
 
