@@ -62,7 +62,7 @@ impl DetailParams {
 
 // --- Gaussian blur (separable 2-pass) ---
 
-fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
+pub(crate) fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
     let half = (3.0 * sigma).ceil() as usize;
     let size = 2 * half + 1;
     let mut kernel = Vec::with_capacity(size);
@@ -78,7 +78,7 @@ fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
     kernel
 }
 
-fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
+pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
     let kernel = build_gaussian_kernel(sigma);
     let half = kernel.len() / 2;
     let mut temp = vec![0.0f32; width * height];

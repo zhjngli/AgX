@@ -632,6 +632,18 @@ mod tests {
     }
 
     #[test]
+    fn can_access_detail_gaussian_blur() {
+        // Verify we can call the shared gaussian_blur from grain module.
+        let input = vec![1.0f32; 9]; // 3x3 uniform
+        let output = super::super::detail::gaussian_blur(&input, 3, 3, 1.0);
+        assert_eq!(output.len(), 9);
+        // Uniform input blurred should stay uniform (within float tolerance)
+        for v in &output {
+            assert!((v - 1.0).abs() < 1e-5, "uniform blur should be identity: got {v}");
+        }
+    }
+
+    #[test]
     fn apply_grain_pixel_output_clamped() {
         let params = GrainParams {
             grain_type: GrainType::Harsh,
