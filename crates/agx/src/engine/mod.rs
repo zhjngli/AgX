@@ -1073,14 +1073,17 @@ impl Engine {
     /// 1. White balance (linear space) — channel multipliers
     /// 2. Exposure (linear space) — multiply by 2^stops
     ///    2b. Dehaze (linear space, buffer-level, when active)
+    ///    2c. Noise reduction (linear space, buffer-level, when active)
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
-    /// 5. HSL adjustments (sRGB gamma space)
-    /// 6. Color grading (sRGB gamma space) — 3-way color wheels
-    /// 7. LUT application (sRGB gamma space)
-    /// 8. Vignette (sRGB gamma space, position-dependent)
-    /// 9. Detail pass — sharpening, clarity, texture (sRGB gamma space, when active)
-    /// 10. Convert back to linear space
+    /// 5. Tone curves (sRGB gamma space)
+    /// 6. HSL adjustments (sRGB gamma space)
+    /// 7. Color grading (sRGB gamma space) — 3-way color wheels
+    /// 8. LUT application (sRGB gamma space)
+    /// 9. Detail pass — sharpening, clarity, texture (sRGB gamma space, buffer-level, when active)
+    /// 10. Grain (sRGB gamma space, buffer-level when size >= threshold, per-pixel otherwise)
+    /// 11. Vignette (sRGB gamma space, position-dependent)
+    /// 12. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
@@ -1277,23 +1280,22 @@ impl Engine {
                 srgb_buf
             };
 
-            // Post-detail-pass: apply grain and vignette, then convert to linear.
-            let grain_pre = grain_active.then(|| {
+            // Post-detail-pass: apply grain to the buffer, then vignette + convert to linear.
+            let mut grain_buf = detail_buf;
+            if grain_active {
                 let seed = self.params.grain.seed.unwrap_or_else(rand::random::<u64>);
-                adjust::grain::GrainPrecomputed::new(&self.params.grain, seed, w, h)
-            });
+                adjust::grain::apply_grain_buffer(
+                    &mut grain_buf,
+                    w as usize,
+                    h as usize,
+                    &self.params.grain,
+                    seed,
+                );
+            }
 
             Rgb32FImage::from_fn(w, h, |x, y| {
                 let idx = (y * w + x) as usize;
-                let [mut sr, mut sg, mut sb] = detail_buf[idx];
-
-                // Grain (sRGB gamma space)
-                if let Some(ref pre) = grain_pre {
-                    let (gr, gg, gb) = adjust::grain::apply_grain_pixel(sr, sg, sb, x, y, pre);
-                    sr = gr;
-                    sg = gg;
-                    sb = gb;
-                }
+                let [mut sr, mut sg, mut sb] = grain_buf[idx];
 
                 // Vignette (sRGB gamma space, position-dependent)
                 if let Some(pre) = &vignette_pre {
