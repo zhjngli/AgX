@@ -30,6 +30,57 @@ run_check() {
     fi
 }
 
+# --- Markdown link checker ---
+# Scans .md files for markdown links to other .md files and verifies they exist.
+# Links are resolved relative to the file's parent directory.
+#
+# Usage: check_md_links <file_or_dir> [<file_or_dir> ...]
+check_md_links() {
+    local errors=0
+    local link_re='\[([^]]*)\]\(([^)]+\.md)\)'
+
+    for target in "$@"; do
+        local files=()
+        if [ -d "$target" ]; then
+            for f in "$target"/*.md; do
+                [ -f "$f" ] && files+=("$f")
+            done
+        elif [ -f "$target" ]; then
+            files+=("$target")
+        else
+            echo "ERROR: $target not found"
+            errors=$((errors + 1))
+            continue
+        fi
+
+        for file in "${files[@]}"; do
+            local dir
+            dir="$(dirname "$file")"
+            while IFS= read -r line; do
+                local remaining="$line"
+                while [[ "$remaining" =~ $link_re ]]; do
+                    local link="${BASH_REMATCH[2]}"
+                    # Skip external URLs
+                    if [[ "$link" != http* ]]; then
+                        local resolved="$dir/$link"
+                        if [ ! -f "$resolved" ]; then
+                            echo "ERROR: Broken link in $file: $link"
+                            errors=$((errors + 1))
+                        fi
+                    fi
+                    remaining="${remaining#*"${BASH_REMATCH[0]}"}"
+                done
+            done < "$file"
+        done
+    done
+
+    if [ "$errors" -gt 0 ]; then
+        echo "$errors broken link(s) found"
+        return 1
+    fi
+    return 0
+}
+
 # 1. Format check
 run_check "Format (cargo fmt)" cargo fmt --check
 
@@ -43,62 +94,11 @@ run_check "Library tests (cargo test -p agx)" cargo test -p agx
 run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
 # 5. Documentation link validation
-check_doc_links() {
-    local errors=0
-    local arch="ARCHITECTURE.md"
-
-    if [ ! -f "$arch" ]; then
-        echo "ERROR: ARCHITECTURE.md not found"
-        return 1
-    fi
-
-    # Regex patterns stored in variables to avoid bash parsing issues
-    local readme_re='\]\(([^)]+README\.md)\)'
-    local plans_re='\]\((docs/plans/[^)]+\.md)\)'
-    local contrib_re='\]\((docs/contributing/[^)]+\.md)\)'
-
-    # Check per-module README links
-    while IFS= read -r line; do
-        if [[ "$line" =~ $readme_re ]]; then
-            local path="${BASH_REMATCH[1]}"
-            if [ ! -f "$path" ]; then
-                echo "ERROR: Missing README: $path (referenced in ARCHITECTURE.md)"
-                errors=$((errors + 1))
-            fi
-        fi
-    done < "$arch"
-
-    # Check design doc links
-    while IFS= read -r line; do
-        if [[ "$line" =~ $plans_re ]]; then
-            local path="${BASH_REMATCH[1]}"
-            if [ ! -f "$path" ]; then
-                echo "ERROR: Missing design doc: $path (referenced in ARCHITECTURE.md)"
-                errors=$((errors + 1))
-            fi
-        fi
-    done < "$arch"
-
-    # Check contributing doc links
-    while IFS= read -r line; do
-        if [[ "$line" =~ $contrib_re ]]; then
-            local path="${BASH_REMATCH[1]}"
-            if [ ! -f "$path" ]; then
-                echo "ERROR: Missing contributing doc: $path (referenced in ARCHITECTURE.md)"
-                errors=$((errors + 1))
-            fi
-        fi
-    done < "$arch"
-
-    if [ "$errors" -gt 0 ]; then
-        echo "$errors broken link(s) found in ARCHITECTURE.md"
-        return 1
-    fi
-
+check_all_doc_links() {
+    check_md_links ARCHITECTURE.md docs/backlog/ || return 1
     echo "All documentation links valid"
-    return 0
 }
-run_check "Documentation links" check_doc_links
+run_check "Documentation links" check_all_doc_links
 
 # Summary
 echo ""
