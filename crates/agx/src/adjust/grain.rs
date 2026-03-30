@@ -4,8 +4,8 @@ use super::{LUMA_B, LUMA_G, LUMA_R};
 
 /// Grain type controlling the internal character of the noise.
 ///
-/// Each type maps to a combination of octave weights, contrast curve,
-/// and luminance falloff strength. Matches Capture One's grain type model.
+/// Each type maps to a combination of contrast curve, luminance falloff
+/// strength, and chromatic intensity. Matches Capture One's grain type model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GrainType {
@@ -90,106 +90,9 @@ impl GrainParams {
     }
 }
 
-/// Standard 2D simplex noise gradient table (12 directions).
-const GRAD2: [[f32; 2]; 12] = [
-    [1.0, 1.0],
-    [-1.0, 1.0],
-    [1.0, -1.0],
-    [-1.0, -1.0],
-    [1.0, 0.0],
-    [-1.0, 0.0],
-    [0.0, 1.0],
-    [0.0, -1.0],
-    [1.0, 1.0],
-    [-1.0, 1.0],
-    [1.0, -1.0],
-    [-1.0, -1.0],
-];
-
-/// Skewing factor for 2D simplex grid: (sqrt(3) - 1) / 2.
-const F2: f32 = 0.366_025_4;
-/// Unskewing factor: (3 - sqrt(3)) / 6.
-const G2: f32 = 0.211_324_87;
-
-/// Build a seeded 256-entry permutation table for simplex noise.
-#[allow(dead_code)]
-fn build_permutation_table(seed: u64) -> [u8; 512] {
-    let mut perm = [0u8; 256];
-    for (i, val) in perm.iter_mut().enumerate() {
-        *val = i as u8;
-    }
-    // Fisher-Yates shuffle with simple LCG seeded PRNG
-    let mut rng = seed;
-    for i in (1..256).rev() {
-        rng = rng
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(1442695040888963407);
-        let j = (rng >> 33) as usize % (i + 1);
-        perm.swap(i, j);
-    }
-    // Double the table to avoid index wrapping
-    let mut table = [0u8; 512];
-    for i in 0..512 {
-        table[i] = perm[i & 255];
-    }
-    table
-}
-
-/// 2D simplex noise, returns value in approximately [-1, 1].
-#[allow(dead_code)]
-fn simplex_noise_2d(x: f32, y: f32, perm: &[u8; 512]) -> f32 {
-    let s = (x + y) * F2;
-    let i = (x + s).floor() as i32;
-    let j = (y + s).floor() as i32;
-
-    let t = (i + j) as f32 * G2;
-    let x0 = x - (i as f32 - t);
-    let y0 = y - (j as f32 - t);
-
-    let (i1, j1) = if x0 > y0 { (1, 0) } else { (0, 1) };
-
-    let x1 = x0 - i1 as f32 + G2;
-    let y1 = y0 - j1 as f32 + G2;
-    let x2 = x0 - 1.0 + 2.0 * G2;
-    let y2 = y0 - 1.0 + 2.0 * G2;
-
-    let ii = (i & 255) as usize;
-    let jj = (j & 255) as usize;
-
-    let mut n = 0.0f32;
-
-    let t0 = 0.5 - x0 * x0 - y0 * y0;
-    if t0 > 0.0 {
-        let t0 = t0 * t0;
-        let gi = perm[ii + perm[jj] as usize] as usize % 12;
-        n += t0 * t0 * (GRAD2[gi][0] * x0 + GRAD2[gi][1] * y0);
-    }
-
-    let t1 = 0.5 - x1 * x1 - y1 * y1;
-    if t1 > 0.0 {
-        let t1 = t1 * t1;
-        let gi = perm[ii + i1 + perm[jj + j1] as usize] as usize % 12;
-        n += t1 * t1 * (GRAD2[gi][0] * x1 + GRAD2[gi][1] * y1);
-    }
-
-    let t2 = 0.5 - x2 * x2 - y2 * y2;
-    if t2 > 0.0 {
-        let t2 = t2 * t2;
-        let gi = perm[ii + 1 + perm[jj + 1] as usize] as usize % 12;
-        n += t2 * t2 * (GRAD2[gi][0] * x2 + GRAD2[gi][1] * y2);
-    }
-
-    // Scale to approximately [-1, 1]
-    70.0 * n
-}
-
 /// Internal configuration for each grain type.
 #[derive(Debug, Clone, Copy)]
 struct GrainTypeConfig {
-    /// Number of octaves (2 or 3)
-    octaves: u32,
-    /// Relative weight of each octave (up to 3 entries)
-    octave_weights: [f32; 3],
     /// Contrast multiplier applied to raw noise
     contrast: f32,
     /// Luminance falloff exponent — higher = stronger midtone bias
@@ -205,43 +108,31 @@ impl GrainTypeConfig {
     fn from_type(grain_type: GrainType) -> Self {
         match grain_type {
             GrainType::Fine => Self {
-                octaves: 2,
-                octave_weights: [0.3, 0.7, 0.0],
                 contrast: 0.6,
                 luma_falloff: 3.0,
                 chromatic: 0.03,
             },
             GrainType::Silver => Self {
-                octaves: 3,
-                octave_weights: [0.5, 0.35, 0.15],
                 contrast: 1.0,
                 luma_falloff: 2.0,
                 chromatic: 0.05,
             },
             GrainType::Soft => Self {
-                octaves: 2,
-                octave_weights: [0.7, 0.3, 0.0],
                 contrast: 0.7,
                 luma_falloff: 3.0,
                 chromatic: 0.05,
             },
             GrainType::Cubic => Self {
-                octaves: 3,
-                octave_weights: [0.4, 0.3, 0.3],
                 contrast: 1.3,
                 luma_falloff: 1.5,
                 chromatic: 0.12,
             },
             GrainType::Tabular => Self {
-                octaves: 2,
-                octave_weights: [0.6, 0.4, 0.0],
                 contrast: 0.8,
                 luma_falloff: 2.0,
                 chromatic: 0.08,
             },
             GrainType::Harsh => Self {
-                octaves: 3,
-                octave_weights: [0.3, 0.3, 0.4],
                 contrast: 1.5,
                 luma_falloff: 1.0,
                 chromatic: 0.15,
@@ -249,30 +140,6 @@ impl GrainTypeConfig {
         }
     }
 }
-
-/// Multi-octave simplex noise with precomputed per-octave frequencies.
-///
-/// Returns a noise value (not yet scaled by amount or luminance weight).
-#[allow(dead_code)]
-fn multi_octave_noise(
-    x: f32,
-    y: f32,
-    perm: &[u8; 512],
-    config: &GrainTypeConfig,
-    octave_freqs: &[f32; 3],
-) -> f32 {
-    let mut value = 0.0f32;
-    for i in 0..config.octaves {
-        let freq = octave_freqs[i as usize];
-        let weight = config.octave_weights[i as usize];
-        value += weight * simplex_noise_2d(x * freq, y * freq, perm);
-    }
-
-    value * config.contrast
-}
-
-/// Fixed base frequency for noise generation. Size is controlled by post-blur, not frequency.
-const GRAIN_BASE_FREQ: f32 = 0.08;
 
 /// Minimum blur sigma below which no blur is applied (noise used as-is).
 const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.5;
@@ -299,36 +166,6 @@ fn grain_sigma(size: f32, width: usize, height: usize) -> f32 {
     let base_sigma = t.powf(1.5) * GRAIN_MAX_SIGMA;
     let long_edge = width.max(height) as f32;
     base_sigma * (long_edge / GRAIN_REF_RESOLUTION)
-}
-
-/// Generate a single-channel noise buffer using simplex noise at fixed high frequency.
-///
-/// Each pixel gets multi-octave simplex noise scaled by `res_scale`
-/// (for resolution independence) and the grain type's contrast.
-/// Retained for potential future use; grain now uses `generate_white_noise_buffer`.
-#[allow(dead_code)]
-fn generate_simplex_noise_buffer(
-    width: usize,
-    height: usize,
-    perm: &[u8; 512],
-    config: &GrainTypeConfig,
-    res_scale: f32,
-) -> Vec<f32> {
-    let octave_freqs = [
-        GRAIN_BASE_FREQ,
-        GRAIN_BASE_FREQ * 2.0,
-        GRAIN_BASE_FREQ * 4.0,
-    ];
-    let mut buf = Vec::with_capacity(width * height);
-    for y in 0..height {
-        for x in 0..width {
-            let xf = x as f32 * res_scale;
-            let yf = y as f32 * res_scale;
-            let noise = multi_octave_noise(xf, yf, perm, config, &octave_freqs);
-            buf.push(noise);
-        }
-    }
-    buf
 }
 
 /// Generate a single-channel white noise buffer.
@@ -475,105 +312,6 @@ mod tests {
     #[test]
     fn grain_type_default_is_silver() {
         assert_eq!(GrainType::default(), GrainType::Silver);
-    }
-
-    #[test]
-    fn simplex_noise_is_deterministic() {
-        let perm = build_permutation_table(42);
-        let a = simplex_noise_2d(1.0, 2.0, &perm);
-        let b = simplex_noise_2d(1.0, 2.0, &perm);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn simplex_noise_in_range() {
-        let perm = build_permutation_table(42);
-        for i in 0..100 {
-            for j in 0..100 {
-                let v = simplex_noise_2d(i as f32 * 0.1, j as f32 * 0.1, &perm);
-                assert!(
-                    (-1.0..=1.0).contains(&v),
-                    "noise at ({}, {}) = {} out of range",
-                    i,
-                    j,
-                    v
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn simplex_noise_spatial_coherence() {
-        let perm = build_permutation_table(42);
-        let a = simplex_noise_2d(1.0, 1.0, &perm);
-        let b = simplex_noise_2d(1.01, 1.01, &perm);
-        let diff = (a - b).abs();
-        assert!(
-            diff < 0.1,
-            "nearby points should have similar noise: a={a}, b={b}, diff={diff}"
-        );
-    }
-
-    #[test]
-    fn different_seeds_produce_different_noise() {
-        let perm_a = build_permutation_table(42);
-        let perm_b = build_permutation_table(99);
-        let mut same = 0;
-        let total = 100;
-        for i in 0..total {
-            let a = simplex_noise_2d(i as f32 * 0.5, 0.0, &perm_a);
-            let b = simplex_noise_2d(i as f32 * 0.5, 0.0, &perm_b);
-            if (a - b).abs() < 1e-6 {
-                same += 1;
-            }
-        }
-        assert!(
-            same < total / 2,
-            "different seeds should produce mostly different values, got {same}/{total} same"
-        );
-    }
-
-    /// Helper: compute octave_freqs at fixed base frequency (for tests).
-    fn fixed_octave_freqs() -> [f32; 3] {
-        [
-            GRAIN_BASE_FREQ,
-            GRAIN_BASE_FREQ * 2.0,
-            GRAIN_BASE_FREQ * 4.0,
-        ]
-    }
-
-    #[test]
-    fn grain_types_produce_different_output() {
-        let types = [
-            GrainType::Fine,
-            GrainType::Silver,
-            GrainType::Soft,
-            GrainType::Cubic,
-            GrainType::Tabular,
-            GrainType::Harsh,
-        ];
-        let perm = build_permutation_table(42);
-        let freqs = fixed_octave_freqs();
-        let mut variances = Vec::new();
-        for gt in &types {
-            let config = GrainTypeConfig::from_type(*gt);
-            let mut sum_sq = 0.0;
-            let n = 400;
-            for i in 0..20 {
-                for j in 0..20 {
-                    let v =
-                        multi_octave_noise(i as f32 * 0.1, j as f32 * 0.1, &perm, &config, &freqs);
-                    sum_sq += v * v;
-                }
-            }
-            variances.push(sum_sq / n as f32);
-        }
-        let min = variances.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max = variances.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        assert!(
-            max > min * 1.1,
-            "grain types should produce different variances: {variances:?}"
-        );
     }
 
     #[test]
