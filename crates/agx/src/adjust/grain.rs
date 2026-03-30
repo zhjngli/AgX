@@ -523,7 +523,10 @@ mod tests {
             let ratio_g = px[1] / 0.2;
             (ratio_r - ratio_g).abs() > 1e-4
         });
-        assert!(found_diff, "chromatic grain on color pixels should shift channels differently");
+        assert!(
+            found_diff,
+            "chromatic grain on color pixels should shift channels differently"
+        );
     }
 
     #[test]
@@ -545,7 +548,9 @@ mod tests {
             assert!(
                 (dr - dg).abs() < 1e-6 && (dg - db).abs() < 1e-6,
                 "grayscale pixel should have identical per-channel grain: [{}, {}, {}]",
-                px[0], px[1], px[2]
+                px[0],
+                px[1],
+                px[2]
             );
         }
     }
