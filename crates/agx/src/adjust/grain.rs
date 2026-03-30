@@ -194,6 +194,11 @@ struct GrainTypeConfig {
     contrast: f32,
     /// Luminance falloff exponent — higher = stronger midtone bias
     luma_falloff: f32,
+    /// Chromatic grain intensity — how much per-channel noise diverges from
+    /// the shared (luminance) noise on saturated pixels. 0.0 = fully monochrome,
+    /// higher = more color fringing. Modulated by pixel saturation so neutral
+    /// pixels always get identical per-channel grain.
+    chromatic: f32,
 }
 
 impl GrainTypeConfig {
@@ -204,36 +209,42 @@ impl GrainTypeConfig {
                 octave_weights: [0.3, 0.7, 0.0],
                 contrast: 0.6,
                 luma_falloff: 3.0,
+                chromatic: 0.03,
             },
             GrainType::Silver => Self {
                 octaves: 3,
                 octave_weights: [0.5, 0.35, 0.15],
                 contrast: 1.0,
                 luma_falloff: 2.0,
+                chromatic: 0.05,
             },
             GrainType::Soft => Self {
                 octaves: 2,
                 octave_weights: [0.7, 0.3, 0.0],
                 contrast: 0.7,
                 luma_falloff: 3.0,
+                chromatic: 0.05,
             },
             GrainType::Cubic => Self {
                 octaves: 3,
                 octave_weights: [0.4, 0.3, 0.3],
                 contrast: 1.3,
                 luma_falloff: 1.5,
+                chromatic: 0.12,
             },
             GrainType::Tabular => Self {
                 octaves: 2,
                 octave_weights: [0.6, 0.4, 0.0],
                 contrast: 0.8,
                 luma_falloff: 2.0,
+                chromatic: 0.08,
             },
             GrainType::Harsh => Self {
                 octaves: 3,
                 octave_weights: [0.3, 0.3, 0.4],
                 contrast: 1.5,
                 luma_falloff: 1.0,
+                chromatic: 0.15,
             },
         }
     }
@@ -360,8 +371,10 @@ fn generate_white_noise_buffer(
 
 /// Apply grain to an sRGB gamma buffer using white noise + blur-based sizing.
 ///
-/// Generates white noise into a buffer, optionally blurs it (when sigma >= threshold),
-/// then applies multiplicatively to preserve the underlying pixel color.
+/// Generates four white noise buffers (1 shared + 3 per-channel) and optionally
+/// blurs them to control grain size. Per-channel noise is blended with the shared
+/// noise based on pixel saturation and the grain type's chromatic intensity, so
+/// saturated pixels get subtle color fringing while neutral pixels stay monochrome.
 ///
 /// Mutates `buf` in-place. Each pixel is `[r, g, b]` in sRGB gamma [0.0, 1.0].
 pub fn apply_grain_buffer(
@@ -376,30 +389,53 @@ pub fn apply_grain_buffer(
     }
 
     let config = GrainTypeConfig::from_type(params.grain_type);
-    let strength = params.amount / 100.0 * GRAIN_STRENGTH_MULT;
+    let amount_factor = params.amount / 100.0;
     let sigma = grain_sigma(params.size, width, height);
 
-    // Generate white noise buffer and optionally blur
+    // Generate 4 independent white noise buffers: 1 shared + 3 per-channel (R, G, B)
     let shared_noise = generate_white_noise_buffer(width, height, seed, &config);
-    let shared_ready = if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
-        super::detail::gaussian_blur(&shared_noise, width, height, sigma)
-    } else {
-        shared_noise
+    let noise_r_raw = generate_white_noise_buffer(width, height, seed.wrapping_add(1), &config);
+    let noise_g_raw = generate_white_noise_buffer(width, height, seed.wrapping_add(2), &config);
+    let noise_b_raw = generate_white_noise_buffer(width, height, seed.wrapping_add(3), &config);
+
+    // Blur all 4 buffers with the same sigma
+    let blur = |noise: Vec<f32>| -> Vec<f32> {
+        if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
+            super::detail::gaussian_blur(&noise, width, height, sigma)
+        } else {
+            noise
+        }
     };
+    let shared = blur(shared_noise);
+    let noise_r = blur(noise_r_raw);
+    let noise_g = blur(noise_g_raw);
+    let noise_b = blur(noise_b_raw);
+
+    let scale = config.contrast * GRAIN_STRENGTH_MULT * amount_factor;
 
     for idx in 0..buf.len() {
         let [r, g, b] = buf[idx];
         let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-        let luma_w = luminance_weight(luma, config.luma_falloff);
-        let scale = strength * luma_w;
-        // Exponential modulation: symmetric in log space so brightening and
-        // darkening are perceptually equal. Avoids the "dark spots only" artifact
-        // of linear multiplicative blending.
-        let mod_factor = (shared_ready[idx] * scale).exp();
+
+        // Pixel saturation: how colorful vs neutral this pixel is.
+        // Neutral pixels (chroma ~0) get identical per-channel noise;
+        // saturated pixels get divergent per-channel noise.
+        let pixel_chroma = r.max(g).max(b) - r.min(g).min(b);
+        let effective_chromatic = config.chromatic * pixel_chroma;
+
+        // Per-channel noise: correlated with shared, small independent perturbation
+        let nr = shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
+        let ng = shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
+        let nb = shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
+
+        let w = luminance_weight(luma, config.luma_falloff);
+        let mod_r = (nr * w * scale).exp();
+        let mod_g = (ng * w * scale).exp();
+        let mod_b = (nb * w * scale).exp();
         buf[idx] = [
-            (r * mod_factor).clamp(0.0, 1.0),
-            (g * mod_factor).clamp(0.0, 1.0),
-            (b * mod_factor).clamp(0.0, 1.0),
+            (r * mod_r).clamp(0.0, 1.0),
+            (g * mod_g).clamp(0.0, 1.0),
+            (b * mod_b).clamp(0.0, 1.0),
         ];
     }
 }
@@ -718,6 +754,54 @@ mod tests {
             shift_small > 0.0 && shift_large > 0.0,
             "both resolutions should have grain: small={shift_small}, large={shift_large}"
         );
+    }
+
+    #[test]
+    fn chromatic_grain_shifts_color_channels_differently() {
+        // Cubic has chromatic=0.12 — on saturated color pixels,
+        // per-channel noise should produce different mod factors per channel.
+        let params = GrainParams {
+            grain_type: GrainType::Cubic,
+            amount: 80.0,
+            size: 25.0,
+            seed: None,
+        };
+        let width = 64;
+        let height = 64;
+        // Saturated red pixels — high pixel_chroma (0.8 - 0.2 = 0.6)
+        let mut buf: Vec<[f32; 3]> = vec![[0.8, 0.2, 0.2]; width * height];
+        apply_grain_buffer(&mut buf, width, height, &params, 42);
+        // Compare per-channel RATIOS (mod factors), not absolute deltas.
+        let found_diff = buf.iter().any(|px| {
+            let ratio_r = px[0] / 0.8;
+            let ratio_g = px[1] / 0.2;
+            (ratio_r - ratio_g).abs() > 1e-4
+        });
+        assert!(found_diff, "chromatic grain on color pixels should shift channels differently");
+    }
+
+    #[test]
+    fn chromatic_grain_no_color_shift_on_grayscale() {
+        let params = GrainParams {
+            grain_type: GrainType::Harsh,
+            amount: 80.0,
+            size: 25.0,
+            seed: None,
+        };
+        let width = 64;
+        let height = 64;
+        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; width * height];
+        apply_grain_buffer(&mut buf, width, height, &params, 42);
+        for px in &buf {
+            let dr = px[0] - 0.5;
+            let dg = px[1] - 0.5;
+            let db = px[2] - 0.5;
+            assert!(
+                (dr - dg).abs() < 1e-6 && (dg - db).abs() < 1e-6,
+                "grayscale pixel should have identical per-channel grain: [{}, {}, {}]",
+                px[0], px[1], px[2]
+            );
+        }
     }
 
     #[test]
