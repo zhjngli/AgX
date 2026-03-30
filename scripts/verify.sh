@@ -95,13 +95,18 @@ run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
 # 5. Documentation link validation
 check_all_doc_links() {
-    # Check all committed docs. docs/plans/impl/ is gitignored (local-only impl plans).
-    local dirs=(ARCHITECTURE.md)
+    # Check all committed markdown: root files, docs/ subdirs (excluding gitignored
+    # docs/plans/impl/), and per-crate READMEs.
+    local targets=(ARCHITECTURE.md CLAUDE.md README.md)
     for d in docs/*/; do
         [[ "$d" == "docs/plans/impl/" ]] && continue
-        dirs+=("$d")
+        targets+=("$d")
     done
-    check_md_links "${dirs[@]}" || return 1
+    # Per-crate and per-module READMEs
+    while IFS= read -r f; do
+        targets+=("$f")
+    done < <(find crates -name "README.md" 2>/dev/null)
+    check_md_links "${targets[@]}" || return 1
     echo "All documentation links valid"
 }
 run_check "Documentation links" check_all_doc_links
