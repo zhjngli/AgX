@@ -237,5 +237,5 @@ Rayon is the standard Rust library for data parallelism. No changes to the core 
 
 ## Related
 
-- [Platform and Distribution](../ideas/platform-and-distribution.md) — batch processing listed as a distribution feature
-- [Pluggable Pipeline](../ideas/pluggable-pipeline.md) — future stage caching could speed up batch with shared LUTs
+- [Platform and Distribution](../backlog/platform-and-distribution.md) — batch processing listed as a distribution feature
+- [Pluggable Pipeline](../backlog/pluggable-pipeline.md) — future stage caching could speed up batch with shared LUTs

@@ -95,7 +95,13 @@ run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
 # 5. Documentation link validation
 check_all_doc_links() {
-    check_md_links ARCHITECTURE.md docs/backlog/ || return 1
+    # Check all committed docs. docs/plans/impl/ is gitignored (local-only impl plans).
+    local dirs=(ARCHITECTURE.md)
+    for d in docs/*/; do
+        [[ "$d" == "docs/plans/impl/" ]] && continue
+        dirs+=("$d")
+    done
+    check_md_links "${dirs[@]}" || return 1
     echo "All documentation links valid"
 }
 run_check "Documentation links" check_all_doc_links
