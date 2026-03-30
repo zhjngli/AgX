@@ -116,6 +116,7 @@ const F2: f32 = 0.366_025_4;
 const G2: f32 = 0.211_324_87;
 
 /// Build a seeded 256-entry permutation table for simplex noise.
+#[allow(dead_code)]
 fn build_permutation_table(seed: u64) -> [u8; 512] {
     let mut perm = [0u8; 256];
     for (i, val) in perm.iter_mut().enumerate() {
@@ -139,6 +140,7 @@ fn build_permutation_table(seed: u64) -> [u8; 512] {
 }
 
 /// 2D simplex noise, returns value in approximately [-1, 1].
+#[allow(dead_code)]
 fn simplex_noise_2d(x: f32, y: f32, perm: &[u8; 512]) -> f32 {
     let s = (x + y) * F2;
     let i = (x + s).floor() as i32;
@@ -244,6 +246,7 @@ impl GrainTypeConfig {
 /// Multi-octave simplex noise with precomputed per-octave frequencies.
 ///
 /// Returns a noise value (not yet scaled by amount or luminance weight).
+#[allow(dead_code)]
 fn multi_octave_noise(
     x: f32,
     y: f32,
@@ -264,24 +267,40 @@ fn multi_octave_noise(
 /// Fixed base frequency for noise generation. Size is controlled by post-blur, not frequency.
 const GRAIN_BASE_FREQ: f32 = 0.08;
 
-/// Minimum blur sigma below which the per-pixel fast path is used.
+/// Minimum blur sigma below which no blur is applied (noise used as-is).
 const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.5;
 
-/// Maximum blur sigma at size=100.
+/// Maximum blur sigma at size=100, at the reference resolution (2000px long edge).
+/// Actual sigma is scaled proportionally to the image's long edge.
 const GRAIN_MAX_SIGMA: f32 = 2.5;
 
-/// Compute blur sigma from the size parameter (0-100).
+/// Reference resolution (long edge in pixels) for grain sigma scaling.
+/// Images larger than this get proportionally larger blur kernels so grain
+/// particles maintain consistent visual size regardless of resolution.
+const GRAIN_REF_RESOLUTION: f32 = 2000.0;
+
+/// Strength multiplier mapping amount to noise intensity.
+/// Controls the standard deviation of the exponential modulation argument.
+/// At amount=35 with Silver (contrast=1.0): exp argument std ≈ 0.028,
+/// giving ~95% of pixels within ±5% brightness change (barely perceptible).
+const GRAIN_STRENGTH_MULT: f32 = 0.08;
+
+/// Compute blur sigma from the size parameter (0-100), scaled to image resolution.
 /// Non-linear curve: low sizes stay sharp, higher sizes spread more.
-fn grain_sigma(size: f32) -> f32 {
+fn grain_sigma(size: f32, width: usize, height: usize) -> f32 {
     let t = (size / 100.0).clamp(0.0, 1.0);
-    t.powf(1.5) * GRAIN_MAX_SIGMA
+    let base_sigma = t.powf(1.5) * GRAIN_MAX_SIGMA;
+    let long_edge = width.max(height) as f32;
+    base_sigma * (long_edge / GRAIN_REF_RESOLUTION)
 }
 
-/// Generate a single-channel noise buffer at fixed high frequency.
+/// Generate a single-channel noise buffer using simplex noise at fixed high frequency.
 ///
 /// Each pixel gets multi-octave simplex noise scaled by `res_scale`
 /// (for resolution independence) and the grain type's contrast.
-fn generate_noise_buffer(
+/// Retained for potential future use; grain now uses `generate_white_noise_buffer`.
+#[allow(dead_code)]
+fn generate_simplex_noise_buffer(
     width: usize,
     height: usize,
     perm: &[u8; 512],
@@ -305,11 +324,48 @@ fn generate_noise_buffer(
     buf
 }
 
-/// Apply grain to an sRGB gamma buffer using blur-based sizing.
+/// Generate a single-channel white noise buffer.
 ///
-/// When sigma is below threshold, uses per-pixel noise (no buffer allocation).
-/// When sigma >= threshold, generates noise into a buffer, blurs it, then
-/// reads per-pixel from the blurred noise.
+/// Each pixel gets an independent random value from a Gaussian distribution
+/// (mean 0, std dev = config.contrast). Uses a seeded PRNG for determinism.
+/// The resulting buffer is then blurred by the caller to control grain size.
+fn generate_white_noise_buffer(
+    width: usize,
+    height: usize,
+    seed: u64,
+    config: &GrainTypeConfig,
+) -> Vec<f32> {
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(seed);
+    let len = width * height;
+    let mut buf = Vec::with_capacity(len);
+
+    // Box-Muller transform for Gaussian distribution (avoids rand_distr dependency)
+    // Generate pairs of Gaussian samples from pairs of uniform samples.
+    let pairs = len.div_ceil(2);
+    for _ in 0..pairs {
+        let u1: f32 = loop {
+            let v: f32 = rand::Rng::gen(&mut rng);
+            if v > 0.0 {
+                break v;
+            }
+        };
+        let u2: f32 = rand::Rng::gen(&mut rng);
+        let r = (-2.0 * u1.ln()).sqrt();
+        let theta = std::f32::consts::TAU * u2;
+        buf.push(r * theta.cos() * config.contrast);
+        buf.push(r * theta.sin() * config.contrast);
+    }
+    buf.truncate(len);
+    buf
+}
+
+/// Apply grain to an sRGB gamma buffer using white noise + blur-based sizing.
+///
+/// Generates white noise into a buffer, optionally blurs it (when sigma >= threshold),
+/// then applies multiplicatively to preserve the underlying pixel color.
 ///
 /// Mutates `buf` in-place. Each pixel is `[r, g, b]` in sRGB gamma [0.0, 1.0].
 pub fn apply_grain_buffer(
@@ -324,120 +380,77 @@ pub fn apply_grain_buffer(
     }
 
     let config = GrainTypeConfig::from_type(params.grain_type);
-    let reference_dim = 3000.0f32;
-    let dim = width.max(height) as f32;
-    let res_scale = reference_dim / dim;
-    let strength = params.amount / 100.0 * 0.15;
+    let strength = params.amount / 100.0 * GRAIN_STRENGTH_MULT;
     let chroma_blend = params.chromatic / 100.0;
-    let sigma = grain_sigma(params.size);
+    let sigma = grain_sigma(params.size, width, height);
 
-    let perm = build_permutation_table(seed);
+    // Generate white noise buffer(s) and optionally blur
+    let shared_noise = generate_white_noise_buffer(width, height, seed, &config);
+    let shared_ready = if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
+        super::detail::gaussian_blur(&shared_noise, width, height, sigma)
+    } else {
+        shared_noise
+    };
 
-    if sigma < GRAIN_BLUR_SIGMA_THRESHOLD {
-        // Fast path: per-pixel noise, no buffer allocation
-        let octave_freqs = [
-            GRAIN_BASE_FREQ,
-            GRAIN_BASE_FREQ * 2.0,
-            GRAIN_BASE_FREQ * 4.0,
-        ];
-        let perm_r = build_permutation_table(seed.wrapping_add(1));
-        let perm_g = build_permutation_table(seed.wrapping_add(2));
-        let perm_b = build_permutation_table(seed.wrapping_add(3));
-
-        for y in 0..height {
-            for x in 0..width {
-                let xf = x as f32 * res_scale;
-                let yf = y as f32 * res_scale;
-                let idx = y * width + x;
-                let [r, g, b] = buf[idx];
-                let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-                let luma_w = luminance_weight(luma, config.luma_falloff);
-                let scale = strength * luma_w;
-
-                if chroma_blend == 0.0 {
-                    let noise = multi_octave_noise(xf, yf, &perm, &config, &octave_freqs);
-                    let shift = noise * scale;
-                    buf[idx] = [
-                        (r + shift).clamp(0.0, 1.0),
-                        (g + shift).clamp(0.0, 1.0),
-                        (b + shift).clamp(0.0, 1.0),
-                    ];
-                } else {
-                    let shared = multi_octave_noise(xf, yf, &perm, &config, &octave_freqs);
-                    let nr = multi_octave_noise(xf, yf, &perm_r, &config, &octave_freqs);
-                    let ng = multi_octave_noise(xf, yf, &perm_g, &config, &octave_freqs);
-                    let nb = multi_octave_noise(xf, yf, &perm_b, &config, &octave_freqs);
-                    let blend = chroma_blend;
-                    buf[idx] = [
-                        (r + (shared * (1.0 - blend) + nr * blend) * scale).clamp(0.0, 1.0),
-                        (g + (shared * (1.0 - blend) + ng * blend) * scale).clamp(0.0, 1.0),
-                        (b + (shared * (1.0 - blend) + nb * blend) * scale).clamp(0.0, 1.0),
-                    ];
-                }
-            }
+    if chroma_blend == 0.0 {
+        for idx in 0..buf.len() {
+            let [r, g, b] = buf[idx];
+            let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+            let luma_w = luminance_weight(luma, config.luma_falloff);
+            let scale = strength * luma_w;
+            // Exponential modulation: symmetric in log space so brightening and
+            // darkening are perceptually equal. Avoids the "dark spots only" artifact
+            // of linear multiplicative blending.
+            let mod_factor = (shared_ready[idx] * scale).exp();
+            buf[idx] = [
+                (r * mod_factor).clamp(0.0, 1.0),
+                (g * mod_factor).clamp(0.0, 1.0),
+                (b * mod_factor).clamp(0.0, 1.0),
+            ];
         }
     } else {
-        // Buffer path: generate noise, blur, apply
-        let shared_noise = generate_noise_buffer(width, height, &perm, &config, res_scale);
-        let shared_blurred = super::detail::gaussian_blur(&shared_noise, width, height, sigma);
-
-        if chroma_blend == 0.0 {
-            for y in 0..height {
-                for x in 0..width {
-                    let idx = y * width + x;
-                    let [r, g, b] = buf[idx];
-                    let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-                    let luma_w = luminance_weight(luma, config.luma_falloff);
-                    let scale = strength * luma_w;
-                    let shift = shared_blurred[idx] * scale;
-                    buf[idx] = [
-                        (r + shift).clamp(0.0, 1.0),
-                        (g + shift).clamp(0.0, 1.0),
-                        (b + shift).clamp(0.0, 1.0),
-                    ];
-                }
-            }
+        let noise_r = generate_white_noise_buffer(width, height, seed.wrapping_add(1), &config);
+        let noise_g = generate_white_noise_buffer(width, height, seed.wrapping_add(2), &config);
+        let noise_b = generate_white_noise_buffer(width, height, seed.wrapping_add(3), &config);
+        let (blurred_r, blurred_g, blurred_b) = if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
+            (
+                super::detail::gaussian_blur(&noise_r, width, height, sigma),
+                super::detail::gaussian_blur(&noise_g, width, height, sigma),
+                super::detail::gaussian_blur(&noise_b, width, height, sigma),
+            )
         } else {
-            let perm_r = build_permutation_table(seed.wrapping_add(1));
-            let perm_g = build_permutation_table(seed.wrapping_add(2));
-            let perm_b = build_permutation_table(seed.wrapping_add(3));
-            let noise_r = generate_noise_buffer(width, height, &perm_r, &config, res_scale);
-            let blurred_r = super::detail::gaussian_blur(&noise_r, width, height, sigma);
-            let noise_g = generate_noise_buffer(width, height, &perm_g, &config, res_scale);
-            let blurred_g = super::detail::gaussian_blur(&noise_g, width, height, sigma);
-            let noise_b = generate_noise_buffer(width, height, &perm_b, &config, res_scale);
-            let blurred_b = super::detail::gaussian_blur(&noise_b, width, height, sigma);
+            (noise_r, noise_g, noise_b)
+        };
 
-            for y in 0..height {
-                for x in 0..width {
-                    let idx = y * width + x;
-                    let [r, g, b] = buf[idx];
-                    let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-                    let luma_w = luminance_weight(luma, config.luma_falloff);
-                    let scale = strength * luma_w;
-                    let blend = chroma_blend;
-                    buf[idx] = [
-                        (r + (shared_blurred[idx] * (1.0 - blend) + blurred_r[idx] * blend)
-                            * scale)
-                            .clamp(0.0, 1.0),
-                        (g + (shared_blurred[idx] * (1.0 - blend) + blurred_g[idx] * blend)
-                            * scale)
-                            .clamp(0.0, 1.0),
-                        (b + (shared_blurred[idx] * (1.0 - blend) + blurred_b[idx] * blend)
-                            * scale)
-                            .clamp(0.0, 1.0),
-                    ];
-                }
-            }
+        for idx in 0..buf.len() {
+            let [r, g, b] = buf[idx];
+            let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+            let luma_w = luminance_weight(luma, config.luma_falloff);
+            let scale = strength * luma_w;
+            let blend = chroma_blend;
+            let nr = shared_ready[idx] * (1.0 - blend) + blurred_r[idx] * blend;
+            let ng = shared_ready[idx] * (1.0 - blend) + blurred_g[idx] * blend;
+            let nb = shared_ready[idx] * (1.0 - blend) + blurred_b[idx] * blend;
+            buf[idx] = [
+                (r * (nr * scale).exp()).clamp(0.0, 1.0),
+                (g * (ng * scale).exp()).clamp(0.0, 1.0),
+                (b * (nb * scale).exp()).clamp(0.0, 1.0),
+            ];
         }
     }
 }
 
 /// Compute luminance-aware weight.
+///
+/// Grain is most visible in shadows and fades in highlights, matching real
+/// film behavior (low signal-to-noise ratio in underexposed areas). The
+/// `falloff` parameter from the grain type config controls how quickly grain
+/// drops off as brightness increases: higher falloff = faster drop = cleaner
+/// highlights.
 #[inline]
 fn luminance_weight(luma: f32, falloff: f32) -> f32 {
-    let base = (4.0 * luma.clamp(0.0, 1.0) * (1.0 - luma.clamp(0.0, 1.0))).clamp(0.0, 1.0);
-    base.powf(falloff)
+    let l = luma.clamp(0.0, 1.0);
+    (1.0 - l).powf(0.5 * falloff)
 }
 
 #[cfg(test)]
@@ -567,12 +580,11 @@ mod tests {
     fn size_affects_spatial_frequency() {
         // Higher size should produce smoother (lower spatial frequency) grain
         // by blurring the noise buffer, reducing adjacent-pixel deltas.
-        let perm = build_permutation_table(42);
         let config = GrainTypeConfig::from_type(GrainType::Silver);
         let width = 128;
         let height = 1;
 
-        let noise = generate_noise_buffer(width, height, &perm, &config, 1.0);
+        let noise = generate_white_noise_buffer(width, height, 42, &config);
 
         // No blur (size=0 equivalent)
         let mut delta_raw = 0.0f32;
@@ -580,8 +592,8 @@ mod tests {
             delta_raw += (noise[i] - noise[i + 1]).abs();
         }
 
-        // Blurred (size=100 equivalent)
-        let sigma = grain_sigma(100.0);
+        // Blurred (size=100 equivalent, at reference resolution)
+        let sigma = grain_sigma(100.0, 2000, 1);
         let blurred = super::super::detail::gaussian_blur(&noise, width, height, sigma);
         let mut delta_blurred = 0.0f32;
         for i in 0..width - 1 {
@@ -610,18 +622,16 @@ mod tests {
     }
 
     #[test]
-    fn generate_noise_buffer_correct_length() {
-        let perm = build_permutation_table(42);
+    fn generate_white_noise_buffer_correct_length() {
         let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let buf = generate_noise_buffer(10, 8, &perm, &config, 1.0);
+        let buf = generate_white_noise_buffer(10, 8, 42, &config);
         assert_eq!(buf.len(), 80);
     }
 
     #[test]
-    fn generate_noise_buffer_has_variance() {
-        let perm = build_permutation_table(42);
+    fn generate_white_noise_buffer_has_variance() {
         let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let buf = generate_noise_buffer(64, 64, &perm, &config, 1.0);
+        let buf = generate_white_noise_buffer(64, 64, 42, &config);
         let mean: f32 = buf.iter().sum::<f32>() / buf.len() as f32;
         let variance: f32 = buf.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / buf.len() as f32;
         assert!(
@@ -631,11 +641,10 @@ mod tests {
     }
 
     #[test]
-    fn generate_noise_buffer_deterministic() {
-        let perm = build_permutation_table(42);
+    fn generate_white_noise_buffer_deterministic() {
         let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let buf1 = generate_noise_buffer(16, 16, &perm, &config, 1.0);
-        let buf2 = generate_noise_buffer(16, 16, &perm, &config, 1.0);
+        let buf1 = generate_white_noise_buffer(16, 16, 42, &config);
+        let buf2 = generate_white_noise_buffer(16, 16, 42, &config);
         assert_eq!(buf1, buf2);
     }
 

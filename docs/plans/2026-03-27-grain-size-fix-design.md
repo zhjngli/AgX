@@ -44,18 +44,28 @@ The original grain design spec (`docs/plans/2026-03-23-grain-design.md`) rejecte
 
 ### Algorithm
 
-1. **Fixed high-frequency noise generation** — always generate multi-octave simplex noise at a constant base frequency (starting point: 0.08), producing fine grain particles regardless of the size parameter. The multi-octave structure, grain type configs (octave weights, contrast, luminance falloff), and chromatic blending all stay unchanged.
+1. **White noise generation** — generate independent random values per pixel using a seeded PRNG (Gaussian distribution, mean 0). Each pixel is statistically independent — no spatial correlation. This produces the sharp, discrete variation that characterizes real film grain.
 
 2. **Post-blur controlled by size** — blur the noise buffer with a Gaussian whose sigma scales with the size parameter:
    - size=0: sigma=0, no blur (skip buffer allocation entirely)
    - size=100: sigma at tuned maximum (starting point: ~2-3px)
    - Mapping: `sigma = (size / 100.0).powf(1.5) * max_sigma` (non-linear — low sizes stay sharp, higher sizes spread more)
 
-3. **Apply blurred noise** — read per-pixel from the blurred noise buffer and apply with the existing luminance-aware blending, amount scaling, and clamping.
+3. **Apply blurred noise (multiplicative blending)** — read per-pixel from the blurred noise buffer and apply as a multiplicative modulation: `pixel * (1.0 + noise * scale)`. This preserves the underlying color (pink stays pink, just brighter/darker) and provides natural luminance falloff (dark pixels change less in absolute terms). The original additive blending (`pixel + noise * scale`) created an "overlaid dark splotches" artifact because it shifted all channels by the same absolute amount regardless of pixel brightness.
 
-### Why blur doesn't create blobs
+### Why white noise instead of simplex noise
 
-Lowering noise frequency changes the fundamental scale of the pattern — simplex noise at low frequencies is mathematically smooth and slowly-varying. Blurring high-frequency noise is different: the underlying pattern has rapid, localized variation (grain-like texture), and the blur just softens/widens those variations into slightly fatter particles. The grain character (discrete-ish particles with clear variation) is preserved.
+The original grain implementation and the first iteration of this fix used multi-octave simplex noise. Simplex noise is spatially coherent by design — neighboring pixels produce correlated values, creating smooth, organic patterns. This is desirable for terrain or cloud generation, but produces the wrong character for film grain: even at high frequencies, simplex noise features are inherently blobby and smooth rather than sharp and discrete.
+
+White noise (independent random values per pixel) combined with Gaussian blur produces the correct grain character because:
+- **Unblurred:** pure pixel-level randomness, like fine-grain film (ISO 50-100)
+- **Lightly blurred:** small clusters of correlated pixels, like medium-grain film (ISO 400)
+- **More blurred:** larger soft clusters, like pushed/high-ISO film (ISO 1600+)
+- The blur radius directly and intuitively controls particle size
+
+This is the technique used by GIMP/Photoshop (manual grain workflow) and Boris FX (explicit grain size + blur sliders). The original grain design (`docs/plans/2026-03-23-grain-design.md`) rejected white noise because it required buffer-level processing, but that architectural constraint no longer applies — this fix already uses buffers.
+
+The simplex noise implementation is retained in the codebase for potential future use (e.g., texture generation, other effects) but is no longer used for grain.
 
 ### Upper bound on blur
 
@@ -63,12 +73,19 @@ If sigma is too large, noise averages out to near-zero and grain disappears. The
 
 ### Tuning constants
 
-The following constants need empirical tuning during implementation:
-- **Base frequency** (starting point: 0.08)
-- **Max sigma** (starting point: 2.0-3.0px)
-- **Sigma curve shape** (starting point: power 1.5)
+Tuned via visual grid search (3 test images × multiple parameter combinations, scripts/grain_tuning.sh):
 
-These are starting points, not final values. The verification process determines the final constants.
+- **Base frequency:** 0.08 (unused by white noise, retained for simplex compatibility)
+- **Max sigma:** 2.5px at reference resolution — sigma above ~2.5 starts producing visible blotchiness; below ~2.0 grain stays fine-textured. 2.5 is the upper limit where grain still reads as grain rather than splotches.
+- **Sigma curve shape:** power 1.5 (low sizes stay sharp, higher sizes spread more)
+- **Strength multiplier:** 0.08 — the original 0.4 caused ±24% brightness swings at moderate settings, producing aggressive dark spots. At 0.08, amount=50 with Silver gives exp argument std ≈ 0.04, meaning ~95% of pixels within ±4% brightness change — subtle and pleasing.
+- **Reference resolution:** 2000px long edge — sigma scales proportionally so grain particles maintain consistent visual size regardless of image resolution.
+
+Tuning rounds:
+1. First round (strength 0.3–0.8, sigma 2.5–5.0): all too aggressive, dark spots problem persisted
+2. Second round (strength 0.05–0.12, sigma 2.0–5.0): sigma ≤2.0 looked good; higher sigma still blotchy
+3. Third round (strength 0.06–0.16, sigma 0.8–1.8): all looked good, confirmed fine-grain range
+4. Fourth round (strength 0.08–0.12, sigma 2.0–4.0): confirmed 2.5 as upper boundary, 3.0+ too blotchy
 
 ## Size vs Grain Type
 
