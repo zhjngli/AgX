@@ -110,36 +110,44 @@ impl GrainTypeConfig {
             GrainType::Fine => Self {
                 contrast: 0.6,
                 luma_falloff: 3.0,
-                chromatic: 0.03,
+                chromatic: CHROMATIC_FINE,
             },
             GrainType::Silver => Self {
                 contrast: 1.0,
                 luma_falloff: 2.0,
-                chromatic: 0.05,
+                chromatic: CHROMATIC_SILVER,
             },
             GrainType::Soft => Self {
                 contrast: 0.7,
                 luma_falloff: 3.0,
-                chromatic: 0.05,
+                chromatic: CHROMATIC_SOFT,
             },
             GrainType::Cubic => Self {
                 contrast: 1.3,
                 luma_falloff: 1.5,
-                chromatic: 0.12,
+                chromatic: CHROMATIC_CUBIC,
             },
             GrainType::Tabular => Self {
                 contrast: 0.8,
                 luma_falloff: 2.0,
-                chromatic: 0.08,
+                chromatic: CHROMATIC_TABULAR,
             },
             GrainType::Harsh => Self {
                 contrast: 1.5,
                 luma_falloff: 1.0,
-                chromatic: 0.15,
+                chromatic: CHROMATIC_HARSH,
             },
         }
     }
 }
+
+// Per-type chromatic intensity constants (extracted for tuning scripts).
+const CHROMATIC_FINE: f32 = 0.03;
+const CHROMATIC_SILVER: f32 = 0.05;
+const CHROMATIC_SOFT: f32 = 0.05;
+const CHROMATIC_TABULAR: f32 = 0.08;
+const CHROMATIC_CUBIC: f32 = 0.12;
+const CHROMATIC_HARSH: f32 = 0.15;
 
 /// Minimum blur sigma below which no blur is applied (noise used as-is).
 const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.5;
