@@ -776,8 +776,6 @@ pub struct PartialGrainParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chromatic: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
 }
 
@@ -787,7 +785,6 @@ impl PartialGrainParams {
             grain_type: overlay.grain_type.or(self.grain_type),
             amount: overlay.amount.or(self.amount),
             size: overlay.size.or(self.size),
-            chromatic: overlay.chromatic.or(self.chromatic),
             seed: overlay.seed.or(self.seed),
         }
     }
@@ -797,7 +794,6 @@ impl PartialGrainParams {
             grain_type: self.grain_type.unwrap_or_default(),
             amount: self.amount.unwrap_or(0.0),
             size: self.size.unwrap_or(50.0),
-            chromatic: self.chromatic.unwrap_or(0.0),
             seed: self.seed,
         }
     }
@@ -809,7 +805,6 @@ impl From<&crate::adjust::GrainParams> for PartialGrainParams {
             grain_type: Some(p.grain_type),
             amount: Some(p.amount),
             size: Some(p.size),
-            chromatic: Some(p.chromatic),
             seed: p.seed,
         }
     }
@@ -2349,14 +2344,12 @@ mod tests {
             grain_type: Some(crate::adjust::GrainType::Silver),
             amount: Some(30.0),
             size: None,
-            chromatic: None,
             seed: None,
         };
         let overlay = PartialGrainParams {
             grain_type: None,
             amount: None,
             size: Some(60.0),
-            chromatic: Some(25.0),
             seed: None,
         };
         let merged = base.merge(&overlay);
@@ -2364,7 +2357,6 @@ mod tests {
         assert_eq!(concrete.grain_type, crate::adjust::GrainType::Silver);
         assert_eq!(concrete.amount, 30.0);
         assert_eq!(concrete.size, 60.0);
-        assert_eq!(concrete.chromatic, 25.0);
     }
 
     #[test]
@@ -2392,7 +2384,6 @@ mod tests {
             grain_type: crate::adjust::GrainType::Silver,
             amount: 50.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         };
         let after = engine.render();

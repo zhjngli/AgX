@@ -32,7 +32,7 @@ All tone functions operate on a single channel and return a clamped `f32`.
 
 ### Grain
 - `GrainType` -- enum: `Fine`, `Silver`, `Soft`, `Cubic`, `Tabular`, `Harsh`
-- `GrainParams` -- grain_type, amount (0-100), size (0-100), chromatic (0-100), optional seed
+- `GrainParams` -- grain_type, amount (0-100), size (0-100), optional seed
 - `apply_grain_buffer(buf, width, height, params, seed)` -- blur-based grain applied to sRGB gamma buffer (buffer-level when size >= threshold, per-pixel otherwise)
 
 ## Extension Guide

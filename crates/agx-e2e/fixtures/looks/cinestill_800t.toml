@@ -40,7 +40,6 @@ amount = -10.0
 type = "harsh"
 amount = 25.0
 size = 65.0
-chromatic = 25.0
 seed = 42
 
 [noise_reduction]

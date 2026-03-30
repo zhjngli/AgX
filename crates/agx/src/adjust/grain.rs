@@ -53,7 +53,6 @@ impl std::str::FromStr for GrainType {
 /// - `grain_type`: selects the grain character (default: Silver)
 /// - `amount`: 0–100, intensity of grain effect (0 = no grain)
 /// - `size`: 0–100, fine to coarse grain (default: 50)
-/// - `chromatic`: 0–100, strength of per-channel color variation (0 = luminance-only)
 /// - `seed`: optional fixed seed for deterministic grain (None = random each render)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrainParams {
@@ -63,8 +62,6 @@ pub struct GrainParams {
     pub amount: f32,
     #[serde(default = "default_size")]
     pub size: f32,
-    #[serde(default)]
-    pub chromatic: f32,
     /// Optional fixed seed for deterministic grain. When None, the engine
     /// generates a random seed each render. Set in e2e test presets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -81,7 +78,6 @@ impl Default for GrainParams {
             grain_type: GrainType::default(),
             amount: 0.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         }
     }
@@ -381,10 +377,9 @@ pub fn apply_grain_buffer(
 
     let config = GrainTypeConfig::from_type(params.grain_type);
     let strength = params.amount / 100.0 * GRAIN_STRENGTH_MULT;
-    let chroma_blend = params.chromatic / 100.0;
     let sigma = grain_sigma(params.size, width, height);
 
-    // Generate white noise buffer(s) and optionally blur
+    // Generate white noise buffer and optionally blur
     let shared_noise = generate_white_noise_buffer(width, height, seed, &config);
     let shared_ready = if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
         super::detail::gaussian_blur(&shared_noise, width, height, sigma)
@@ -392,51 +387,20 @@ pub fn apply_grain_buffer(
         shared_noise
     };
 
-    if chroma_blend == 0.0 {
-        for idx in 0..buf.len() {
-            let [r, g, b] = buf[idx];
-            let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-            let luma_w = luminance_weight(luma, config.luma_falloff);
-            let scale = strength * luma_w;
-            // Exponential modulation: symmetric in log space so brightening and
-            // darkening are perceptually equal. Avoids the "dark spots only" artifact
-            // of linear multiplicative blending.
-            let mod_factor = (shared_ready[idx] * scale).exp();
-            buf[idx] = [
-                (r * mod_factor).clamp(0.0, 1.0),
-                (g * mod_factor).clamp(0.0, 1.0),
-                (b * mod_factor).clamp(0.0, 1.0),
-            ];
-        }
-    } else {
-        let noise_r = generate_white_noise_buffer(width, height, seed.wrapping_add(1), &config);
-        let noise_g = generate_white_noise_buffer(width, height, seed.wrapping_add(2), &config);
-        let noise_b = generate_white_noise_buffer(width, height, seed.wrapping_add(3), &config);
-        let (blurred_r, blurred_g, blurred_b) = if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
-            (
-                super::detail::gaussian_blur(&noise_r, width, height, sigma),
-                super::detail::gaussian_blur(&noise_g, width, height, sigma),
-                super::detail::gaussian_blur(&noise_b, width, height, sigma),
-            )
-        } else {
-            (noise_r, noise_g, noise_b)
-        };
-
-        for idx in 0..buf.len() {
-            let [r, g, b] = buf[idx];
-            let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
-            let luma_w = luminance_weight(luma, config.luma_falloff);
-            let scale = strength * luma_w;
-            let blend = chroma_blend;
-            let nr = shared_ready[idx] * (1.0 - blend) + blurred_r[idx] * blend;
-            let ng = shared_ready[idx] * (1.0 - blend) + blurred_g[idx] * blend;
-            let nb = shared_ready[idx] * (1.0 - blend) + blurred_b[idx] * blend;
-            buf[idx] = [
-                (r * (nr * scale).exp()).clamp(0.0, 1.0),
-                (g * (ng * scale).exp()).clamp(0.0, 1.0),
-                (b * (nb * scale).exp()).clamp(0.0, 1.0),
-            ];
-        }
+    for idx in 0..buf.len() {
+        let [r, g, b] = buf[idx];
+        let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+        let luma_w = luminance_weight(luma, config.luma_falloff);
+        let scale = strength * luma_w;
+        // Exponential modulation: symmetric in log space so brightening and
+        // darkening are perceptually equal. Avoids the "dark spots only" artifact
+        // of linear multiplicative blending.
+        let mod_factor = (shared_ready[idx] * scale).exp();
+        buf[idx] = [
+            (r * mod_factor).clamp(0.0, 1.0),
+            (g * mod_factor).clamp(0.0, 1.0),
+            (b * mod_factor).clamp(0.0, 1.0),
+        ];
     }
 }
 
@@ -654,7 +618,6 @@ mod tests {
             grain_type: GrainType::Silver,
             amount: 50.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         };
         let width = 64;
@@ -671,7 +634,6 @@ mod tests {
             grain_type: GrainType::Silver,
             amount: 0.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         };
         let width = 16;
@@ -683,31 +645,6 @@ mod tests {
     }
 
     #[test]
-    fn apply_grain_buffer_chromatic_shifts_channels_differently() {
-        let params = GrainParams {
-            grain_type: GrainType::Silver,
-            amount: 50.0,
-            size: 50.0,
-            chromatic: 100.0,
-            seed: None,
-        };
-        let width = 32;
-        let height = 32;
-        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; width * height];
-        apply_grain_buffer(&mut buf, width, height, &params, 42);
-        let found_diff = buf.iter().any(|px| {
-            let dr = px[0] - 0.5;
-            let dg = px[1] - 0.5;
-            let db = px[2] - 0.5;
-            (dr - dg).abs() > 1e-4 || (dg - db).abs() > 1e-4
-        });
-        assert!(
-            found_diff,
-            "chromatic grain should produce different per-channel shifts"
-        );
-    }
-
-    #[test]
     fn apply_grain_buffer_variance_across_sizes() {
         // Verify grain has meaningful variance at all sizes (doesn't wash out)
         for size in [0.0, 25.0, 50.0, 75.0, 100.0] {
@@ -715,7 +652,6 @@ mod tests {
                 grain_type: GrainType::Silver,
                 amount: 80.0,
                 size,
-                chromatic: 0.0,
                 seed: None,
             };
             let width = 64;
@@ -737,7 +673,6 @@ mod tests {
             grain_type: GrainType::Silver,
             amount: 80.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         };
         let width = 128;
@@ -766,7 +701,6 @@ mod tests {
             grain_type: GrainType::Silver,
             amount: 50.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         };
         // Both images should produce non-zero grain
@@ -792,7 +726,6 @@ mod tests {
             grain_type: GrainType::Harsh,
             amount: 100.0,
             size: 50.0,
-            chromatic: 100.0,
             seed: None,
         };
         let width = 32;
