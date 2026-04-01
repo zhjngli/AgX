@@ -17,8 +17,11 @@ pub use engine::{
     Engine, HslChannel, HslChannels, Parameters, PartialColorGradingParams, PartialColorWheel,
     PartialDehazeParams, PartialDetailParams, PartialGrainParams, PartialHslChannel,
     PartialHslChannels, PartialNoiseReductionParams, PartialParameters, PartialSharpeningParams,
-    PartialToneCurve, PartialToneCurveParams, PartialVignetteParams, VignetteParams,
+    PartialToneCurve, PartialToneCurveParams, PartialVignetteParams, RenderResult, VignetteParams,
 };
+
+#[cfg(feature = "profiling")]
+pub use engine::RenderProfile;
 pub use error::{AgxError, Result};
 pub use lut::Lut3D;
 pub use metadata::ImageMetadata;
