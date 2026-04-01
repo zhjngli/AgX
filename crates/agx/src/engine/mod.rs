@@ -5,6 +5,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjust;
 
+/// Timing data for a single render pass. Only available when compiled
+/// with the `profiling` feature.
+#[cfg(feature = "profiling")]
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RenderProfile {
+    pub stages: Vec<(String, f64)>,
+    pub total_ms: f64,
+}
+
+/// Result of a render operation. Contains the rendered image and optional
+/// profiling data (when compiled with the `profiling` feature).
+pub struct RenderResult {
+    pub image: Rgb32FImage,
+    #[cfg(feature = "profiling")]
+    pub profile: Option<RenderProfile>,
+}
+
 /// Per-channel HSL adjustment (hue shift, saturation, luminance).
 ///
 /// Ranges: hue -180.0 to +180.0 (degrees), saturation/luminance -100.0 to +100.0.
