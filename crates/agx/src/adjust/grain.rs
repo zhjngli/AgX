@@ -60,7 +60,7 @@ pub struct GrainParams {
 }
 
 fn default_size() -> f32 {
-    50.0
+    GRAIN_DEFAULT_SIZE
 }
 
 impl Default for GrainParams {
@@ -68,7 +68,7 @@ impl Default for GrainParams {
         Self {
             grain_type: GrainType::default(),
             amount: 0.0,
-            size: 50.0,
+            size: GRAIN_DEFAULT_SIZE,
             seed: None,
         }
     }
@@ -140,6 +140,20 @@ const AMOUNT_CURVE_FINE: f32 = 0.7;
 const AMOUNT_CURVE_SILVER: f32 = 0.6;
 const AMOUNT_CURVE_HARSH: f32 = 0.5;
 
+/// Maximum value for user-facing amount and size parameters.
+const GRAIN_PARAM_MAX: f32 = 100.0;
+
+/// Default grain size when not specified.
+const GRAIN_DEFAULT_SIZE: f32 = 50.0;
+
+/// Exponent for the size-to-sigma curve. Higher values keep grain tight
+/// at low sizes and only spread at high sizes.
+const GRAIN_SIZE_CURVE_EXPONENT: f32 = 1.5;
+
+/// Multiplier applied to the falloff exponent in luminance_weight.
+/// Controls the steepness of the shadow-to-highlight grain gradient.
+const GRAIN_LUMINANCE_WEIGHT_SCALE: f32 = 0.5;
+
 /// Minimum blur sigma below which no blur is applied (noise used as-is).
 const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.3;
 
@@ -168,23 +182,18 @@ const GRAIN_FALLOFF_REDUCTION: f32 = 0.4;
 /// Compute blur sigma from the size parameter (0-100), scaled to image resolution.
 /// Non-linear curve: low sizes stay sharp, higher sizes spread more.
 fn grain_sigma(size: f32, width: usize, height: usize) -> f32 {
-    let t = (size / 100.0).clamp(0.0, 1.0);
-    let base_sigma = t.powf(1.5) * GRAIN_MAX_SIGMA;
+    let t = (size / GRAIN_PARAM_MAX).clamp(0.0, 1.0);
+    let base_sigma = t.powf(GRAIN_SIZE_CURVE_EXPONENT) * GRAIN_MAX_SIGMA;
     let long_edge = width.max(height) as f32;
     base_sigma * (long_edge / GRAIN_REF_RESOLUTION)
 }
 
-/// Generate a single-channel white noise buffer.
+/// Generate a single-channel white noise buffer with standard normal distribution.
 ///
-/// Each pixel gets an independent random value from a Gaussian distribution
-/// (mean 0, std dev = config.contrast). Uses a seeded PRNG for determinism.
-/// The resulting buffer is then blurred by the caller to control grain size.
-fn generate_white_noise_buffer(
-    width: usize,
-    height: usize,
-    seed: u64,
-    config: &GrainTypeConfig,
-) -> Vec<f32> {
+/// Each pixel gets an independent random value (mean 0, std dev 1). Uses a
+/// seeded PRNG for determinism. The resulting buffer is blurred by the caller
+/// to control grain size, then scaled by contrast in the apply loop.
+fn generate_white_noise_buffer(width: usize, height: usize, seed: u64) -> Vec<f32> {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -192,8 +201,8 @@ fn generate_white_noise_buffer(
     let len = width * height;
     let mut buf = Vec::with_capacity(len);
 
-    // Box-Muller transform for Gaussian distribution (avoids rand_distr dependency)
-    // Generate pairs of Gaussian samples from pairs of uniform samples.
+    // Box-Muller transform: generate Gaussian samples from uniform pairs
+    // (avoids rand_distr dependency).
     let pairs = len.div_ceil(2);
     for _ in 0..pairs {
         let u1: f32 = loop {
@@ -205,8 +214,8 @@ fn generate_white_noise_buffer(
         let u2: f32 = rand::Rng::gen(&mut rng);
         let r = (-2.0 * u1.ln()).sqrt();
         let theta = std::f32::consts::TAU * u2;
-        buf.push(r * theta.cos() * config.contrast);
-        buf.push(r * theta.sin() * config.contrast);
+        buf.push(r * theta.cos());
+        buf.push(r * theta.sin());
     }
     buf.truncate(len);
     buf
@@ -232,14 +241,12 @@ pub fn apply_grain_buffer(
     }
 
     let config = GrainTypeConfig::from_type(params.grain_type);
-    let amount_factor = (params.amount / 100.0).powf(config.amount_curve);
+    let amount_factor = (params.amount / GRAIN_PARAM_MAX).powf(config.amount_curve);
     let sigma = grain_sigma(params.size, width, height);
 
     // Generate 4 independent white noise buffers: 1 shared + 3 per-channel (R, G, B)
-    let shared_noise = generate_white_noise_buffer(width, height, seed, &config);
-    let noise_r_raw = generate_white_noise_buffer(width, height, seed.wrapping_add(1), &config);
-    let noise_g_raw = generate_white_noise_buffer(width, height, seed.wrapping_add(2), &config);
-    let noise_b_raw = generate_white_noise_buffer(width, height, seed.wrapping_add(3), &config);
+    let [shared_noise, noise_r_raw, noise_g_raw, noise_b_raw] =
+        [0u64, 1, 2, 3].map(|i| generate_white_noise_buffer(width, height, seed.wrapping_add(i)));
 
     // Blur all 4 buffers with the same sigma
     let blur = |noise: Vec<f32>| -> Vec<f32> {
@@ -272,8 +279,8 @@ pub fn apply_grain_buffer(
         // Boost chromatic divergence in shadows — film grain shows as color
         // shifts in dark areas where luminance changes are invisible.
         // Still multiplied by pixel_chroma so BW/desaturated pixels are unaffected.
-        let shadow_chromatic_boost = 1.0 + (1.0 - luma).clamp(0.0, 1.0);
-        let effective_chromatic = (config.chromatic * pixel_chroma * shadow_chromatic_boost).min(1.0);
+        let shadow_chromatic_boost = 2.0 - luma; // ranges [1.0, 2.0] for luma in [0, 1]
+        let effective_chromatic = config.chromatic * pixel_chroma * shadow_chromatic_boost;
 
         // Per-channel noise: correlated with shared, small independent perturbation
         let nr = shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
@@ -285,15 +292,13 @@ pub fn apply_grain_buffer(
         let mod_g = (ng * w * scale).exp();
         let mod_b = (nb * w * scale).exp();
 
-        // Additive shadow floor: use a minimum effective value so grain is
-        // visible even on near-black pixels where multiplicative changes
-        // would be imperceptible.
-        let floor = GRAIN_SHADOW_FLOOR;
-        buf[idx] = [
-            (r + r.max(floor) * (mod_r - 1.0)).clamp(0.0, 1.0),
-            (g + g.max(floor) * (mod_g - 1.0)).clamp(0.0, 1.0),
-            (b + b.max(floor) * (mod_b - 1.0)).clamp(0.0, 1.0),
-        ];
+        // Shadow floor: use a minimum effective value so grain is visible
+        // on near-black pixels where pure multiplicative changes would be
+        // imperceptible.
+        let apply = |val: f32, mod_factor: f32| {
+            (val + val.max(GRAIN_SHADOW_FLOOR) * (mod_factor - 1.0)).clamp(0.0, 1.0)
+        };
+        buf[idx] = [apply(r, mod_r), apply(g, mod_g), apply(b, mod_b)];
     }
 }
 
@@ -307,7 +312,7 @@ pub fn apply_grain_buffer(
 #[inline]
 fn luminance_weight(luma: f32, falloff: f32) -> f32 {
     let l = luma.clamp(0.0, 1.0);
-    (1.0 - l).powf(0.5 * falloff)
+    (1.0 - l).powf(GRAIN_LUMINANCE_WEIGHT_SCALE * falloff)
 }
 
 #[cfg(test)]
@@ -338,11 +343,10 @@ mod tests {
     fn size_affects_spatial_frequency() {
         // Higher size should produce smoother (lower spatial frequency) grain
         // by blurring the noise buffer, reducing adjacent-pixel deltas.
-        let config = GrainTypeConfig::from_type(GrainType::Silver);
         let width = 128;
         let height = 1;
 
-        let noise = generate_white_noise_buffer(width, height, 42, &config);
+        let noise = generate_white_noise_buffer(width, height, 42);
 
         // No blur (size=0 equivalent)
         let mut delta_raw = 0.0f32;
@@ -381,15 +385,13 @@ mod tests {
 
     #[test]
     fn generate_white_noise_buffer_correct_length() {
-        let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let buf = generate_white_noise_buffer(10, 8, 42, &config);
+        let buf = generate_white_noise_buffer(10, 8, 42);
         assert_eq!(buf.len(), 80);
     }
 
     #[test]
     fn generate_white_noise_buffer_has_variance() {
-        let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let buf = generate_white_noise_buffer(64, 64, 42, &config);
+        let buf = generate_white_noise_buffer(64, 64, 42);
         let mean: f32 = buf.iter().sum::<f32>() / buf.len() as f32;
         let variance: f32 = buf.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / buf.len() as f32;
         assert!(
@@ -400,9 +402,8 @@ mod tests {
 
     #[test]
     fn generate_white_noise_buffer_deterministic() {
-        let config = GrainTypeConfig::from_type(GrainType::Silver);
-        let buf1 = generate_white_noise_buffer(16, 16, 42, &config);
-        let buf2 = generate_white_noise_buffer(16, 16, 42, &config);
+        let buf1 = generate_white_noise_buffer(16, 16, 42);
+        let buf2 = generate_white_noise_buffer(16, 16, 42);
         assert_eq!(buf1, buf2);
     }
 
