@@ -30,6 +30,7 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 ### Memory and buffer optimizations
 
+- [ ] **Batch memory pressure with stage-based pipeline** — the pluggable pipeline always materializes intermediate buffers between stages (~300MB per buffer at 26MP). For batch workflows processing many large images in parallel, peak memory could become a bottleneck. Profile memory usage under batch load and consider strategies: buffer pooling, limiting concurrent large-image renders, or lazy buffer allocation.
 - [ ] Decode buffer reduction — convert sRGB-to-linear in-place instead of allocating an intermediate buffer (~1 buffer saved)
 - [ ] Encode buffer reduction — go directly from linear f32 to u8 sRGB in a single pass (~1-2 buffers saved)
 
