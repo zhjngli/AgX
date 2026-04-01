@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{LUMA_B, LUMA_G, LUMA_R};
+use super::{smoothstep, LUMA_B, LUMA_G, LUMA_R};
 
 /// Grain type controlling the internal character of the noise.
 ///
@@ -170,10 +170,20 @@ const GRAIN_REF_RESOLUTION: f32 = 2000.0;
 /// Controls the standard deviation of the exponential modulation argument.
 const GRAIN_STRENGTH_MULT: f32 = 0.04;
 
-/// Minimum effective pixel value for grain calculation. Ensures grain is
-/// visible in deep shadows where pure multiplicative changes would be
-/// imperceptible (e.g., 0.01 * 1.05 = 0.0105, invisible).
-const GRAIN_SHADOW_FLOOR: f32 = 0.05;
+/// Luma threshold below which grain is fully additive (bright specks on
+/// dark film base). Matches real film: in deep shadows only a few silver
+/// halide crystals develop, appearing as sparse bright points.
+const GRAIN_ADDITIVE_END: f32 = 0.1;
+
+/// Luma threshold above which grain is fully multiplicative (proportional
+/// density modulation). Between ADDITIVE_END and MULTIPLICATIVE_START the
+/// two modes are smoothly blended via smoothstep.
+const GRAIN_MULTIPLICATIVE_START: f32 = 0.2;
+
+/// Scale factor for additive grain in deep shadows, relative to the
+/// multiplicative strength. Additive grain is perceptually stronger per
+/// unit of noise, so we scale it down to match the midtone intensity.
+const GRAIN_ADDITIVE_SCALE: f32 = 0.35;
 
 /// How much luma_falloff decreases at amount=100. At 0.4, a base falloff
 /// of 2.5 drops to 1.5 at full amount, spreading grain into midtones.
@@ -287,18 +297,23 @@ pub fn apply_grain_buffer(
         let ng = shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
         let nb = shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
 
-        let w = luminance_weight(luma, effective_falloff);
-        let mod_r = (nr * w * scale).exp();
-        let mod_g = (ng * w * scale).exp();
-        let mod_b = (nb * w * scale).exp();
+        let ws = luminance_weight(luma, effective_falloff) * scale;
 
-        // Shadow floor: use a minimum effective value so grain is visible
-        // on near-black pixels where pure multiplicative changes would be
-        // imperceptible.
-        let apply = |val: f32, mod_factor: f32| {
-            (val + val.max(GRAIN_SHADOW_FLOOR) * (mod_factor - 1.0)).clamp(0.0, 1.0)
+        // Blend between additive grain (shadows) and multiplicative grain
+        // (midtones/highlights). In deep shadows, multiplicative changes are
+        // imperceptible — real film shows bright specks from sparse developed
+        // crystals. In midtones/highlights, multiplicative grain gives
+        // perceptually correct proportional density modulation.
+        let blend = smoothstep(GRAIN_ADDITIVE_END, GRAIN_MULTIPLICATIVE_START, luma);
+
+        let apply = |val: f32, noise: f32| {
+            let nws = noise * ws;
+            let additive_delta = nws * GRAIN_ADDITIVE_SCALE;
+            let multiplicative_delta = val * (nws.exp() - 1.0);
+            let delta = additive_delta + (multiplicative_delta - additive_delta) * blend;
+            (val + delta).clamp(0.0, 1.0)
         };
-        buf[idx] = [apply(r, mod_r), apply(g, mod_g), apply(b, mod_b)];
+        buf[idx] = [apply(r, nr), apply(g, ng), apply(b, nb)];
     }
 }
 
@@ -480,9 +495,10 @@ mod tests {
         let mid = measure(0.5);
         let dark = measure(0.02);
         let bright = measure(0.98);
+        // With additive grain in shadows, dark pixels show visible bright specks
         assert!(
-            mid > dark,
-            "midtones should have more grain than shadows: mid={mid}, dark={dark}"
+            dark > 0.0,
+            "shadows should have visible grain from additive mode: dark={dark}"
         );
         assert!(
             mid > bright,

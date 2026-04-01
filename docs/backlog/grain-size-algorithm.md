@@ -11,6 +11,10 @@ Fix the grain size frequency mapping so larger sizes produce coarser grain parti
 - [x] **Add visual/behavioral tests** — variance tests at all size values, visual verification of goldens
 - [x] **Update e2e presets** — grain sizes raised to 35-65 range, goldens regenerated
 
+### Future enhancements
+
+- [ ] **Grain color tint per type** — real film stocks have characteristic color biases in grain (Portra skews warm/orange, Fuji skews green). Add a per-GrainType directional color tint applied to the noise, gated on pixel saturation (so BW/desaturated pixels stay neutral). Could map naturally: Fine=neutral, Silver=slight warm, Harsh=cooler/green. Distinct from existing chromatic grain (random per-channel divergence) — this is a systematic directional shift.
+
 ## Problem
 
 The current grain size parameter maps to simplex noise frequency via an exponential curve:

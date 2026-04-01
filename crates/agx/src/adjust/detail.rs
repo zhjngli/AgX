@@ -166,10 +166,7 @@ fn compute_edge_map(luminance: &[f32], width: usize, height: usize) -> Vec<f32> 
     edge_map
 }
 
-fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
-    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
+use super::smoothstep;
 
 fn apply_sharpening(
     buf: &[[f32; 3]],
