@@ -38,7 +38,7 @@ Practical improvements to existing functionality — small scope, clear value.
 | 2 | [Multi-Preset CLI](multi-preset-cli.md) | Cuts e2e test time in half; improves batch workflows |
 | 3 | [Parallel CI E2E](parallel-ci-e2e.md) | Reduces CI wall-clock time; improves developer velocity |
 | 4 | [Preset Tooling](preset-tooling.md) | Validation command catches preset errors before processing |
-| 5 | [Performance](performance.md) | Profile first, then tackle buffer reduction and render parallelization |
+| 5 | [Performance](performance.md) | Profiled — parallelize per-pixel loop and Gaussian blur for 50-60% render speedup |
 
 ### Mid-term
 
@@ -77,7 +77,7 @@ Major features that require significant design work or change the project's scop
 
 | File | Summary |
 |------|---------|
-| [performance.md](performance.md) | Render parallelization, buffer reduction, profiling |
+| [performance.md](performance.md) | Data-driven render optimization roadmap (profiled, prioritized P1-P6) |
 | [multi-preset-cli.md](multi-preset-cli.md) | Decode once, apply N presets per CLI invocation |
 | [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness |
 | [parallel-ci-e2e.md](parallel-ci-e2e.md) | Parallelize e2e tests in GitHub Actions via matrix strategy |
