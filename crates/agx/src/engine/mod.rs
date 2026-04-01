@@ -16,6 +16,7 @@ pub struct RenderProfile {
 
 /// Result of a render operation. Contains the rendered image and optional
 /// profiling data (when compiled with the `profiling` feature).
+#[derive(Debug, Clone)]
 pub struct RenderResult {
     pub image: Rgb32FImage,
     #[cfg(feature = "profiling")]
