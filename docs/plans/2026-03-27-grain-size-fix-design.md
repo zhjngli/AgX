@@ -1,7 +1,7 @@
 # Grain Size Algorithm Fix
 
 **Date:** 2026-03-27
-**Status:** Approved
+**Status:** Implemented — see [docs/reference/grain-algorithm.md](../reference/grain-algorithm.md) for current algorithm
 **Branch:** `fix/grain-size-algorithm`
 
 ## Problem
