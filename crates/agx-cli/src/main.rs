@@ -438,7 +438,7 @@ struct EditArgs {
     #[arg(long = "nr-detail", default_value_t = 0.0)]
     nr_detail: f32,
 
-    /// Grain type (fine, silver, soft, cubic, tabular, harsh)
+    /// Grain type (fine, silver, harsh)
     #[arg(long = "grain-type", default_value_t = agx::GrainType::Silver)]
     grain_type: agx::GrainType,
     /// Grain amount (0-100)

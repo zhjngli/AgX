@@ -4,17 +4,14 @@ use super::{LUMA_B, LUMA_G, LUMA_R};
 
 /// Grain type controlling the internal character of the noise.
 ///
-/// Each type maps to a combination of contrast curve, luminance falloff
-/// strength, and chromatic intensity. Matches Capture One's grain type model.
+/// Each type maps to a set of internal parameters: contrast, luminance falloff,
+/// chromatic intensity, and amount curve exponent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GrainType {
     Fine,
     #[default]
     Silver,
-    Soft,
-    Cubic,
-    Tabular,
     Harsh,
 }
 
@@ -23,9 +20,6 @@ impl std::fmt::Display for GrainType {
         match self {
             Self::Fine => write!(f, "fine"),
             Self::Silver => write!(f, "silver"),
-            Self::Soft => write!(f, "soft"),
-            Self::Cubic => write!(f, "cubic"),
-            Self::Tabular => write!(f, "tabular"),
             Self::Harsh => write!(f, "harsh"),
         }
     }
@@ -37,12 +31,9 @@ impl std::str::FromStr for GrainType {
         match s {
             "fine" => Ok(Self::Fine),
             "silver" => Ok(Self::Silver),
-            "soft" => Ok(Self::Soft),
-            "cubic" => Ok(Self::Cubic),
-            "tabular" => Ok(Self::Tabular),
             "harsh" => Ok(Self::Harsh),
             _ => Err(format!(
-                "invalid grain type '{s}'. Use: fine, silver, soft, cubic, tabular, or harsh"
+                "invalid grain type '{s}'. Use: fine, silver, or harsh"
             )),
         }
     }
@@ -93,68 +84,68 @@ impl GrainParams {
 /// Internal configuration for each grain type.
 #[derive(Debug, Clone, Copy)]
 struct GrainTypeConfig {
-    /// Contrast multiplier applied to raw noise
+    /// Contrast multiplier applied to raw noise — higher = stronger grain
     contrast: f32,
-    /// Luminance falloff exponent — higher = stronger midtone bias
+    /// Base luminance falloff exponent — higher = grain concentrated in shadows.
+    /// Dynamically reduced as amount increases so high-amount grain spreads
+    /// across more tonal range.
     luma_falloff: f32,
-    /// Chromatic grain intensity — how much per-channel noise diverges from
-    /// the shared (luminance) noise on saturated pixels. 0.0 = fully monochrome,
-    /// higher = more color fringing. Modulated by pixel saturation so neutral
-    /// pixels always get identical per-channel grain.
+    /// Chromatic grain intensity [0, 1] — per-channel noise divergence on
+    /// saturated pixels. Boosted in shadows, zeroed on grayscale pixels.
     chromatic: f32,
+    /// Amount curve exponent — controls how the 0-100 slider maps to intensity.
+    /// Lower = grain kicks in faster at low amounts. Higher = stays subtle longer.
+    amount_curve: f32,
 }
 
 impl GrainTypeConfig {
     fn from_type(grain_type: GrainType) -> Self {
         match grain_type {
             GrainType::Fine => Self {
-                contrast: 0.6,
-                luma_falloff: 3.0,
+                contrast: CONTRAST_FINE,
+                luma_falloff: FALLOFF_FINE,
                 chromatic: CHROMATIC_FINE,
+                amount_curve: AMOUNT_CURVE_FINE,
             },
             GrainType::Silver => Self {
-                contrast: 1.0,
-                luma_falloff: 2.0,
+                contrast: CONTRAST_SILVER,
+                luma_falloff: FALLOFF_SILVER,
                 chromatic: CHROMATIC_SILVER,
-            },
-            GrainType::Soft => Self {
-                contrast: 0.7,
-                luma_falloff: 3.0,
-                chromatic: CHROMATIC_SOFT,
-            },
-            GrainType::Cubic => Self {
-                contrast: 1.3,
-                luma_falloff: 1.5,
-                chromatic: CHROMATIC_CUBIC,
-            },
-            GrainType::Tabular => Self {
-                contrast: 0.8,
-                luma_falloff: 2.0,
-                chromatic: CHROMATIC_TABULAR,
+                amount_curve: AMOUNT_CURVE_SILVER,
             },
             GrainType::Harsh => Self {
-                contrast: 1.5,
-                luma_falloff: 1.0,
+                contrast: CONTRAST_HARSH,
+                luma_falloff: FALLOFF_HARSH,
                 chromatic: CHROMATIC_HARSH,
+                amount_curve: AMOUNT_CURVE_HARSH,
             },
         }
     }
 }
 
-// Per-type chromatic intensity constants (extracted for tuning scripts).
-const CHROMATIC_FINE: f32 = 0.03;
-const CHROMATIC_SILVER: f32 = 0.05;
-const CHROMATIC_SOFT: f32 = 0.05;
-const CHROMATIC_TABULAR: f32 = 0.08;
-const CHROMATIC_CUBIC: f32 = 0.12;
+// Per-type constants (extracted for tuning scripts).
+const CONTRAST_FINE: f32 = 0.95;
+const CONTRAST_SILVER: f32 = 1.2;
+const CONTRAST_HARSH: f32 = 1.5;
+
+const FALLOFF_FINE: f32 = 2.5;
+const FALLOFF_SILVER: f32 = 1.5;
+const FALLOFF_HARSH: f32 = 0.8;
+
+const CHROMATIC_FINE: f32 = 0.05;
+const CHROMATIC_SILVER: f32 = 0.10;
 const CHROMATIC_HARSH: f32 = 0.15;
 
+const AMOUNT_CURVE_FINE: f32 = 0.7;
+const AMOUNT_CURVE_SILVER: f32 = 0.6;
+const AMOUNT_CURVE_HARSH: f32 = 0.5;
+
 /// Minimum blur sigma below which no blur is applied (noise used as-is).
-const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.5;
+const GRAIN_BLUR_SIGMA_THRESHOLD: f32 = 0.3;
 
 /// Maximum blur sigma at size=100, at the reference resolution (2000px long edge).
 /// Actual sigma is scaled proportionally to the image's long edge.
-const GRAIN_MAX_SIGMA: f32 = 2.5;
+const GRAIN_MAX_SIGMA: f32 = 1.0;
 
 /// Reference resolution (long edge in pixels) for grain sigma scaling.
 /// Images larger than this get proportionally larger blur kernels so grain
@@ -163,9 +154,16 @@ const GRAIN_REF_RESOLUTION: f32 = 2000.0;
 
 /// Strength multiplier mapping amount to noise intensity.
 /// Controls the standard deviation of the exponential modulation argument.
-/// At amount=35 with Silver (contrast=1.0): exp argument std ≈ 0.028,
-/// giving ~95% of pixels within ±5% brightness change (barely perceptible).
-const GRAIN_STRENGTH_MULT: f32 = 0.08;
+const GRAIN_STRENGTH_MULT: f32 = 0.04;
+
+/// Minimum effective pixel value for grain calculation. Ensures grain is
+/// visible in deep shadows where pure multiplicative changes would be
+/// imperceptible (e.g., 0.01 * 1.05 = 0.0105, invisible).
+const GRAIN_SHADOW_FLOOR: f32 = 0.05;
+
+/// How much luma_falloff decreases at amount=100. At 0.4, a base falloff
+/// of 2.5 drops to 1.5 at full amount, spreading grain into midtones.
+const GRAIN_FALLOFF_REDUCTION: f32 = 0.4;
 
 /// Compute blur sigma from the size parameter (0-100), scaled to image resolution.
 /// Non-linear curve: low sizes stay sharp, higher sizes spread more.
@@ -234,7 +232,7 @@ pub fn apply_grain_buffer(
     }
 
     let config = GrainTypeConfig::from_type(params.grain_type);
-    let amount_factor = params.amount / 100.0;
+    let amount_factor = (params.amount / 100.0).powf(config.amount_curve);
     let sigma = grain_sigma(params.size, width, height);
 
     // Generate 4 independent white noise buffers: 1 shared + 3 per-channel (R, G, B)
@@ -258,6 +256,10 @@ pub fn apply_grain_buffer(
 
     let scale = config.contrast * GRAIN_STRENGTH_MULT * amount_factor;
 
+    // Dynamic luma falloff: at higher amounts, reduce falloff so grain
+    // spreads beyond shadows into midtones and highlights.
+    let effective_falloff = config.luma_falloff * (1.0 - GRAIN_FALLOFF_REDUCTION * amount_factor);
+
     for idx in 0..buf.len() {
         let [r, g, b] = buf[idx];
         let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
@@ -266,21 +268,31 @@ pub fn apply_grain_buffer(
         // Neutral pixels (chroma ~0) get identical per-channel noise;
         // saturated pixels get divergent per-channel noise.
         let pixel_chroma = r.max(g).max(b) - r.min(g).min(b);
-        let effective_chromatic = config.chromatic * pixel_chroma;
+
+        // Boost chromatic divergence in shadows — film grain shows as color
+        // shifts in dark areas where luminance changes are invisible.
+        // Still multiplied by pixel_chroma so BW/desaturated pixels are unaffected.
+        let shadow_chromatic_boost = 1.0 + (1.0 - luma).clamp(0.0, 1.0);
+        let effective_chromatic = (config.chromatic * pixel_chroma * shadow_chromatic_boost).min(1.0);
 
         // Per-channel noise: correlated with shared, small independent perturbation
         let nr = shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
         let ng = shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
         let nb = shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
 
-        let w = luminance_weight(luma, config.luma_falloff);
+        let w = luminance_weight(luma, effective_falloff);
         let mod_r = (nr * w * scale).exp();
         let mod_g = (ng * w * scale).exp();
         let mod_b = (nb * w * scale).exp();
+
+        // Additive shadow floor: use a minimum effective value so grain is
+        // visible even on near-black pixels where multiplicative changes
+        // would be imperceptible.
+        let floor = GRAIN_SHADOW_FLOOR;
         buf[idx] = [
-            (r * mod_r).clamp(0.0, 1.0),
-            (g * mod_g).clamp(0.0, 1.0),
-            (b * mod_b).clamp(0.0, 1.0),
+            (r + r.max(floor) * (mod_r - 1.0)).clamp(0.0, 1.0),
+            (g + g.max(floor) * (mod_g - 1.0)).clamp(0.0, 1.0),
+            (b + b.max(floor) * (mod_b - 1.0)).clamp(0.0, 1.0),
         ];
     }
 }
@@ -504,10 +516,10 @@ mod tests {
 
     #[test]
     fn chromatic_grain_shifts_color_channels_differently() {
-        // Cubic has chromatic=0.12 — on saturated color pixels,
+        // Harsh has chromatic=0.15 — on saturated color pixels,
         // per-channel noise should produce different mod factors per channel.
         let params = GrainParams {
-            grain_type: GrainType::Cubic,
+            grain_type: GrainType::Harsh,
             amount: 80.0,
             size: 25.0,
             seed: None,
