@@ -748,7 +748,12 @@ fn run_apply(
     let preset_name = if !presets.is_empty() {
         presets
             .iter()
-            .map(|p| p.file_stem().unwrap_or_default().to_string_lossy().to_string())
+            .map(|p| {
+                p.file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            })
             .collect::<Vec<_>>()
             .join("+")
     } else if let Some(path) = preset_path {

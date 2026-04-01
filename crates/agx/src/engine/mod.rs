@@ -1403,14 +1403,16 @@ impl Engine {
 
                     // 7. Whites
                     if whites != 0.0 {
-                        (sr, sg, sb) =
-                            adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_whites(v, whites));
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_whites(v, whites)
+                        });
                     }
 
                     // 8. Blacks
                     if blacks != 0.0 {
-                        (sr, sg, sb) =
-                            adjust::apply_per_channel(sr, sg, sb, |v| adjust::apply_blacks(v, blacks));
+                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
+                            adjust::apply_blacks(v, blacks)
+                        });
                     }
 
                     // 9. Tone curves (sRGB gamma space)
