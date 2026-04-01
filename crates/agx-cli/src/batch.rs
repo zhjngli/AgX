@@ -179,7 +179,8 @@ fn process_single(
     let linear = agx::decode::decode(input).map_err(|e| e.to_string())?;
     let mut engine = agx::Engine::new(linear);
     configure(&mut engine);
-    let rendered = engine.render();
+    let result = engine.render();
+    let rendered = result.image;
     let opts = agx::encode::EncodeOptions {
         jpeg_quality: quality,
         format,

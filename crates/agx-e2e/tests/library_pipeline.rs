@@ -8,7 +8,7 @@ fn process_with_params(input: &Path, output: &Path, configure: impl FnOnce(&mut 
     let image = agx::decode(input).expect("decode failed");
     let mut engine = agx::Engine::new(image);
     configure(&mut engine);
-    let rendered = engine.render();
+    let rendered = engine.render().image;
     agx::encode::encode_to_file(&rendered, output).expect("encode failed");
 }
 
@@ -45,7 +45,7 @@ fn library_apply_preset() {
     let mut engine = agx::Engine::new(image);
     let preset = agx::Preset::load_from_file(&preset_path).expect("preset load failed");
     engine.apply_preset(&preset);
-    let rendered = engine.render();
+    let rendered = engine.render().image;
     agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
 
     assert_valid_output(&output);
@@ -76,7 +76,7 @@ fn library_lut_load_and_apply() {
     let mut engine = agx::Engine::new(image);
     let lut = agx::Lut3D::from_cube_file(&lut_path).expect("LUT load failed");
     engine.set_lut(Some(std::sync::Arc::new(lut)));
-    let rendered = engine.render();
+    let rendered = engine.render().image;
     agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
 
     assert_valid_output(&output);
@@ -106,7 +106,7 @@ fn library_preset_with_extends() {
     let preset =
         agx::Preset::load_from_file(&preset_path).expect("preset with extends should load");
     engine.apply_preset(&preset);
-    let rendered = engine.render();
+    let rendered = engine.render().image;
     agx::encode::encode_to_file(&rendered, &output).expect("encode failed");
 
     assert_valid_output(&output);

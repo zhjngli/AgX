@@ -701,7 +701,8 @@ fn run_apply(
         engine.apply_preset(&preset);
     }
 
-    let rendered = engine.render();
+    let result = engine.render();
+    let rendered = result.image;
     let opts = output_opts.encode_options()?;
     let final_path =
         agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
@@ -722,7 +723,8 @@ fn run_edit(
     if let Some(lut) = edit.load_lut()? {
         engine.set_lut(Some(lut));
     }
-    let rendered = engine.render();
+    let result = engine.render();
+    let rendered = result.image;
     let opts = output_opts.encode_options()?;
     let final_path =
         agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;

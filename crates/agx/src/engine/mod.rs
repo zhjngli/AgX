@@ -1500,7 +1500,7 @@ mod tests {
     fn render_neutral_params_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
         let engine = Engine::new(img);
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -1519,7 +1519,7 @@ mod tests {
         let img = make_test_image(0.25, 0.25, 0.25);
         let mut engine = Engine::new(img);
         engine.params_mut().exposure = 1.0;
-        let pixel = *engine.render().get_pixel(0, 0);
+        let pixel = *engine.render().image.get_pixel(0, 0);
         for i in 0..3 {
             assert!(
                 (pixel.0[i] - 0.5).abs() < 1e-5,
@@ -1535,9 +1535,9 @@ mod tests {
         let img = make_test_image(0.5, 0.5, 0.5);
         let mut engine = Engine::new(img);
         engine.params_mut().contrast = 50.0;
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let neutral_engine = Engine::new(make_test_image(0.5, 0.5, 0.5));
-        let neutral = neutral_engine.render();
+        let neutral = neutral_engine.render().image;
         // With contrast, pixel values above/below mid should shift
         let rp = rendered.get_pixel(0, 0);
         let np = neutral.get_pixel(0, 0);
@@ -1554,7 +1554,7 @@ mod tests {
         let img = make_test_image(0.5, 0.5, 0.5);
         let mut engine = Engine::new(img);
         engine.params_mut().temperature = 50.0;
-        let pixel = *engine.render().get_pixel(0, 0);
+        let pixel = *engine.render().image.get_pixel(0, 0);
         // Warm shift: red > blue
         assert!(
             pixel.0[0] > pixel.0[2],
@@ -1570,7 +1570,7 @@ mod tests {
         let mut engine = Engine::new(img);
         engine.params_mut().exposure = 1.0;
         engine.params_mut().contrast = 25.0;
-        let pixel = *engine.render().get_pixel(0, 0);
+        let pixel = *engine.render().image.get_pixel(0, 0);
         // Should be brighter than original 0.2
         assert!(pixel.0[0] > 0.2, "Expected brighter, got {}", pixel.0[0]);
     }
@@ -1598,7 +1598,7 @@ mod tests {
         };
         engine.set_lut(Some(Arc::new(lut)));
 
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -1617,7 +1617,7 @@ mod tests {
         let img = make_test_image(0.5, 0.3, 0.1);
         let engine = Engine::new(img);
         assert!(engine.lut().is_none());
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -1681,7 +1681,7 @@ mod tests {
         let engine = Engine::new(img);
         // HSL defaults to all zeros, so render should be identity
         let orig = engine.original().get_pixel(0, 0);
-        let rend = *engine.render().get_pixel(0, 0);
+        let rend = *engine.render().image.get_pixel(0, 0);
         for i in 0..3 {
             assert!(
                 (orig.0[i] - rend.0[i]).abs() < 1e-4,
@@ -1698,7 +1698,7 @@ mod tests {
         let img = make_test_image(0.5, 0.01, 0.01);
         let mut engine = Engine::new(img);
         engine.params_mut().hsl.red.saturation = -100.0;
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let p = rendered.get_pixel(0, 0);
         // Desaturated: channels should be closer together than original
         let spread = (p.0[0] - p.0[1]).abs() + (p.0[0] - p.0[2]).abs();
@@ -1715,7 +1715,7 @@ mod tests {
         let img = make_test_image(0.5, 0.01, 0.01);
         let mut engine = Engine::new(img);
         engine.params_mut().hsl.green.saturation = -100.0;
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -2040,7 +2040,7 @@ mod tests {
         let img: Rgb32FImage = ImageBuffer::from_pixel(10, 10, Rgb([0.5, 0.5, 0.5]));
         let mut engine = Engine::new(img);
         engine.params_mut().vignette.amount = -50.0;
-        let rendered = engine.render();
+        let rendered = engine.render().image;
 
         // Center pixel should be close to original
         let center = rendered.get_pixel(5, 5);
@@ -2065,7 +2065,7 @@ mod tests {
         let img = make_test_image(0.5, 0.3, 0.1);
         let mut engine = Engine::new(img);
         engine.params_mut().vignette.amount = 0.0;
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -2094,7 +2094,7 @@ mod tests {
         let linear = crate::decode::decode_standard(&input).unwrap();
         let mut engine = Engine::new(linear);
         engine.params_mut().exposure = 1.0;
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         crate::encode::encode_to_file(&rendered, &output).unwrap();
 
         // Verify output is brighter (sRGB 128 → linear ~0.216 → *2 → ~0.432 → sRGB ~173)
@@ -2268,11 +2268,11 @@ mod tests {
             Rgb([v * 0.5, v * 0.5, v * 0.5])
         });
         let mut engine = Engine::new(img.clone());
-        let neutral_render = engine.render();
+        let neutral_render = engine.render().image;
 
         engine.params_mut().detail.sharpening.amount = 80.0;
         engine.params_mut().detail.sharpening.threshold = 0.0;
-        let sharp_render = engine.render();
+        let sharp_render = engine.render().image;
 
         let mut diffs = 0;
         for y in 2..h - 2 {
@@ -2291,7 +2291,7 @@ mod tests {
     fn render_default_detail_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
         let engine = Engine::new(img);
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -2330,8 +2330,8 @@ mod tests {
         }
         let mut engine = Engine::new(img.clone());
         engine.params_mut().dehaze.amount = 50.0;
-        let dehazed = engine.render();
-        let neutral = Engine::new(img).render();
+        let dehazed = engine.render().image;
+        let neutral = Engine::new(img).render().image;
         let dp = dehazed.get_pixel(0, 0);
         let np = neutral.get_pixel(0, 0);
         let differs = (0..3).any(|i| (dp.0[i] - np.0[i]).abs() > 1e-4);
@@ -2342,7 +2342,7 @@ mod tests {
     fn render_default_dehaze_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
         let engine = Engine::new(img);
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -2395,8 +2395,8 @@ mod tests {
         }
         let mut engine = Engine::new(img.clone());
         engine.params_mut().noise_reduction.luminance = 50.0;
-        let denoised = engine.render();
-        let neutral = Engine::new(img).render();
+        let denoised = engine.render().image;
+        let neutral = Engine::new(img).render().image;
         let dp = denoised.get_pixel(0, 0);
         let np = neutral.get_pixel(0, 0);
         let differs = (0..3).any(|i| (dp.0[i] - np.0[i]).abs() > 1e-4);
@@ -2407,7 +2407,7 @@ mod tests {
     fn render_default_nr_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
         let engine = Engine::new(img);
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -2443,7 +2443,7 @@ mod tests {
     fn render_default_grain_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
         let engine = Engine::new(img);
-        let rendered = engine.render();
+        let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
         for i in 0..3 {
@@ -2459,14 +2459,14 @@ mod tests {
         // Use a larger image to get meaningful grain variation across pixels
         let img = ImageBuffer::from_pixel(64, 64, Rgb([0.5f32, 0.5, 0.5]));
         let mut engine = Engine::new(img);
-        let before = engine.render();
+        let before = engine.render().image;
         engine.params_mut().grain = crate::adjust::GrainParams {
             grain_type: crate::adjust::GrainType::Silver,
             amount: 50.0,
             size: 50.0,
             seed: None,
         };
-        let after = engine.render();
+        let after = engine.render().image;
         // Check multiple pixels — grain is random so at least some should differ
         let mut changed = false;
         for y in 0..64 {
