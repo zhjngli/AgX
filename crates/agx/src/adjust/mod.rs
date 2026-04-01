@@ -27,6 +27,13 @@ pub fn apply_per_channel(r: f32, g: f32, b: f32, f: impl Fn(f32) -> f32) -> (f32
     (f(r), f(g), f(b))
 }
 
+/// Hermite smoothstep: 0 at edge0, 1 at edge1, smooth cubic transition.
+#[inline]
+pub(crate) fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 // --- Color space helpers ---
 
 /// Convert linear sRGB to sRGB gamma space.

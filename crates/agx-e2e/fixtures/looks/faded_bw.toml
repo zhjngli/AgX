@@ -15,9 +15,9 @@ points = [[0.0, 0.06], [0.25, 0.22], [0.75, 0.78], [1.0, 0.94]]
 texture = -18.0
 
 [grain]
-type = "soft"
+type = "silver"
 amount = 22.0
-size = 30.0
+size = 50.0
 seed = 42
 
 [lut]

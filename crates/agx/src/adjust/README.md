@@ -31,10 +31,9 @@ All tone functions operate on a single channel and return a clamped `f32`.
 - `apply_noise_reduction(pixels, width, height, params)` -- à trous wavelet denoising in YCbCr space (linear buffer-level pass)
 
 ### Grain
-- `GrainType` -- enum: `Fine`, `Silver`, `Soft`, `Cubic`, `Tabular`, `Harsh`
-- `GrainParams` -- grain_type, amount (0-100), size (0-100), chromatic (0-100), optional seed
-- `GrainPrecomputed::new(params, seed, width, height)` -- precomputed struct for per-pixel grain
-- `apply_grain_pixel(r, g, b, x, y, pre)` -- per-pixel grain via simplex noise (sRGB gamma space)
+- `GrainType` -- enum: `Fine`, `Silver`, `Harsh`
+- `GrainParams` -- grain_type, amount (0-100), size (0-100), optional seed
+- `apply_grain_buffer(buf, width, height, params, seed)` -- blur-based grain applied to sRGB gamma buffer (buffer-level when size >= threshold, per-pixel otherwise)
 
 ## Extension Guide
 1. Add a new `pub fn apply_foo(value: f32, amount: f32) -> f32` here.
@@ -43,9 +42,10 @@ All tone functions operate on a single channel and return a clamped `f32`.
 4. Add the field to the preset TOML section structs and mapping in `preset/mod.rs`.
 
 ## Does NOT
-- Hold or iterate over image buffers.
 - Perform file I/O.
 - Know about presets, the engine, or the rendering pipeline order.
+
+**Note:** Some submodules (`detail`, `dehaze`, `denoise`, `grain`) operate on full image buffers rather than individual pixel values. These are still pure math with no I/O or pipeline awareness.
 
 ## Key Decisions
 - **Stateless functions, not methods.** Each function takes scalar inputs and returns scalar outputs. The engine decides iteration order and pipeline sequencing.

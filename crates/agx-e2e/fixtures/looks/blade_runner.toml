@@ -37,9 +37,9 @@ luminance = 3.0
 clarity = 10.0
 
 [grain]
-type = "tabular"
+type = "silver"
 amount = 14.0
-size = 24.0
+size = 45.0
 seed = 42
 
 [lut]

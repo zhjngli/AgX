@@ -21,7 +21,7 @@ masking = 35.0
 [grain]
 type = "fine"
 amount = 10.0
-size = 25.0
+size = 35.0
 seed = 42
 
 [noise_reduction]

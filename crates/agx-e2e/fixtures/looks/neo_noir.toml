@@ -40,7 +40,7 @@ masking = 45.0
 [grain]
 type = "harsh"
 amount = 20.0
-size = 26.0
+size = 50.0
 seed = 42
 
 [lut]

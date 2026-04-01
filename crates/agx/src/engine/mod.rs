@@ -776,8 +776,6 @@ pub struct PartialGrainParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chromatic: Option<f32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
 }
 
@@ -787,7 +785,6 @@ impl PartialGrainParams {
             grain_type: overlay.grain_type.or(self.grain_type),
             amount: overlay.amount.or(self.amount),
             size: overlay.size.or(self.size),
-            chromatic: overlay.chromatic.or(self.chromatic),
             seed: overlay.seed.or(self.seed),
         }
     }
@@ -797,7 +794,6 @@ impl PartialGrainParams {
             grain_type: self.grain_type.unwrap_or_default(),
             amount: self.amount.unwrap_or(0.0),
             size: self.size.unwrap_or(50.0),
-            chromatic: self.chromatic.unwrap_or(0.0),
             seed: self.seed,
         }
     }
@@ -809,7 +805,6 @@ impl From<&crate::adjust::GrainParams> for PartialGrainParams {
             grain_type: Some(p.grain_type),
             amount: Some(p.amount),
             size: Some(p.size),
-            chromatic: Some(p.chromatic),
             seed: p.seed,
         }
     }
@@ -1073,14 +1068,17 @@ impl Engine {
     /// 1. White balance (linear space) — channel multipliers
     /// 2. Exposure (linear space) — multiply by 2^stops
     ///    2b. Dehaze (linear space, buffer-level, when active)
+    ///    2c. Noise reduction (linear space, buffer-level, when active)
     /// 3. Convert to sRGB gamma space
     /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
-    /// 5. HSL adjustments (sRGB gamma space)
-    /// 6. Color grading (sRGB gamma space) — 3-way color wheels
-    /// 7. LUT application (sRGB gamma space)
-    /// 8. Vignette (sRGB gamma space, position-dependent)
-    /// 9. Detail pass — sharpening, clarity, texture (sRGB gamma space, when active)
-    /// 10. Convert back to linear space
+    /// 5. Tone curves (sRGB gamma space)
+    /// 6. HSL adjustments (sRGB gamma space)
+    /// 7. Color grading (sRGB gamma space) — 3-way color wheels
+    /// 8. LUT application (sRGB gamma space)
+    /// 9. Detail pass — sharpening, clarity, texture (sRGB gamma space, buffer-level, when active)
+    /// 10. Grain (sRGB gamma space, buffer-level when size >= threshold, per-pixel otherwise)
+    /// 11. Vignette (sRGB gamma space, position-dependent)
+    /// 12. Convert back to linear space
     pub fn render(&self) -> Rgb32FImage {
         let (w, h) = self.original.dimensions();
         let exposure_factor = adjust::exposure_factor(self.params.exposure);
@@ -1277,23 +1275,22 @@ impl Engine {
                 srgb_buf
             };
 
-            // Post-detail-pass: apply grain and vignette, then convert to linear.
-            let grain_pre = grain_active.then(|| {
+            // Post-detail-pass: apply grain to the buffer, then vignette + convert to linear.
+            let mut grain_buf = detail_buf;
+            if grain_active {
                 let seed = self.params.grain.seed.unwrap_or_else(rand::random::<u64>);
-                adjust::grain::GrainPrecomputed::new(&self.params.grain, seed, w, h)
-            });
+                adjust::grain::apply_grain_buffer(
+                    &mut grain_buf,
+                    w as usize,
+                    h as usize,
+                    &self.params.grain,
+                    seed,
+                );
+            }
 
             Rgb32FImage::from_fn(w, h, |x, y| {
                 let idx = (y * w + x) as usize;
-                let [mut sr, mut sg, mut sb] = detail_buf[idx];
-
-                // Grain (sRGB gamma space)
-                if let Some(ref pre) = grain_pre {
-                    let (gr, gg, gb) = adjust::grain::apply_grain_pixel(sr, sg, sb, x, y, pre);
-                    sr = gr;
-                    sg = gg;
-                    sb = gb;
-                }
+                let [mut sr, mut sg, mut sb] = grain_buf[idx];
 
                 // Vignette (sRGB gamma space, position-dependent)
                 if let Some(pre) = &vignette_pre {
@@ -2347,14 +2344,12 @@ mod tests {
             grain_type: Some(crate::adjust::GrainType::Silver),
             amount: Some(30.0),
             size: None,
-            chromatic: None,
             seed: None,
         };
         let overlay = PartialGrainParams {
             grain_type: None,
             amount: None,
             size: Some(60.0),
-            chromatic: Some(25.0),
             seed: None,
         };
         let merged = base.merge(&overlay);
@@ -2362,7 +2357,6 @@ mod tests {
         assert_eq!(concrete.grain_type, crate::adjust::GrainType::Silver);
         assert_eq!(concrete.amount, 30.0);
         assert_eq!(concrete.size, 60.0);
-        assert_eq!(concrete.chromatic, 25.0);
     }
 
     #[test]
@@ -2390,7 +2384,6 @@ mod tests {
             grain_type: crate::adjust::GrainType::Silver,
             amount: 50.0,
             size: 50.0,
-            chromatic: 0.0,
             seed: None,
         };
         let after = engine.render();

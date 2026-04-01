@@ -1,8 +1,8 @@
 # Grain Simulation Design
 
 **Date:** 2026-03-23
-**Status:** Draft
-**Category:** Editing — Per-Pixel (spatially coherent simplex noise)
+**Status:** Implemented — see [docs/reference/grain-algorithm.md](../reference/grain-algorithm.md) for current algorithm
+**Category:** Editing — Grain simulation
 
 ## Problem
 

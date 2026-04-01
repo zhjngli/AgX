@@ -20,9 +20,9 @@ masking = 25.0
 amount = -7.0
 
 [grain]
-type = "cubic"
+type = "harsh"
 amount = 32.0
-size = 28.0
+size = 60.0
 seed = 42
 
 [lut]

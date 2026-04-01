@@ -206,13 +206,6 @@ fn validate_grain_params(params: &PartialGrainParams) -> Result<()> {
             )));
         }
     }
-    if let Some(chromatic) = params.chromatic {
-        if !(0.0..=100.0).contains(&chromatic) {
-            return Err(AgxError::Preset(format!(
-                "grain chromatic must be 0-100, got {chromatic}"
-            )));
-        }
-    }
     Ok(())
 }
 
@@ -1213,14 +1206,12 @@ version = "1.0"
 type = "harsh"
 amount = 60.0
 size = 70.0
-chromatic = 30.0
 "#;
         let preset = Preset::from_toml(toml_str).unwrap();
         let params = preset.params();
         assert_eq!(params.grain.grain_type, crate::adjust::GrainType::Harsh);
         assert_eq!(params.grain.amount, 60.0);
         assert_eq!(params.grain.size, 70.0);
-        assert_eq!(params.grain.chromatic, 30.0);
 
         let round_tripped = preset.to_toml().unwrap();
         let preset2 = Preset::from_toml(&round_tripped).unwrap();

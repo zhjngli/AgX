@@ -62,7 +62,7 @@ impl DetailParams {
 
 // --- Gaussian blur (separable 2-pass) ---
 
-fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
+pub(crate) fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
     let half = (3.0 * sigma).ceil() as usize;
     let size = 2 * half + 1;
     let mut kernel = Vec::with_capacity(size);
@@ -78,7 +78,7 @@ fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
     kernel
 }
 
-fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
+pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
     let kernel = build_gaussian_kernel(sigma);
     let half = kernel.len() / 2;
     let mut temp = vec![0.0f32; width * height];
@@ -166,10 +166,7 @@ fn compute_edge_map(luminance: &[f32], width: usize, height: usize) -> Vec<f32> 
     edge_map
 }
 
-fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
-    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
+use super::smoothstep;
 
 fn apply_sharpening(
     buf: &[[f32; 3]],
