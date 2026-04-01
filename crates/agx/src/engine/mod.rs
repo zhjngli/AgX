@@ -1333,8 +1333,8 @@ impl Engine {
 
             // Post-detail-pass: apply grain to the buffer, then vignette + convert to linear.
             let mut grain_buf = detail_buf;
-            profile_stage!(stages, "grain", {
-                if grain_active {
+            if grain_active {
+                profile_stage!(stages, "grain", {
                     let seed = self.params.grain.seed.unwrap_or_else(rand::random::<u64>);
                     adjust::grain::apply_grain_buffer(
                         &mut grain_buf,
@@ -1343,8 +1343,8 @@ impl Engine {
                         &self.params.grain,
                         seed,
                     );
-                }
-            });
+                });
+            }
 
             let image = profile_stage!(stages, "vignette_and_srgb_to_linear", {
                 Rgb32FImage::from_fn(w, h, |x, y| {

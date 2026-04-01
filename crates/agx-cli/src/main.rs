@@ -713,20 +713,16 @@ fn write_profile_entry(
         "total_ms": total_ms,
     });
 
-    // Append to existing array or create new one
-    let mut entries: Vec<serde_json::Value> = if path.exists() {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| agx::AgxError::Encode(e.to_string()))?;
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        Vec::new()
+    let mut entries: Vec<serde_json::Value> = match std::fs::read_to_string(path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(e) => return Err(agx::AgxError::Io(e)),
     };
     entries.push(entry);
 
-    let mut file = std::fs::File::create(path)
-        .map_err(|e| agx::AgxError::Encode(e.to_string()))?;
+    let mut file = std::fs::File::create(path).map_err(agx::AgxError::Io)?;
     file.write_all(serde_json::to_string_pretty(&entries).unwrap().as_bytes())
-        .map_err(|e| agx::AgxError::Encode(e.to_string()))?;
+        .map_err(agx::AgxError::Io)?;
     Ok(())
 }
 
@@ -748,7 +744,6 @@ fn run_apply(
 
     let mut engine = Engine::new(linear);
 
-    // Determine preset name for profiling
     #[cfg(feature = "profiling")]
     let preset_name = if !presets.is_empty() {
         presets
