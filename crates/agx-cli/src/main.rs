@@ -24,6 +24,10 @@ struct OutputOpts {
     /// Output format (jpeg, png, tiff). Inferred from extension if not specified.
     #[arg(long)]
     format: Option<String>,
+    /// Write profiling timing data to this JSON file (requires --features profiling)
+    #[cfg(feature = "profiling")]
+    #[arg(long)]
+    profile_output: Option<PathBuf>,
 }
 
 impl OutputOpts {
@@ -680,6 +684,52 @@ fn parse_output_format(s: &str) -> agx::Result<agx::encode::OutputFormat> {
     })
 }
 
+#[cfg(feature = "profiling")]
+fn write_profile_entry(
+    path: &std::path::Path,
+    image_name: &str,
+    preset_name: &str,
+    dimensions: (u32, u32),
+    decode_ms: f64,
+    render_profile: &agx::RenderProfile,
+    encode_ms: f64,
+) -> agx::Result<()> {
+    use std::io::Write;
+
+    let mut stages = serde_json::Map::new();
+    stages.insert("decode".to_string(), serde_json::Value::from(decode_ms));
+    for (name, ms) in &render_profile.stages {
+        stages.insert(name.clone(), serde_json::Value::from(*ms));
+    }
+    stages.insert("encode".to_string(), serde_json::Value::from(encode_ms));
+
+    let total_ms = decode_ms + render_profile.total_ms + encode_ms;
+
+    let entry = serde_json::json!({
+        "image": image_name,
+        "preset": preset_name,
+        "dimensions": [dimensions.0, dimensions.1],
+        "stages": stages,
+        "total_ms": total_ms,
+    });
+
+    // Append to existing array or create new one
+    let mut entries: Vec<serde_json::Value> = if path.exists() {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| agx::AgxError::Encode(e.to_string()))?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    entries.push(entry);
+
+    let mut file = std::fs::File::create(path)
+        .map_err(|e| agx::AgxError::Encode(e.to_string()))?;
+    file.write_all(serde_json::to_string_pretty(&entries).unwrap().as_bytes())
+        .map_err(|e| agx::AgxError::Encode(e.to_string()))?;
+    Ok(())
+}
+
 fn run_apply(
     input: &std::path::Path,
     preset_path: Option<&std::path::Path>,
@@ -687,9 +737,33 @@ fn run_apply(
     output: &std::path::Path,
     output_opts: &OutputOpts,
 ) -> agx::Result<()> {
+    #[cfg(feature = "profiling")]
+    let decode_start = std::time::Instant::now();
+
     let metadata = agx::metadata::extract_metadata(input);
     let linear = agx::decode::decode(input)?;
+
+    #[cfg(feature = "profiling")]
+    let decode_ms = decode_start.elapsed().as_secs_f64() * 1000.0;
+
     let mut engine = Engine::new(linear);
+
+    // Determine preset name for profiling
+    #[cfg(feature = "profiling")]
+    let preset_name = if !presets.is_empty() {
+        presets
+            .iter()
+            .map(|p| p.file_stem().unwrap_or_default().to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join("+")
+    } else if let Some(path) = preset_path {
+        path.file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string()
+    } else {
+        "none".to_string()
+    };
 
     if !presets.is_empty() {
         for path in presets {
@@ -704,9 +778,35 @@ fn run_apply(
     let result = engine.render();
     let rendered = result.image;
     let opts = output_opts.encode_options()?;
+
+    #[cfg(feature = "profiling")]
+    let encode_start = std::time::Instant::now();
+
     let final_path =
         agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
+
+    #[cfg(feature = "profiling")]
+    let encode_ms = encode_start.elapsed().as_secs_f64() * 1000.0;
+
     println!("Saved to {}", final_path.display());
+
+    #[cfg(feature = "profiling")]
+    if let Some(ref profile_path) = output_opts.profile_output {
+        if let Some(profile) = result.profile {
+            let dims = (rendered.width(), rendered.height());
+            let image_name = input.file_name().unwrap_or_default().to_string_lossy();
+            write_profile_entry(
+                profile_path,
+                &image_name,
+                &preset_name,
+                dims,
+                decode_ms,
+                &profile,
+                encode_ms,
+            )?;
+        }
+    }
+
     Ok(())
 }
 
@@ -716,8 +816,15 @@ fn run_edit(
     edit: &EditArgs,
     output_opts: &OutputOpts,
 ) -> agx::Result<()> {
+    #[cfg(feature = "profiling")]
+    let decode_start = std::time::Instant::now();
+
     let metadata = agx::metadata::extract_metadata(input);
     let linear = agx::decode::decode(input)?;
+
+    #[cfg(feature = "profiling")]
+    let decode_ms = decode_start.elapsed().as_secs_f64() * 1000.0;
+
     let mut engine = Engine::new(linear);
     engine.set_params(edit.to_params());
     if let Some(lut) = edit.load_lut()? {
@@ -726,9 +833,35 @@ fn run_edit(
     let result = engine.render();
     let rendered = result.image;
     let opts = output_opts.encode_options()?;
+
+    #[cfg(feature = "profiling")]
+    let encode_start = std::time::Instant::now();
+
     let final_path =
         agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())?;
+
+    #[cfg(feature = "profiling")]
+    let encode_ms = encode_start.elapsed().as_secs_f64() * 1000.0;
+
     println!("Saved to {}", final_path.display());
+
+    #[cfg(feature = "profiling")]
+    if let Some(ref profile_path) = output_opts.profile_output {
+        if let Some(profile) = result.profile {
+            let dims = (rendered.width(), rendered.height());
+            let image_name = input.file_name().unwrap_or_default().to_string_lossy();
+            write_profile_entry(
+                profile_path,
+                &image_name,
+                "edit",
+                dims,
+                decode_ms,
+                &profile,
+                encode_ms,
+            )?;
+        }
+    }
+
     Ok(())
 }
 
