@@ -1179,27 +1179,27 @@ impl Engine {
                 buf
             });
             // Apply dehaze if active
-            profile_stage!(stages, "dehaze", {
-                if dehaze_active {
-                    linear_buf = adjust::dehaze::apply_dehaze(
+            if dehaze_active {
+                linear_buf = profile_stage!(stages, "dehaze", {
+                    adjust::dehaze::apply_dehaze(
                         &linear_buf,
                         w as usize,
                         h as usize,
                         &self.params.dehaze,
-                    );
-                }
-            });
+                    )
+                });
+            }
             // Apply noise reduction if active
-            profile_stage!(stages, "denoise", {
-                if nr_active {
-                    linear_buf = adjust::denoise::apply_noise_reduction(
+            if nr_active {
+                linear_buf = profile_stage!(stages, "denoise", {
+                    adjust::denoise::apply_noise_reduction(
                         &linear_buf,
                         w as usize,
                         h as usize,
                         &self.params.noise_reduction,
-                    );
-                }
-            });
+                    )
+                });
+            }
             Some(linear_buf)
         } else {
             None
