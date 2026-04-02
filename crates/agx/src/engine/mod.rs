@@ -77,6 +77,108 @@ pub trait Stage: Send + Sync {
     fn process(&self, ctx: &mut RenderContext) -> Result<(), crate::error::AgxError>;
 }
 
+/// The fixed render pipeline. Holds stages in execution order.
+///
+/// The pipeline order is hardcoded and not configurable by consumers.
+/// This preserves the invariant that identical parameters always produce
+/// identical output, regardless of the order they were set.
+pub struct Pipeline {
+    stages: Vec<Box<dyn Stage>>,
+}
+
+impl Pipeline {
+    /// Construct the fixed pipeline with all stages in render order.
+    pub fn new() -> Self {
+        Pipeline {
+            stages: vec![
+                Box::new(stages::WhiteBalanceExposureStage::new()),
+                Box::new(stages::DehazeStage::new()),
+                Box::new(stages::DenoiseStage::new()),
+                Box::new(stages::LinearToSrgbStage::new()),
+                Box::new(stages::PerPixelAdjustmentsStage::new()),
+                Box::new(stages::DetailStage::new()),
+                Box::new(stages::GrainStage::new()),
+                Box::new(stages::VignetteStage::new()),
+                Box::new(stages::SrgbToLinearStage::new()),
+            ],
+        }
+    }
+
+    /// Execute the pipeline, returning the rendered image and optional profiling data.
+    pub fn execute(
+        &mut self,
+        original: &Rgb32FImage,
+        params: &Parameters,
+        lut: Option<&crate::lut::Lut3D>,
+    ) -> RenderResult {
+        let (w, h) = original.dimensions();
+
+        #[cfg(feature = "profiling")]
+        let render_start = std::time::Instant::now();
+        #[cfg(feature = "profiling")]
+        let mut profile_stages: Vec<(String, f64)> = Vec::new();
+
+        // Build initial buffer from original image (linear sRGB)
+        let buf: Vec<[f32; 3]> = original
+            .pixels()
+            .map(|p| [p.0[0], p.0[1], p.0[2]])
+            .collect();
+
+        let mut ctx = RenderContext {
+            buf,
+            width: w,
+            height: h,
+            params,
+            lut,
+        };
+
+        // Prepare all active stages
+        for stage in &mut self.stages {
+            if stage.is_active(params) {
+                stage.prepare(params);
+            }
+        }
+
+        // Execute stages in order
+        for stage in &self.stages {
+            if !stage.is_active(params) {
+                continue;
+            }
+
+            #[cfg(feature = "profiling")]
+            let stage_start = std::time::Instant::now();
+
+            // The pipeline is constructed with explicit conversion stages
+            // (LinearToSrgbStage, SrgbToLinearStage) at the correct positions,
+            // so no runtime color space checking is needed.
+            stage
+                .process(&mut ctx)
+                .expect("stage processing should not fail");
+
+            #[cfg(feature = "profiling")]
+            profile_stages.push((
+                stage.name().to_string(),
+                stage_start.elapsed().as_secs_f64() * 1000.0,
+            ));
+        }
+
+        // Build final image from buffer
+        let image = Rgb32FImage::from_fn(w, h, |x, y| {
+            let idx = (y * w + x) as usize;
+            Rgb(ctx.buf[idx])
+        });
+
+        RenderResult {
+            image,
+            #[cfg(feature = "profiling")]
+            profile: Some(RenderProfile {
+                stages: profile_stages,
+                total_ms: render_start.elapsed().as_secs_f64() * 1000.0,
+            }),
+        }
+    }
+}
+
 /// Records elapsed time for a named pipeline stage.
 /// No-ops when the `profiling` feature is disabled.
 #[cfg(feature = "profiling")]
