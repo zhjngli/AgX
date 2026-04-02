@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjust;
 
+pub mod stages;
+
 /// Timing data for a single render pass. Only available when compiled
 /// with the `profiling` feature.
 #[cfg(feature = "profiling")]
