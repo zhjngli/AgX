@@ -87,6 +87,24 @@ pub fn apply_white_balance(r: f32, g: f32, b: f32, temperature: f32, tint: f32) 
     )
 }
 
+/// Apply white balance and exposure to a linear buffer in-place.
+///
+/// Each pixel gets WB channel multipliers (normalized to preserve brightness)
+/// followed by exposure (multiply by 2^stops). Operates in linear space.
+pub fn apply_white_balance_exposure_buffer(
+    buf: &mut [[f32; 3]],
+    temperature: f32,
+    tint: f32,
+    exposure: f32,
+) {
+    let factor = exposure_factor(exposure);
+    for pixel in buf.iter_mut() {
+        let (r, g, b) = apply_white_balance(pixel[0], pixel[1], pixel[2], temperature, tint);
+        let (r, g, b) = apply_per_channel(r, g, b, |v| apply_exposure(v, factor));
+        *pixel = [r, g, b];
+    }
+}
+
 // --- Contrast (sRGB gamma space) ---
 
 /// Apply contrast adjustment to a single channel value in sRGB gamma space.
@@ -1595,5 +1613,41 @@ mod tests {
         assert!((r - 0.3).abs() < 0.02, "r should be ~0.3, got {r}");
         assert!((g - 0.3).abs() < 0.02, "g should be ~0.3, got {g}");
         assert!((b - 0.3).abs() < 0.02, "b should be ~0.3, got {b}");
+    }
+
+    #[test]
+    fn white_balance_exposure_buffer_identity() {
+        let mut buf = vec![[0.5, 0.3, 0.1], [0.25, 0.25, 0.25]];
+        let original = buf.clone();
+        apply_white_balance_exposure_buffer(&mut buf, 0.0, 0.0, 0.0);
+        for i in 0..buf.len() {
+            for c in 0..3 {
+                assert!(
+                    (buf[i][c] - original[i][c]).abs() < 1e-6,
+                    "pixel[{}][{}] changed with neutral params",
+                    i, c
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn white_balance_exposure_buffer_applies_exposure() {
+        let mut buf = vec![[0.25, 0.25, 0.25]];
+        apply_white_balance_exposure_buffer(&mut buf, 0.0, 0.0, 1.0);
+        for c in 0..3 {
+            assert!(
+                (buf[0][c] - 0.5).abs() < 1e-5,
+                "channel {}: expected 0.5, got {}",
+                c, buf[0][c]
+            );
+        }
+    }
+
+    #[test]
+    fn white_balance_exposure_buffer_applies_wb() {
+        let mut buf = vec![[0.5, 0.5, 0.5]];
+        apply_white_balance_exposure_buffer(&mut buf, 50.0, 0.0, 0.0);
+        assert!(buf[0][0] > buf[0][2], "warm WB should make red > blue");
     }
 }
