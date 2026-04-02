@@ -13,6 +13,12 @@ pub struct PerPixelAdjustmentsStage {
     hsl_active: bool,
 }
 
+impl Default for PerPixelAdjustmentsStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerPixelAdjustmentsStage {
     pub fn new() -> Self {
         Self {

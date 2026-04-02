@@ -6,6 +6,12 @@ use crate::error::AgxError;
 /// Operates in sRGB gamma space as a buffer-level pass.
 pub struct DetailStage;
 
+impl Default for DetailStage {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl DetailStage {
     pub fn new() -> Self {
         Self

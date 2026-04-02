@@ -3,8 +3,6 @@ use std::sync::Arc;
 use image::{Rgb, Rgb32FImage};
 use serde::{Deserialize, Serialize};
 
-use crate::adjust;
-
 pub mod stages;
 
 /// Timing data for a single render pass. Only available when compiled
@@ -84,6 +82,12 @@ pub trait Stage: Send + Sync {
 /// identical output, regardless of the order they were set.
 pub struct Pipeline {
     stages: Vec<Box<dyn Stage>>,
+}
+
+impl Default for Pipeline {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Pipeline {
@@ -177,25 +181,6 @@ impl Pipeline {
             }),
         }
     }
-}
-
-/// Records elapsed time for a named pipeline stage.
-/// No-ops when the `profiling` feature is disabled.
-#[cfg(feature = "profiling")]
-macro_rules! profile_stage {
-    ($stages:expr, $name:expr, $block:expr) => {{
-        let _start = std::time::Instant::now();
-        let _result = $block;
-        $stages.push(($name.to_string(), _start.elapsed().as_secs_f64() * 1000.0));
-        _result
-    }};
-}
-
-#[cfg(not(feature = "profiling"))]
-macro_rules! profile_stage {
-    ($stages:expr, $name:expr, $block:expr) => {
-        $block
-    };
 }
 
 /// Per-channel HSL adjustment (hue shift, saturation, luminance).
@@ -1192,6 +1177,7 @@ pub struct Engine {
     original: Rgb32FImage,
     params: Parameters,
     lut: Option<Arc<crate::lut::Lut3D>>,
+    pipeline: Pipeline,
 }
 
 impl Engine {
@@ -1201,6 +1187,7 @@ impl Engine {
             original: image,
             params: Parameters::default(),
             lut: None,
+            pipeline: Pipeline::new(),
         }
     }
 
@@ -1257,376 +1244,11 @@ impl Engine {
 
     /// Render the image by applying all adjustments from scratch.
     ///
-    /// Pipeline order:
-    /// 1. White balance (linear space) — channel multipliers
-    /// 2. Exposure (linear space) — multiply by 2^stops
-    ///    2b. Dehaze (linear space, buffer-level, when active)
-    ///    2c. Noise reduction (linear space, buffer-level, when active)
-    /// 3. Convert to sRGB gamma space
-    /// 4. Contrast, highlights, shadows, whites, blacks (sRGB gamma space)
-    /// 5. Tone curves (sRGB gamma space)
-    /// 6. HSL adjustments (sRGB gamma space)
-    /// 7. Color grading (sRGB gamma space) — 3-way color wheels
-    /// 8. LUT application (sRGB gamma space)
-    /// 9. Detail pass — sharpening, clarity, texture (sRGB gamma space, buffer-level, when active)
-    /// 10. Grain (sRGB gamma space, buffer-level when size >= threshold, per-pixel otherwise)
-    /// 11. Vignette (sRGB gamma space, position-dependent)
-    /// 12. Convert back to linear space
-    pub fn render(&self) -> RenderResult {
-        let (w, h) = self.original.dimensions();
-        #[cfg(feature = "profiling")]
-        let render_start = std::time::Instant::now();
-        #[cfg(feature = "profiling")]
-        let mut stages: Vec<(String, f64)> = Vec::new();
-        #[cfg(not(feature = "profiling"))]
-        #[allow(unused_variables, unused_mut)]
-        let mut stages: () = ();
-        let exposure_factor = adjust::exposure_factor(self.params.exposure);
-        let contrast = self.params.contrast;
-        let highlights = self.params.highlights;
-        let shadows = self.params.shadows;
-        let whites = self.params.whites;
-        let blacks = self.params.blacks;
-        let hsl_active = !self.params.hsl.is_default();
-        let color_grading_pre = (!self.params.color_grading.is_default())
-            .then(|| adjust::ColorGradingPrecomputed::new(&self.params.color_grading));
-        let tone_curve_pre = (!self.params.tone_curve.is_default())
-            .then(|| adjust::ToneCurvePrecomputed::new(&self.params.tone_curve));
-        let vignette_pre = (!self.params.vignette.is_default()).then(|| {
-            adjust::VignettePrecomputed::new(
-                self.params.vignette.amount,
-                self.params.vignette.shape,
-                w,
-                h,
-            )
-        });
-        let hue_shifts = self.params.hsl.hue_shifts();
-        let sat_shifts = self.params.hsl.saturation_shifts();
-        let lum_shifts = self.params.hsl.luminance_shifts();
-        let detail_active = !self.params.detail.is_neutral();
-        let dehaze_active = !self.params.dehaze.is_neutral();
-        let nr_active = !self.params.noise_reduction.is_neutral();
-        let grain_active = !self.params.grain.is_neutral();
-
-        // When dehaze or NR is active, build WB+exposure linear buffer for buffer-level passes.
-        let linear_processed_buf: Option<Vec<[f32; 3]>> = if dehaze_active || nr_active {
-            let mut linear_buf: Vec<[f32; 3]> = profile_stage!(stages, "white_balance_exposure", {
-                let mut buf: Vec<[f32; 3]> = Vec::with_capacity((w * h) as usize);
-                for y in 0..h {
-                    for x in 0..w {
-                        let p = self.original.get_pixel(x, y);
-                        let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
-                        let wb = adjust::apply_white_balance(
-                            r,
-                            g,
-                            b,
-                            self.params.temperature,
-                            self.params.tint,
-                        );
-                        r = wb.0;
-                        g = wb.1;
-                        b = wb.2;
-                        (r, g, b) = adjust::apply_per_channel(r, g, b, |v| {
-                            adjust::apply_exposure(v, exposure_factor)
-                        });
-                        buf.push([r, g, b]);
-                    }
-                }
-                buf
-            });
-            // Apply dehaze if active
-            if dehaze_active {
-                linear_buf = profile_stage!(stages, "dehaze", {
-                    adjust::dehaze::apply_dehaze(
-                        &linear_buf,
-                        w as usize,
-                        h as usize,
-                        &self.params.dehaze,
-                    )
-                });
-            }
-            // Apply noise reduction if active
-            if nr_active {
-                linear_buf = profile_stage!(stages, "denoise", {
-                    adjust::denoise::apply_noise_reduction(
-                        &linear_buf,
-                        w as usize,
-                        h as usize,
-                        &self.params.noise_reduction,
-                    )
-                });
-            }
-            Some(linear_buf)
-        } else {
-            None
-        };
-
-        // Helper: get linear (r, g, b) for pixel (x, y).
-        // When buffer-level passes are active, reads from the pre-computed buffer.
-        // Otherwise, reads from original image and applies WB + exposure.
-        let get_linear = |x: u32, y: u32| -> (f32, f32, f32) {
-            if let Some(ref buf) = linear_processed_buf {
-                let idx = (y * w + x) as usize;
-                (buf[idx][0], buf[idx][1], buf[idx][2])
-            } else {
-                let p = self.original.get_pixel(x, y);
-                let (mut r, mut g, mut b) = (p.0[0], p.0[1], p.0[2]);
-                let wb =
-                    adjust::apply_white_balance(r, g, b, self.params.temperature, self.params.tint);
-                r = wb.0;
-                g = wb.1;
-                b = wb.2;
-                adjust::apply_per_channel(r, g, b, |v| adjust::apply_exposure(v, exposure_factor))
-            }
-        };
-
-        if detail_active || grain_active || vignette_pre.is_some() {
-            // Two-phase render: build sRGB buffer, apply detail pass, then convert to linear.
-            let srgb_buf: Vec<[f32; 3]> = profile_stage!(stages, "linear_to_srgb_and_per_pixel", {
-                let mut buf = Vec::with_capacity((w * h) as usize);
-                for y in 0..h {
-                    for x in 0..w {
-                        let (r, g, b) = get_linear(x, y);
-
-                        // 3. Convert to sRGB gamma space
-                        let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
-
-                        // 4. Contrast
-                        if contrast != 0.0 {
-                            (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                                adjust::apply_contrast(v, contrast)
-                            });
-                        }
-
-                        // 5. Highlights
-                        if highlights != 0.0 {
-                            (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                                adjust::apply_highlights(v, highlights)
-                            });
-                        }
-
-                        // 6. Shadows
-                        if shadows != 0.0 {
-                            (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                                adjust::apply_shadows(v, shadows)
-                            });
-                        }
-
-                        // 7. Whites
-                        if whites != 0.0 {
-                            (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                                adjust::apply_whites(v, whites)
-                            });
-                        }
-
-                        // 8. Blacks
-                        if blacks != 0.0 {
-                            (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                                adjust::apply_blacks(v, blacks)
-                            });
-                        }
-
-                        // 9. Tone curves (sRGB gamma space)
-                        if let Some(ref pre) = tone_curve_pre {
-                            let (tr, tg, tb) = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
-                            sr = tr;
-                            sg = tg;
-                            sb = tb;
-                        }
-
-                        // 10. HSL adjustments (sRGB gamma space)
-                        if hsl_active {
-                            let (hr, hg, hb) = adjust::apply_hsl(
-                                sr,
-                                sg,
-                                sb,
-                                &hue_shifts,
-                                &sat_shifts,
-                                &lum_shifts,
-                                adjust::cosine_weight,
-                            );
-                            sr = hr;
-                            sg = hg;
-                            sb = hb;
-                        }
-
-                        // 11. Color grading (sRGB gamma space)
-                        if let Some(pre) = &color_grading_pre {
-                            let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
-                            sr = cr;
-                            sg = cg;
-                            sb = cb;
-                        }
-
-                        // 12. LUT (sRGB gamma space)
-                        if let Some(lut) = &self.lut {
-                            let (lr, lg, lb) = lut.lookup(sr, sg, sb);
-                            sr = lr;
-                            sg = lg;
-                            sb = lb;
-                        }
-
-                        buf.push([sr, sg, sb]);
-                    }
-                }
-                buf
-            });
-
-            // Detail pass (sharpening, clarity, texture) operates in sRGB gamma space.
-            // Skip when detail is neutral to avoid an unnecessary full-image copy.
-            let detail_buf = profile_stage!(stages, "detail", {
-                if detail_active {
-                    adjust::detail::apply_detail_pass(
-                        &srgb_buf,
-                        w as usize,
-                        h as usize,
-                        &self.params.detail,
-                    )
-                } else {
-                    srgb_buf
-                }
-            });
-
-            // Post-detail-pass: apply grain to the buffer, then vignette + convert to linear.
-            let mut grain_buf = detail_buf;
-            if grain_active {
-                profile_stage!(stages, "grain", {
-                    let seed = self.params.grain.seed.unwrap_or_else(rand::random::<u64>);
-                    adjust::grain::apply_grain_buffer(
-                        &mut grain_buf,
-                        w as usize,
-                        h as usize,
-                        &self.params.grain,
-                        seed,
-                    );
-                });
-            }
-
-            let image = profile_stage!(stages, "vignette_and_srgb_to_linear", {
-                Rgb32FImage::from_fn(w, h, |x, y| {
-                    let idx = (y * w + x) as usize;
-                    let [mut sr, mut sg, mut sb] = grain_buf[idx];
-
-                    // Vignette (sRGB gamma space, position-dependent)
-                    if let Some(pre) = &vignette_pre {
-                        let (vr, vg, vb) = adjust::apply_vignette_pre(sr, sg, sb, pre, x, y);
-                        sr = vr;
-                        sg = vg;
-                        sb = vb;
-                    }
-
-                    let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
-                    Rgb([lr, lg, lb])
-                })
-            });
-
-            RenderResult {
-                image,
-                #[cfg(feature = "profiling")]
-                profile: Some(RenderProfile {
-                    stages,
-                    total_ms: render_start.elapsed().as_secs_f64() * 1000.0,
-                }),
-            }
-        } else {
-            let image = profile_stage!(stages, "linear_to_srgb_and_per_pixel", {
-                Rgb32FImage::from_fn(w, h, |x, y| {
-                    let (r, g, b) = get_linear(x, y);
-
-                    // 3. Convert to sRGB gamma space
-                    let (mut sr, mut sg, mut sb) = adjust::linear_to_srgb(r, g, b);
-
-                    // 4. Contrast
-                    if contrast != 0.0 {
-                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                            adjust::apply_contrast(v, contrast)
-                        });
-                    }
-
-                    // 5. Highlights
-                    if highlights != 0.0 {
-                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                            adjust::apply_highlights(v, highlights)
-                        });
-                    }
-
-                    // 6. Shadows
-                    if shadows != 0.0 {
-                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                            adjust::apply_shadows(v, shadows)
-                        });
-                    }
-
-                    // 7. Whites
-                    if whites != 0.0 {
-                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                            adjust::apply_whites(v, whites)
-                        });
-                    }
-
-                    // 8. Blacks
-                    if blacks != 0.0 {
-                        (sr, sg, sb) = adjust::apply_per_channel(sr, sg, sb, |v| {
-                            adjust::apply_blacks(v, blacks)
-                        });
-                    }
-
-                    // 9. Tone curves (sRGB gamma space)
-                    if let Some(ref pre) = tone_curve_pre {
-                        let (tr, tg, tb) = adjust::apply_tone_curves_pre(sr, sg, sb, pre);
-                        sr = tr;
-                        sg = tg;
-                        sb = tb;
-                    }
-
-                    // 10. HSL adjustments (sRGB gamma space)
-                    if hsl_active {
-                        let (hr, hg, hb) = adjust::apply_hsl(
-                            sr,
-                            sg,
-                            sb,
-                            &hue_shifts,
-                            &sat_shifts,
-                            &lum_shifts,
-                            adjust::cosine_weight,
-                        );
-                        sr = hr;
-                        sg = hg;
-                        sb = hb;
-                    }
-
-                    // 11. Color grading (sRGB gamma space)
-                    if let Some(pre) = &color_grading_pre {
-                        let (cr, cg, cb) = adjust::apply_color_grading_pre(sr, sg, sb, pre);
-                        sr = cr;
-                        sg = cg;
-                        sb = cb;
-                    }
-
-                    // 12. LUT (sRGB gamma space)
-                    if let Some(lut) = &self.lut {
-                        let (lr, lg, lb) = lut.lookup(sr, sg, sb);
-                        sr = lr;
-                        sg = lg;
-                        sb = lb;
-                    }
-
-                    // 13. Convert back to linear space
-                    let (lr, lg, lb) = adjust::srgb_to_linear(sr, sg, sb);
-
-                    Rgb([lr, lg, lb])
-                })
-            });
-
-            RenderResult {
-                image,
-                #[cfg(feature = "profiling")]
-                profile: Some(RenderProfile {
-                    stages,
-                    total_ms: render_start.elapsed().as_secs_f64() * 1000.0,
-                }),
-            }
-        }
+    /// Delegates to the stage-based pipeline. Each render starts from the
+    /// original image — no state accumulates between renders.
+    pub fn render(&mut self) -> RenderResult {
+        self.pipeline
+            .execute(&self.original, &self.params, self.lut.as_deref())
     }
 }
 
@@ -1657,7 +1279,7 @@ mod tests {
     #[test]
     fn render_neutral_params_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
@@ -1694,7 +1316,7 @@ mod tests {
         let mut engine = Engine::new(img);
         engine.params_mut().contrast = 50.0;
         let rendered = engine.render().image;
-        let neutral_engine = Engine::new(make_test_image(0.5, 0.5, 0.5));
+        let mut neutral_engine = Engine::new(make_test_image(0.5, 0.5, 0.5));
         let neutral = neutral_engine.render().image;
         // With contrast, pixel values above/below mid should shift
         let rp = rendered.get_pixel(0, 0);
@@ -1773,7 +1395,7 @@ mod tests {
     #[test]
     fn render_with_no_lut_unchanged() {
         let img = make_test_image(0.5, 0.3, 0.1);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         assert!(engine.lut().is_none());
         let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
@@ -1836,9 +1458,9 @@ mod tests {
     fn render_hsl_neutral_is_identity() {
         // Red-ish pixel in linear space
         let img = make_test_image(0.5, 0.01, 0.01);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         // HSL defaults to all zeros, so render should be identity
-        let orig = engine.original().get_pixel(0, 0);
+        let orig = *engine.original().get_pixel(0, 0);
         let rend = *engine.render().image.get_pixel(0, 0);
         for i in 0..3 {
             assert!(
@@ -2448,7 +2070,7 @@ mod tests {
     #[test]
     fn render_default_detail_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
@@ -2499,7 +2121,7 @@ mod tests {
     #[test]
     fn render_default_dehaze_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
@@ -2564,7 +2186,7 @@ mod tests {
     #[test]
     fn render_default_nr_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);
@@ -2600,7 +2222,7 @@ mod tests {
     #[test]
     fn render_default_grain_is_identity() {
         let img = make_test_image(0.5, 0.3, 0.1);
-        let engine = Engine::new(img);
+        let mut engine = Engine::new(img);
         let rendered = engine.render().image;
         let orig = engine.original().get_pixel(0, 0);
         let rend = rendered.get_pixel(0, 0);

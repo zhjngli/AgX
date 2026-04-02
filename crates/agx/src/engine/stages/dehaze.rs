@@ -5,6 +5,12 @@ use crate::error::AgxError;
 /// Removes atmospheric haze using dark channel prior. Operates in linear space.
 pub struct DehazeStage;
 
+impl Default for DehazeStage {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl DehazeStage {
     pub fn new() -> Self {
         Self

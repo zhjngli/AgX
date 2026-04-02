@@ -8,6 +8,12 @@ pub struct VignetteStage {
     precomputed: Option<adjust::VignettePrecomputed>,
 }
 
+impl Default for VignetteStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VignetteStage {
     pub fn new() -> Self {
         Self { precomputed: None }

@@ -5,6 +5,12 @@ use crate::error::AgxError;
 /// Converts the buffer from linear sRGB to sRGB gamma space.
 pub struct LinearToSrgbStage;
 
+impl Default for LinearToSrgbStage {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl LinearToSrgbStage {
     pub fn new() -> Self {
         Self
@@ -41,6 +47,12 @@ impl Stage for LinearToSrgbStage {
 
 /// Converts the buffer from sRGB gamma space to linear sRGB.
 pub struct SrgbToLinearStage;
+
+impl Default for SrgbToLinearStage {
+    fn default() -> Self {
+        Self
+    }
+}
 
 impl SrgbToLinearStage {
     pub fn new() -> Self {

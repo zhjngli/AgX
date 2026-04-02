@@ -5,6 +5,12 @@ use crate::error::AgxError;
 /// Wavelet-based noise reduction. Operates in linear space.
 pub struct DenoiseStage;
 
+impl Default for DenoiseStage {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl DenoiseStage {
     pub fn new() -> Self {
         Self

@@ -5,6 +5,12 @@ use crate::error::AgxError;
 /// Applies white balance and exposure in linear space.
 pub struct WhiteBalanceExposureStage;
 
+impl Default for WhiteBalanceExposureStage {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl WhiteBalanceExposureStage {
     pub fn new() -> Self {
         Self

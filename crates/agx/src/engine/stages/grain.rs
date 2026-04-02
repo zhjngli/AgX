@@ -8,6 +8,12 @@ pub struct GrainStage {
     seed: u64,
 }
 
+impl Default for GrainStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GrainStage {
     pub fn new() -> Self {
         Self { seed: 0 }
