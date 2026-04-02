@@ -61,6 +61,9 @@ impl Stage for PerPixelAdjustmentsStage {
     }
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
+        let lut_lookup = ctx
+            .lut
+            .map(|lut| move |r: f32, g: f32, b: f32| lut.lookup(r, g, b));
         let pp = adjust::PerPixelParams {
             contrast: ctx.params.contrast,
             highlights: ctx.params.highlights,
@@ -73,7 +76,9 @@ impl Stage for PerPixelAdjustmentsStage {
             sat_shifts: self.sat_shifts,
             lum_shifts: self.lum_shifts,
             color_grading_pre: self.color_grading_pre,
-            lut: ctx.lut,
+            lut_fn: lut_lookup
+                .as_ref()
+                .map(|f| f as &dyn Fn(f32, f32, f32) -> (f32, f32, f32)),
         };
         adjust::apply_per_pixel_adjustments(&mut ctx.buf, &pp);
         Ok(())
