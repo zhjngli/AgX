@@ -113,7 +113,10 @@ mod tests {
         to_srgb.prepare(ctx.params);
         to_srgb.process(&mut ctx).unwrap();
 
-        assert!((ctx.buf[0][0] - 0.5).abs() > 0.01, "gamma encoding should change 0.5");
+        assert!(
+            (ctx.buf[0][0] - 0.5).abs() > 0.01,
+            "gamma encoding should change 0.5"
+        );
 
         let mut to_linear = SrgbToLinearStage::new();
         to_linear.prepare(ctx.params);
@@ -124,7 +127,10 @@ mod tests {
                 assert!(
                     (ctx.buf[i][c] - pixels[i][c]).abs() < 1e-5,
                     "pixel[{}][{}]: expected {}, got {}",
-                    i, c, pixels[i][c], ctx.buf[i][c]
+                    i,
+                    c,
+                    pixels[i][c],
+                    ctx.buf[i][c]
                 );
             }
         }

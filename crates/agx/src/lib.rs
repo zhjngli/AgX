@@ -14,10 +14,11 @@ pub use adjust::{
 pub use decode::decode;
 pub use encode::{EncodeOptions, OutputFormat};
 pub use engine::{
-    ColorSpace, Engine, HslChannel, HslChannels, Parameters, PartialColorGradingParams, PartialColorWheel,
-    PartialDehazeParams, PartialDetailParams, PartialGrainParams, PartialHslChannel,
-    PartialHslChannels, PartialNoiseReductionParams, PartialParameters, PartialSharpeningParams,
-    PartialToneCurve, PartialToneCurveParams, PartialVignetteParams, RenderResult, VignetteParams,
+    ColorSpace, Engine, HslChannel, HslChannels, Parameters, PartialColorGradingParams,
+    PartialColorWheel, PartialDehazeParams, PartialDetailParams, PartialGrainParams,
+    PartialHslChannel, PartialHslChannels, PartialNoiseReductionParams, PartialParameters,
+    PartialSharpeningParams, PartialToneCurve, PartialToneCurveParams, PartialVignetteParams,
+    RenderResult, VignetteParams,
 };
 
 #[cfg(feature = "profiling")]

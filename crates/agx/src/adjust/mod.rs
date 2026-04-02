@@ -158,7 +158,9 @@ pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
         }
         if pp.hsl_active {
             let (hr, hg, hb) = apply_hsl(
-                sr, sg, sb,
+                sr,
+                sg,
+                sb,
                 &pp.hue_shifts,
                 &pp.sat_shifts,
                 &pp.lum_shifts,
@@ -1723,7 +1725,8 @@ mod tests {
                 assert!(
                     (buf[i][c] - original[i][c]).abs() < 1e-6,
                     "pixel[{}][{}] changed with neutral params",
-                    i, c
+                    i,
+                    c
                 );
             }
         }
@@ -1737,7 +1740,8 @@ mod tests {
             assert!(
                 (buf[0][c] - 0.5).abs() < 1e-5,
                 "channel {}: expected 0.5, got {}",
-                c, buf[0][c]
+                c,
+                buf[0][c]
             );
         }
     }
@@ -1798,7 +1802,10 @@ mod tests {
         };
         apply_per_pixel_adjustments(&mut buf, &pp);
         // Positive contrast should push values above 0.5 higher
-        assert!(buf[0][0] > 0.8, "contrast should increase value above midpoint");
+        assert!(
+            buf[0][0] > 0.8,
+            "contrast should increase value above midpoint"
+        );
     }
 
     #[test]
@@ -1815,7 +1822,8 @@ mod tests {
         assert!(
             corner[0] < center[0],
             "corner ({}) should be darker than center ({})",
-            corner[0], center[0]
+            corner[0],
+            center[0]
         );
     }
 }
