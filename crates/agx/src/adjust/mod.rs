@@ -602,6 +602,23 @@ pub fn apply_vignette(
     )
 }
 
+/// Apply vignette to an sRGB gamma buffer in-place using precomputed invariants.
+pub fn apply_vignette_buffer(
+    buf: &mut [[f32; 3]],
+    width: u32,
+    height: u32,
+    pre: &VignettePrecomputed,
+) {
+    for y in 0..height {
+        for x in 0..width {
+            let idx = (y * width + x) as usize;
+            let [r, g, b] = buf[idx];
+            let (r, g, b) = apply_vignette_pre(r, g, b, pre, x, y);
+            buf[idx] = [r, g, b];
+        }
+    }
+}
+
 // --- Tone Curves ---
 
 /// A single tone curve defined by control points.
@@ -1778,5 +1795,23 @@ mod tests {
         apply_per_pixel_adjustments(&mut buf, &pp);
         // Positive contrast should push values above 0.5 higher
         assert!(buf[0][0] > 0.8, "contrast should increase value above midpoint");
+    }
+
+    #[test]
+    fn vignette_buffer_darkens_corners() {
+        let w = 4u32;
+        let h = 4u32;
+        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; (w * h) as usize];
+        let pre = VignettePrecomputed::new(-50.0, VignetteShape::Elliptical, w, h);
+        apply_vignette_buffer(&mut buf, w, h, &pre);
+        // Center pixel should be unchanged (or close)
+        let center = buf[(1 * w + 1) as usize];
+        // Corner pixel should be darker
+        let corner = buf[0];
+        assert!(
+            corner[0] < center[0],
+            "corner ({}) should be darker than center ({})",
+            corner[0], center[0]
+        );
     }
 }
