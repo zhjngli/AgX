@@ -23,6 +23,58 @@ pub struct RenderResult {
     pub profile: Option<RenderProfile>,
 }
 
+/// Color space declaration for pipeline stages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSpace {
+    /// Linear sRGB (scene-referred, pre-gamma).
+    LinearSrgb,
+    /// sRGB with gamma encoding (display-referred).
+    SrgbGamma,
+}
+
+/// Shared mutable context passed through pipeline stages.
+///
+/// Owns the pixel buffer and provides read-only access to parameters and LUT.
+/// The executor creates this once per render; each stage mutates `buf` in place.
+pub struct RenderContext<'a> {
+    /// Pixel buffer in row-major order: `buf[y * width + x] = [r, g, b]`.
+    pub buf: Vec<[f32; 3]>,
+    pub width: u32,
+    pub height: u32,
+    pub params: &'a Parameters,
+    pub lut: Option<&'a crate::lut::Lut3D>,
+}
+
+/// A single stage in the render pipeline.
+///
+/// Stages are executed in a fixed order by the pipeline executor. Each stage
+/// declares its working color space; the executor auto-inserts conversions
+/// when adjacent stages disagree. The pipeline order is hardcoded and not
+/// configurable — this preserves preset compatibility (same params = same output).
+///
+/// Implementors should delegate pixel math to the `adjust` module.
+pub trait Stage: Send + Sync {
+    /// Human-readable name, used in profiling output.
+    fn name(&self) -> &'static str;
+
+    /// Color space this stage expects its input buffer in.
+    fn input_color_space(&self) -> ColorSpace;
+
+    /// Color space this stage produces in the output buffer.
+    fn output_color_space(&self) -> ColorSpace;
+
+    /// Whether this stage has any effect given current params.
+    /// Returning false lets the executor skip the stage entirely.
+    fn is_active(&self, params: &Parameters) -> bool;
+
+    /// Precompute loop-invariant data from params.
+    /// Called once per render before `process()`.
+    fn prepare(&mut self, params: &Parameters);
+
+    /// Process the pixel buffer in-place.
+    fn process(&self, ctx: &mut RenderContext) -> Result<(), crate::error::AgxError>;
+}
+
 /// Records elapsed time for a named pipeline stage.
 /// No-ops when the `profiling` feature is disabled.
 #[cfg(feature = "profiling")]
