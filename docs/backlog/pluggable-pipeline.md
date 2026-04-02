@@ -4,9 +4,10 @@ Refactor the hardcoded render sequence in `engine::render()` into discrete stage
 
 ## Sub-tasks
 
-- [ ] **Design the Stage trait** — each stage declares its color space (linear, sRGB gamma, log), accepts an image buffer, returns a modified buffer. The engine auto-inserts color space conversions between stages
-- [ ] **Extract per-pixel adjustments into a stage** — move exposure, contrast, highlights/shadows, whites/blacks, white balance, HSL, color grading, tone curves into a single per-pixel stage
-- [ ] **Extract neighborhood ops into stages** — detail pass, dehaze, noise reduction, grain each become independent stages
+- [x] **Design the Stage trait** — each stage declares its color space (linear, sRGB gamma, log), accepts an image buffer, returns a modified buffer. The engine auto-inserts color space conversions between stages
+- [x] **Extract per-pixel adjustments into a stage** — move exposure, contrast, highlights/shadows, whites/blacks, white balance, HSL, color grading, tone curves into a single per-pixel stage
+- [x] **Extract neighborhood ops into stages** — detail pass, dehaze, noise reduction, grain each become independent stages
+- [x] **Move profiling into the pipeline executor** — replace the `profile_stage!` macro calls in `engine::render()` with automatic per-stage timing in the executor. This eliminates macro injection and makes profiling a pipeline concern, not a per-stage concern
 - [ ] **Stage-level caching** — cache intermediate results at stage boundaries. When a parameter changes, only recompute from the affected stage forward. Key for interactive editing performance
 - [ ] **Color-space-aware stage insertion** — auto-insert conversions between stages with different working color spaces. Enables LUTs designed for different input spaces (sRGB, log, linear)
 

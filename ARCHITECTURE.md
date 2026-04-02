@@ -71,7 +71,7 @@ What does NOT exist in each module -- violations of these constraints indicate a
 - **metadata**: No pixel manipulation. No encoding. Does not decide what to do with metadata -- it only extracts and represents it.
 - **encode**: No decoding. No adjustments. No preset logic. Receives final pixels and metadata, writes output.
 - **preset**: No I/O beyond TOML file reading. No pixel math. Does not execute adjustments -- it only declares parameter values.
-- **engine**: No direct file I/O for decoding/encoding (delegates to decode/encode modules). Does not define adjustment algorithms (delegates to adjust module).
+- **engine**: No direct file I/O for decoding/encoding (delegates to decode/encode modules). Does not define adjustment algorithms (delegates to adjust module). Pipeline stages are orchestrated by the Pipeline executor in a fixed order; stages are not reorderable by consumers.
 - **agx-cli**: No image processing logic. Thin wrapper that parses CLI arguments and calls library API.
 
 ## Core Invariants
@@ -99,6 +99,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | encode     | [`crates/agx/src/encode/README.md`](crates/agx/src/encode/README.md)     |
 | preset     | [`crates/agx/src/preset/README.md`](crates/agx/src/preset/README.md)     |
 | engine     | [`crates/agx/src/engine/README.md`](crates/agx/src/engine/README.md)     |
+| engine/stages | Stage implementations (see engine README)                             |
 | agx-cli    | [`crates/agx-cli/README.md`](crates/agx-cli/README.md)                   |
 
 ## Design Docs
@@ -128,6 +129,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-23 | [Grain Design](docs/plans/2026-03-23-grain-design.md)                                            |
 | 2026-03-27 | [E2E Look Consolidation Design](docs/plans/2026-03-27-e2e-look-consolidation-design.md)          |
 | 2026-03-27 | [Grain Size Fix Design](docs/plans/2026-03-27-grain-size-fix-design.md)                          |
+| 2026-04-01 | [Pluggable Pipeline Design](docs/plans/2026-04-01-pluggable-pipeline-design.md)                  |
 
 ### Backlog
 

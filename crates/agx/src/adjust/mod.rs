@@ -87,6 +87,106 @@ pub fn apply_white_balance(r: f32, g: f32, b: f32, temperature: f32, tint: f32) 
     )
 }
 
+/// Apply white balance and exposure to a linear buffer in-place.
+///
+/// Each pixel gets WB channel multipliers (normalized to preserve brightness)
+/// followed by exposure (multiply by 2^stops). Operates in linear space.
+pub fn apply_white_balance_exposure_buffer(
+    buf: &mut [[f32; 3]],
+    temperature: f32,
+    tint: f32,
+    exposure: f32,
+) {
+    let factor = exposure_factor(exposure);
+    for pixel in buf.iter_mut() {
+        let (r, g, b) = apply_white_balance(pixel[0], pixel[1], pixel[2], temperature, tint);
+        let (r, g, b) = apply_per_channel(r, g, b, |v| apply_exposure(v, factor));
+        *pixel = [r, g, b];
+    }
+}
+
+// --- Per-pixel adjustments (sRGB gamma space) ---
+
+/// All per-pixel parameters needed for the sRGB gamma-space adjustment pass.
+///
+/// The `lut_fn` closure abstracts over the LUT lookup so that `adjust`
+/// does not depend on the `lut` module (architecture rule).
+pub struct PerPixelParams<'a> {
+    pub contrast: f32,
+    pub highlights: f32,
+    pub shadows: f32,
+    pub whites: f32,
+    pub blacks: f32,
+    pub tone_curve_pre: Option<&'a ToneCurvePrecomputed>,
+    pub hsl_active: bool,
+    pub hue_shifts: [f32; 8],
+    pub sat_shifts: [f32; 8],
+    pub lum_shifts: [f32; 8],
+    pub color_grading_pre: Option<ColorGradingPrecomputed>,
+    #[allow(clippy::type_complexity)]
+    pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + 'a)>,
+}
+
+/// Apply all per-pixel adjustments to an sRGB gamma buffer in-place.
+///
+/// Processes contrast, highlights, shadows, whites, blacks, tone curves,
+/// HSL, color grading, and LUT in that order. Operates in sRGB gamma space.
+pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
+    for pixel in buf.iter_mut() {
+        let [mut sr, mut sg, mut sb] = *pixel;
+
+        if pp.contrast != 0.0 {
+            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_contrast(v, pp.contrast));
+        }
+        if pp.highlights != 0.0 {
+            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_highlights(v, pp.highlights));
+        }
+        if pp.shadows != 0.0 {
+            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_shadows(v, pp.shadows));
+        }
+        if pp.whites != 0.0 {
+            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_whites(v, pp.whites));
+        }
+        if pp.blacks != 0.0 {
+            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_blacks(v, pp.blacks));
+        }
+        if let Some(pre) = pp.tone_curve_pre {
+            let (tr, tg, tb) = apply_tone_curves_pre(sr, sg, sb, pre);
+            sr = tr;
+            sg = tg;
+            sb = tb;
+        }
+        if pp.hsl_active {
+            let (hr, hg, hb) = apply_hsl(
+                sr,
+                sg,
+                sb,
+                &pp.hue_shifts,
+                &pp.sat_shifts,
+                &pp.lum_shifts,
+                cosine_weight,
+            );
+            sr = hr;
+            sg = hg;
+            sb = hb;
+        }
+        if let Some(ref pre) = pp.color_grading_pre {
+            let (cr, cg, cb) = apply_color_grading_pre(sr, sg, sb, pre);
+            sr = cr;
+            sg = cg;
+            sb = cb;
+        }
+        if let Some(lut_fn) = pp.lut_fn {
+            let (lr, lg, lb) = lut_fn(sr, sg, sb);
+            sr = lr;
+            sg = lg;
+            sb = lb;
+        }
+
+        *pixel = [sr, sg, sb];
+    }
+}
+
 // --- Contrast (sRGB gamma space) ---
 
 /// Apply contrast adjustment to a single channel value in sRGB gamma space.
@@ -508,6 +608,23 @@ pub fn apply_vignette(
     )
 }
 
+/// Apply vignette to an sRGB gamma buffer in-place using precomputed invariants.
+pub fn apply_vignette_buffer(
+    buf: &mut [[f32; 3]],
+    width: u32,
+    height: u32,
+    pre: &VignettePrecomputed,
+) {
+    for y in 0..height {
+        for x in 0..width {
+            let idx = (y * width + x) as usize;
+            let [r, g, b] = buf[idx];
+            let (r, g, b) = apply_vignette_pre(r, g, b, pre, x, y);
+            buf[idx] = [r, g, b];
+        }
+    }
+}
+
 // --- Tone Curves ---
 
 /// A single tone curve defined by control points.
@@ -694,6 +811,7 @@ pub(crate) fn lut_lookup(lut: &[f32; 256], value: f32) -> f32 {
 }
 
 /// Precomputed tone curve LUTs for fast per-pixel application.
+#[derive(Clone)]
 pub struct ToneCurvePrecomputed {
     rgb: Option<[f32; 256]>,
     luma: Option<[f32; 256]>,
@@ -1595,5 +1713,117 @@ mod tests {
         assert!((r - 0.3).abs() < 0.02, "r should be ~0.3, got {r}");
         assert!((g - 0.3).abs() < 0.02, "g should be ~0.3, got {g}");
         assert!((b - 0.3).abs() < 0.02, "b should be ~0.3, got {b}");
+    }
+
+    #[test]
+    fn white_balance_exposure_buffer_identity() {
+        let mut buf = vec![[0.5, 0.3, 0.1], [0.25, 0.25, 0.25]];
+        let original = buf.clone();
+        apply_white_balance_exposure_buffer(&mut buf, 0.0, 0.0, 0.0);
+        for i in 0..buf.len() {
+            for c in 0..3 {
+                assert!(
+                    (buf[i][c] - original[i][c]).abs() < 1e-6,
+                    "pixel[{}][{}] changed with neutral params",
+                    i,
+                    c
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn white_balance_exposure_buffer_applies_exposure() {
+        let mut buf = vec![[0.25, 0.25, 0.25]];
+        apply_white_balance_exposure_buffer(&mut buf, 0.0, 0.0, 1.0);
+        for c in 0..3 {
+            assert!(
+                (buf[0][c] - 0.5).abs() < 1e-5,
+                "channel {}: expected 0.5, got {}",
+                c,
+                buf[0][c]
+            );
+        }
+    }
+
+    #[test]
+    fn white_balance_exposure_buffer_applies_wb() {
+        let mut buf = vec![[0.5, 0.5, 0.5]];
+        apply_white_balance_exposure_buffer(&mut buf, 50.0, 0.0, 0.0);
+        assert!(buf[0][0] > buf[0][2], "warm WB should make red > blue");
+    }
+
+    // --- Per-pixel adjustments tests ---
+
+    #[test]
+    fn per_pixel_adjustments_neutral_is_identity() {
+        let mut buf = vec![[0.7, 0.5, 0.3]]; // values already in sRGB gamma
+        let original = buf.clone();
+        let pp = PerPixelParams {
+            contrast: 0.0,
+            highlights: 0.0,
+            shadows: 0.0,
+            whites: 0.0,
+            blacks: 0.0,
+            tone_curve_pre: None,
+            hsl_active: false,
+            hue_shifts: [0.0; 8],
+            sat_shifts: [0.0; 8],
+            lum_shifts: [0.0; 8],
+            color_grading_pre: None,
+            lut_fn: None,
+        };
+        apply_per_pixel_adjustments(&mut buf, &pp);
+        for c in 0..3 {
+            assert!(
+                (buf[0][c] - original[0][c]).abs() < 1e-6,
+                "channel {} changed with neutral params",
+                c
+            );
+        }
+    }
+
+    #[test]
+    fn per_pixel_adjustments_applies_contrast() {
+        let mut buf = vec![[0.8, 0.8, 0.8]]; // above midpoint in sRGB
+        let pp = PerPixelParams {
+            contrast: 50.0,
+            highlights: 0.0,
+            shadows: 0.0,
+            whites: 0.0,
+            blacks: 0.0,
+            tone_curve_pre: None,
+            hsl_active: false,
+            hue_shifts: [0.0; 8],
+            sat_shifts: [0.0; 8],
+            lum_shifts: [0.0; 8],
+            color_grading_pre: None,
+            lut_fn: None,
+        };
+        apply_per_pixel_adjustments(&mut buf, &pp);
+        // Positive contrast should push values above 0.5 higher
+        assert!(
+            buf[0][0] > 0.8,
+            "contrast should increase value above midpoint"
+        );
+    }
+
+    #[test]
+    fn vignette_buffer_darkens_corners() {
+        let w = 4u32;
+        let h = 4u32;
+        let mut buf: Vec<[f32; 3]> = vec![[0.5, 0.5, 0.5]; (w * h) as usize];
+        let pre = VignettePrecomputed::new(-50.0, VignetteShape::Elliptical, w, h);
+        apply_vignette_buffer(&mut buf, w, h, &pre);
+        // Center pixel should be unchanged (or close)
+        let center = buf[(1 * w + 1) as usize];
+        // Corner pixel should be darker
+        let corner = buf[0];
+        assert!(
+            corner[0] < center[0],
+            "corner ({}) should be darker than center ({})",
+            corner[0],
+            center[0]
+        );
     }
 }

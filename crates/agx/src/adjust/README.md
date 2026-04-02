@@ -35,6 +35,12 @@ All tone functions operate on a single channel and return a clamped `f32`.
 - `GrainParams` -- grain_type, amount (0-100), size (0-100), optional seed
 - `apply_grain_buffer(buf, width, height, params, seed)` -- blur-based grain applied to sRGB gamma buffer (buffer-level when size >= threshold, per-pixel otherwise)
 
+### Buffer-Level Functions
+- `apply_white_balance_exposure_buffer(buf, temperature, tint, exposure)` -- WB + exposure on a linear buffer in-place
+- `PerPixelParams` -- struct holding all per-pixel adjustment parameters for the sRGB gamma pass
+- `apply_per_pixel_adjustments(buf, params)` -- all sRGB gamma-space per-pixel adjustments (contrast through LUT) on a buffer in-place
+- `apply_vignette_buffer(buf, width, height, precomputed)` -- position-dependent vignette on an sRGB gamma buffer in-place
+
 ## Extension Guide
 1. Add a new `pub fn apply_foo(value: f32, amount: f32) -> f32` here.
 2. Add a `foo` field to `Parameters` in `engine/mod.rs`.
