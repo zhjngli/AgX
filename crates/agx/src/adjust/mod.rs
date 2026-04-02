@@ -117,7 +117,7 @@ pub struct PerPixelParams<'a> {
     pub shadows: f32,
     pub whites: f32,
     pub blacks: f32,
-    pub tone_curve_pre: Option<ToneCurvePrecomputed>,
+    pub tone_curve_pre: Option<&'a ToneCurvePrecomputed>,
     pub hsl_active: bool,
     pub hue_shifts: [f32; 8],
     pub sat_shifts: [f32; 8],
@@ -150,7 +150,7 @@ pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
         if pp.blacks != 0.0 {
             (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_blacks(v, pp.blacks));
         }
-        if let Some(ref pre) = pp.tone_curve_pre {
+        if let Some(pre) = pp.tone_curve_pre {
             let (tr, tg, tb) = apply_tone_curves_pre(sr, sg, sb, pre);
             sr = tr;
             sg = tg;

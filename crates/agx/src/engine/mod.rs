@@ -122,7 +122,6 @@ impl Pipeline {
         #[cfg(feature = "profiling")]
         let mut profile_stages: Vec<(String, f64)> = Vec::new();
 
-        // Build initial buffer from original image (linear sRGB)
         let buf: Vec<[f32; 3]> = original
             .pixels()
             .map(|p| [p.0[0], p.0[1], p.0[2]])
@@ -143,21 +142,36 @@ impl Pipeline {
             }
         }
 
-        // Execute stages in order
+        // Execute stages in order, tracking color space in debug builds
+        #[cfg(debug_assertions)]
+        let mut current_color_space = ColorSpace::LinearSrgb;
+
         for stage in &self.stages {
             if !stage.is_active(params) {
                 continue;
             }
 
+            #[cfg(debug_assertions)]
+            debug_assert_eq!(
+                stage.input_color_space(),
+                current_color_space,
+                "stage '{}' expects {:?} but current space is {:?}",
+                stage.name(),
+                stage.input_color_space(),
+                current_color_space,
+            );
+
             #[cfg(feature = "profiling")]
             let stage_start = std::time::Instant::now();
 
-            // The pipeline is constructed with explicit conversion stages
-            // (LinearToSrgbStage, SrgbToLinearStage) at the correct positions,
-            // so no runtime color space checking is needed.
             stage
                 .process(&mut ctx)
                 .expect("stage processing should not fail");
+
+            #[cfg(debug_assertions)]
+            {
+                current_color_space = stage.output_color_space();
+            }
 
             #[cfg(feature = "profiling")]
             profile_stages.push((
@@ -166,7 +180,6 @@ impl Pipeline {
             ));
         }
 
-        // Build final image from buffer
         let image = Rgb32FImage::from_fn(w, h, |x, y| {
             let idx = (y * w + x) as usize;
             Rgb(ctx.buf[idx])

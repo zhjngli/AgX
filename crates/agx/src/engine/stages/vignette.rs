@@ -4,19 +4,17 @@ use crate::error::AgxError;
 
 /// Position-dependent edge darkening/brightening.
 /// Operates in sRGB gamma space.
-pub struct VignetteStage {
-    precomputed: Option<adjust::VignettePrecomputed>,
-}
+pub struct VignetteStage;
 
 impl Default for VignetteStage {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl VignetteStage {
     pub fn new() -> Self {
-        Self { precomputed: None }
+        Self
     }
 }
 
@@ -37,10 +35,7 @@ impl Stage for VignetteStage {
         !params.vignette.is_default()
     }
 
-    fn prepare(&mut self, _params: &Parameters) {
-        // Width/height are not known at prepare time; precompute in process()
-        self.precomputed = None;
-    }
+    fn prepare(&mut self, _params: &Parameters) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         let pre = adjust::VignettePrecomputed::new(

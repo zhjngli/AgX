@@ -30,8 +30,8 @@ impl Stage for WhiteBalanceExposureStage {
         ColorSpace::LinearSrgb
     }
 
-    fn is_active(&self, _params: &Parameters) -> bool {
-        true
+    fn is_active(&self, params: &Parameters) -> bool {
+        params.temperature != 0.0 || params.tint != 0.0 || params.exposure != 0.0
     }
 
     fn prepare(&mut self, _params: &Parameters) {}
@@ -52,23 +52,19 @@ mod tests {
     use super::*;
     use crate::engine::Parameters;
 
-    fn make_ctx(pixels: Vec<[f32; 3]>, w: u32, h: u32) -> RenderContext<'static> {
-        let params = Box::leak(Box::new(Parameters::default()));
-        RenderContext {
-            buf: pixels,
-            width: w,
-            height: h,
-            params,
-            lut: None,
-        }
-    }
-
     #[test]
     fn stage_neutral_params_is_identity() {
+        let params = Parameters::default();
         let pixels = vec![[0.5, 0.3, 0.1]];
-        let mut ctx = make_ctx(pixels.clone(), 1, 1);
+        let mut ctx = RenderContext {
+            buf: pixels.clone(),
+            width: 1,
+            height: 1,
+            params: &params,
+            lut: None,
+        };
         let mut stage = WhiteBalanceExposureStage::new();
-        stage.prepare(ctx.params);
+        stage.prepare(&params);
         stage.process(&mut ctx).unwrap();
         for c in 0..3 {
             assert!(

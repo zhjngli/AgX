@@ -93,24 +93,20 @@ mod tests {
     use super::*;
     use crate::engine::Parameters;
 
-    fn make_ctx(pixels: Vec<[f32; 3]>, w: u32, h: u32) -> RenderContext<'static> {
-        let params = Box::leak(Box::new(Parameters::default()));
-        RenderContext {
-            buf: pixels,
-            width: w,
-            height: h,
-            params,
-            lut: None,
-        }
-    }
-
     #[test]
     fn linear_to_srgb_roundtrip() {
+        let params = Parameters::default();
         let pixels = vec![[0.5, 0.3, 0.1], [0.0, 1.0, 0.25]];
-        let mut ctx = make_ctx(pixels.clone(), 2, 1);
+        let mut ctx = RenderContext {
+            buf: pixels.clone(),
+            width: 2,
+            height: 1,
+            params: &params,
+            lut: None,
+        };
 
         let mut to_srgb = LinearToSrgbStage::new();
-        to_srgb.prepare(ctx.params);
+        to_srgb.prepare(&params);
         to_srgb.process(&mut ctx).unwrap();
 
         assert!(
@@ -119,7 +115,7 @@ mod tests {
         );
 
         let mut to_linear = SrgbToLinearStage::new();
-        to_linear.prepare(ctx.params);
+        to_linear.prepare(&params);
         to_linear.process(&mut ctx).unwrap();
 
         for i in 0..2 {

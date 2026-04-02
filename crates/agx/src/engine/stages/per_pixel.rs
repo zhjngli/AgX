@@ -7,10 +7,6 @@ use crate::error::AgxError;
 pub struct PerPixelAdjustmentsStage {
     tone_curve_pre: Option<adjust::ToneCurvePrecomputed>,
     color_grading_pre: Option<adjust::ColorGradingPrecomputed>,
-    hue_shifts: [f32; 8],
-    sat_shifts: [f32; 8],
-    lum_shifts: [f32; 8],
-    hsl_active: bool,
 }
 
 impl Default for PerPixelAdjustmentsStage {
@@ -24,10 +20,6 @@ impl PerPixelAdjustmentsStage {
         Self {
             tone_curve_pre: None,
             color_grading_pre: None,
-            hue_shifts: [0.0; 8],
-            sat_shifts: [0.0; 8],
-            lum_shifts: [0.0; 8],
-            hsl_active: false,
         }
     }
 }
@@ -54,10 +46,6 @@ impl Stage for PerPixelAdjustmentsStage {
             .then(|| adjust::ToneCurvePrecomputed::new(&params.tone_curve));
         self.color_grading_pre = (!params.color_grading.is_default())
             .then(|| adjust::ColorGradingPrecomputed::new(&params.color_grading));
-        self.hsl_active = !params.hsl.is_default();
-        self.hue_shifts = params.hsl.hue_shifts();
-        self.sat_shifts = params.hsl.saturation_shifts();
-        self.lum_shifts = params.hsl.luminance_shifts();
     }
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
@@ -70,11 +58,11 @@ impl Stage for PerPixelAdjustmentsStage {
             shadows: ctx.params.shadows,
             whites: ctx.params.whites,
             blacks: ctx.params.blacks,
-            tone_curve_pre: self.tone_curve_pre.clone(),
-            hsl_active: self.hsl_active,
-            hue_shifts: self.hue_shifts,
-            sat_shifts: self.sat_shifts,
-            lum_shifts: self.lum_shifts,
+            tone_curve_pre: self.tone_curve_pre.as_ref(),
+            hsl_active: !ctx.params.hsl.is_default(),
+            hue_shifts: ctx.params.hsl.hue_shifts(),
+            sat_shifts: ctx.params.hsl.saturation_shifts(),
+            lum_shifts: ctx.params.hsl.luminance_shifts(),
             color_grading_pre: self.color_grading_pre,
             lut_fn: lut_lookup
                 .as_ref()
