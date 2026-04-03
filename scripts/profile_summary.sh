@@ -49,8 +49,8 @@ results.sort(key=lambda x: -x[2])
 
 # Collect all stage names in consistent order
 stage_order = ['decode', 'white_balance_exposure', 'dehaze', 'denoise',
-               'linear_to_srgb_and_per_pixel', 'detail', 'grain',
-               'vignette_and_srgb_to_linear', 'encode']
+               'linear_to_srgb', 'per_pixel_adjustments', 'detail', 'grain',
+               'vignette', 'srgb_to_linear', 'encode']
 
 # Print summary
 print()
