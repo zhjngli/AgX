@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 image = "0.25"
 imageproc = "0.25"
 palette = "0.7"
+rayon = "1"
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
