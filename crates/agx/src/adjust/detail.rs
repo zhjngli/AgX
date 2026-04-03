@@ -85,20 +85,18 @@ pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f
 
     // Horizontal pass: each row reads from `input`, writes to its own row in `temp`.
     let mut temp = vec![0.0f32; width * height];
-    temp.par_chunks_mut(width)
-        .enumerate()
-        .for_each(|(y, row)| {
-            for x in 0..width {
-                let mut sum = 0.0f32;
-                for (ki, &kw) in kernel.iter().enumerate() {
-                    let sx = (x as isize + ki as isize - half as isize)
-                        .max(0)
-                        .min(width as isize - 1) as usize;
-                    sum += input[y * width + sx] * kw;
-                }
-                row[x] = sum;
+    temp.par_chunks_mut(width).enumerate().for_each(|(y, row)| {
+        for (x, out) in row.iter_mut().enumerate() {
+            let mut sum = 0.0f32;
+            for (ki, &kw) in kernel.iter().enumerate() {
+                let sx = (x as isize + ki as isize - half as isize)
+                    .max(0)
+                    .min(width as isize - 1) as usize;
+                sum += input[y * width + sx] * kw;
             }
-        });
+            *out = sum;
+        }
+    });
 
     // Vertical pass: each row reads from `temp` (immutable), writes to its own row in `output`.
     let mut output = vec![0.0f32; width * height];
@@ -106,7 +104,7 @@ pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f
         .par_chunks_mut(width)
         .enumerate()
         .for_each(|(y, row)| {
-            for x in 0..width {
+            for (x, out) in row.iter_mut().enumerate() {
                 let mut sum = 0.0f32;
                 for (ki, &kw) in kernel.iter().enumerate() {
                     let sy = (y as isize + ki as isize - half as isize)
@@ -114,7 +112,7 @@ pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f
                         .min(height as isize - 1) as usize;
                     sum += temp[sy * width + x] * kw;
                 }
-                row[x] = sum;
+                *out = sum;
             }
         });
 
