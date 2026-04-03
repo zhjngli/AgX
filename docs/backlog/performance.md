@@ -8,18 +8,18 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 | Preset type | Baseline | Top bottlenecks |
 |-------------|----------|-----------------|
-| Heavy (dehaze+detail+grain) | 15-17.5s | dehaze 27%, per_pixel 29%, grain 17-19% |
-| Detail-heavy (detail+grain) | 13-16.5s | detail 33-41%, per_pixel 22-28%, grain 17-21% |
-| Denoise (denoise+grain) | 11-15s | denoise 24-32%, per_pixel 26-33%, grain 19-24% |
-| Light (grain only) | 9-11s | per_pixel 31-44%, grain 27-33% |
+| Heavy (dehaze+detail+grain) | 15-17.5s | dehaze 27%, per_pixel_adjustments 29%, grain 17-19% |
+| Detail-heavy (detail+grain) | 13-16.5s | detail 33-41%, per_pixel_adjustments 22-28%, grain 17-21% |
+| Denoise (denoise+grain) | 11-15s | denoise 24-32%, per_pixel_adjustments 26-33%, grain 19-24% |
+| Light (grain only) | 9-11s | per_pixel_adjustments 31-44%, grain 27-33% |
 | Noop (decode+encode) | 4s | decode 64%, encode 15% |
 
 ## Sub-tasks
 
 ### Parallelization (data-driven priorities)
 
-- [ ] **P1: Parallelize per-pixel adjustment loop** — the `linear_to_srgb_and_per_pixel` loop is the most frequent bottleneck (27/32 combos, avg 31%). Each pixel is independent — use rayon `par_chunks_mut`. Estimated 3-5x speedup for this stage, saving 3-4s on heavy presets. Low complexity.
-- [ ] **P2: Parallelize Gaussian blur** — the separable blur in `detail.rs` is shared by detail, grain, and dehaze. Horizontal pass parallelized by rows, vertical by columns. Estimated 3-5x speedup, saving 2-5s depending on active stages. Medium complexity.
+- [x] **P1: Parallelize per-pixel adjustment loop** — the `linear_to_srgb_and_per_pixel` loop is the most frequent bottleneck (27/32 combos, avg 31%). Each pixel is independent — use rayon `par_chunks_mut`. Estimated 3-5x speedup for this stage, saving 3-4s on heavy presets. Low complexity.
+- [x] **P2: Parallelize Gaussian blur** — the separable blur in `detail.rs` is shared by detail, grain, and dehaze. Horizontal pass parallelized by rows, vertical by columns. Estimated 3-5x speedup, saving 2-5s depending on active stages. Medium complexity.
 - [ ] **P3: Parallelize denoise wavelet passes** — a trous wavelet decomposition processes each pixel independently per iteration. 24-32% of total when active. Medium complexity.
 - [ ] **P4: Parallelize grain noise generation and application** — embarrassingly parallel. 17-33% of total. Low complexity. (Blur portion covered by P2.)
 
