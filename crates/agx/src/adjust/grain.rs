@@ -290,42 +290,44 @@ pub fn apply_grain_buffer(
     // spreads beyond shadows into midtones and highlights.
     let effective_falloff = config.luma_falloff * (1.0 - GRAIN_FALLOFF_REDUCTION * amount_factor);
 
-    buf.par_chunks_mut(1024).enumerate().for_each(|(chunk_idx, chunk)| {
-        let base = chunk_idx * 1024;
-        for (i, pixel) in chunk.iter_mut().enumerate() {
-            let idx = base + i;
-            let [r, g, b] = *pixel;
-            let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+    buf.par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, pixel) in chunk.iter_mut().enumerate() {
+                let idx = base + i;
+                let [r, g, b] = *pixel;
+                let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
 
-            // Pixel saturation: how colorful vs neutral this pixel is.
-            let pixel_chroma = r.max(g).max(b) - r.min(g).min(b);
+                // Pixel saturation: how colorful vs neutral this pixel is.
+                let pixel_chroma = r.max(g).max(b) - r.min(g).min(b);
 
-            // Boost chromatic divergence in shadows
-            let shadow_chromatic_boost = 2.0 - luma;
-            let effective_chromatic = config.chromatic * pixel_chroma * shadow_chromatic_boost;
+                // Boost chromatic divergence in shadows
+                let shadow_chromatic_boost = 2.0 - luma;
+                let effective_chromatic = config.chromatic * pixel_chroma * shadow_chromatic_boost;
 
-            // Per-channel noise: correlated with shared, small independent perturbation
-            let nr =
-                shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
-            let ng =
-                shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
-            let nb =
-                shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
+                // Per-channel noise: correlated with shared, small independent perturbation
+                let nr =
+                    shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
+                let ng =
+                    shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
+                let nb =
+                    shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
 
-            let ws = luminance_weight(luma, effective_falloff) * scale;
+                let ws = luminance_weight(luma, effective_falloff) * scale;
 
-            let blend = smoothstep(GRAIN_ADDITIVE_END, GRAIN_MULTIPLICATIVE_START, luma);
+                let blend = smoothstep(GRAIN_ADDITIVE_END, GRAIN_MULTIPLICATIVE_START, luma);
 
-            let apply = |val: f32, noise: f32| {
-                let nws = noise * ws;
-                let additive_delta = nws * GRAIN_ADDITIVE_SCALE;
-                let multiplicative_delta = val * (nws.exp() - 1.0);
-                let delta = additive_delta + (multiplicative_delta - additive_delta) * blend;
-                (val + delta).clamp(0.0, 1.0)
-            };
-            *pixel = [apply(r, nr), apply(g, ng), apply(b, nb)];
-        }
-    });
+                let apply = |val: f32, noise: f32| {
+                    let nws = noise * ws;
+                    let additive_delta = nws * GRAIN_ADDITIVE_SCALE;
+                    let multiplicative_delta = val * (nws.exp() - 1.0);
+                    let delta = additive_delta + (multiplicative_delta - additive_delta) * blend;
+                    (val + delta).clamp(0.0, 1.0)
+                };
+                *pixel = [apply(r, nr), apply(g, ng), apply(b, nb)];
+            }
+        });
 }
 
 /// Compute luminance-aware weight.

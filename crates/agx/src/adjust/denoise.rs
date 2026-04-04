@@ -261,8 +261,26 @@ pub fn apply_noise_reduction(
         || denoise_channel(&y_chan, width, height, luma_strength, detail_factor, true),
         || {
             rayon::join(
-                || denoise_channel(&cb_chan, width, height, chroma_strength, detail_factor, false),
-                || denoise_channel(&cr_chan, width, height, chroma_strength, detail_factor, false),
+                || {
+                    denoise_channel(
+                        &cb_chan,
+                        width,
+                        height,
+                        chroma_strength,
+                        detail_factor,
+                        false,
+                    )
+                },
+                || {
+                    denoise_channel(
+                        &cr_chan,
+                        width,
+                        height,
+                        chroma_strength,
+                        detail_factor,
+                        false,
+                    )
+                },
             )
         },
     );
