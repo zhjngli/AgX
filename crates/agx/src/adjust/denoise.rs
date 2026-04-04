@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::{LUMA_B, LUMA_G, LUMA_R};
@@ -130,34 +131,40 @@ fn mirror(i: isize, max: usize) -> usize {
 /// Horizontal convolution with B3-spline kernel at given tap spacing (gap = 2^level).
 fn convolve_horizontal(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
     let mut output = vec![0.0f32; width * height];
-    for y in 0..height {
-        for x in 0..width {
-            let mut sum = 0.0;
-            for (k, &w_k) in B3_KERNEL.iter().enumerate() {
-                let offset = (k as isize - 2) * gap as isize;
-                let xi = mirror(x as isize + offset, width);
-                sum += w_k * input[y * width + xi];
+    output
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, out) in row.iter_mut().enumerate() {
+                let mut sum = 0.0;
+                for (k, &w_k) in B3_KERNEL.iter().enumerate() {
+                    let offset = (k as isize - 2) * gap as isize;
+                    let xi = mirror(x as isize + offset, width);
+                    sum += w_k * input[y * width + xi];
+                }
+                *out = sum;
             }
-            output[y * width + x] = sum;
-        }
-    }
+        });
     output
 }
 
 /// Vertical convolution with B3-spline kernel at given tap spacing (gap = 2^level).
 fn convolve_vertical(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
     let mut output = vec![0.0f32; width * height];
-    for y in 0..height {
-        for x in 0..width {
-            let mut sum = 0.0;
-            for (k, &w_k) in B3_KERNEL.iter().enumerate() {
-                let offset = (k as isize - 2) * gap as isize;
-                let yi = mirror(y as isize + offset, height);
-                sum += w_k * input[yi * width + x];
+    output
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, out) in row.iter_mut().enumerate() {
+                let mut sum = 0.0;
+                for (k, &w_k) in B3_KERNEL.iter().enumerate() {
+                    let offset = (k as isize - 2) * gap as isize;
+                    let yi = mirror(y as isize + offset, height);
+                    sum += w_k * input[yi * width + x];
+                }
+                *out = sum;
             }
-            output[y * width + x] = sum;
-        }
-    }
+        });
     output
 }
 
