@@ -128,8 +128,15 @@ fn mirror(i: isize, max: usize) -> usize {
     }
 }
 
-/// Horizontal convolution with B3-spline kernel at given tap spacing (gap = 2^level).
-fn convolve_horizontal(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
+/// Separable B3-spline convolution along one axis at the given tap spacing (gap = 2^level).
+/// Horizontal applies the kernel offset to x; vertical applies it to y.
+fn convolve_b3(
+    input: &[f32],
+    width: usize,
+    height: usize,
+    gap: usize,
+    horizontal: bool,
+) -> Vec<f32> {
     let mut output = vec![0.0f32; width * height];
     output
         .par_chunks_mut(width)
@@ -139,28 +146,12 @@ fn convolve_horizontal(input: &[f32], width: usize, height: usize, gap: usize) -
                 let mut sum = 0.0;
                 for (k, &w_k) in B3_KERNEL.iter().enumerate() {
                     let offset = (k as isize - 2) * gap as isize;
-                    let xi = mirror(x as isize + offset, width);
-                    sum += w_k * input[y * width + xi];
-                }
-                *out = sum;
-            }
-        });
-    output
-}
-
-/// Vertical convolution with B3-spline kernel at given tap spacing (gap = 2^level).
-fn convolve_vertical(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
-    let mut output = vec![0.0f32; width * height];
-    output
-        .par_chunks_mut(width)
-        .enumerate()
-        .for_each(|(y, row)| {
-            for (x, out) in row.iter_mut().enumerate() {
-                let mut sum = 0.0;
-                for (k, &w_k) in B3_KERNEL.iter().enumerate() {
-                    let offset = (k as isize - 2) * gap as isize;
-                    let yi = mirror(y as isize + offset, height);
-                    sum += w_k * input[yi * width + x];
+                    let idx = if horizontal {
+                        y * width + mirror(x as isize + offset, width)
+                    } else {
+                        mirror(y as isize + offset, height) * width + x
+                    };
+                    sum += w_k * input[idx];
                 }
                 *out = sum;
             }
@@ -180,11 +171,12 @@ fn atrous_decompose(input: &[f32], width: usize, height: usize) -> (Vec<Vec<f32>
 
     for level in 0..NUM_LEVELS {
         let gap = 1 << level; // 1, 2, 4, 8, 16
-        let smoothed = convolve_vertical(
-            &convolve_horizontal(&approximation, width, height, gap),
+        let smoothed = convolve_b3(
+            &convolve_b3(&approximation, width, height, gap, true),
             width,
             height,
             gap,
+            false,
         );
         let mut detail = vec![0.0f32; n];
         for i in 0..n {
@@ -256,7 +248,6 @@ pub fn apply_noise_reduction(
     // Inverted: detail=100 → factor=0 (level-0 threshold zeroed, preserving fine detail)
     let detail_factor = 1.0 - params.detail / 100.0;
 
-    // Denoise all three channels in parallel
     let (y_denoised, (cb_denoised, cr_denoised)) = rayon::join(
         || denoise_channel(&y_chan, width, height, luma_strength, detail_factor, true),
         || {

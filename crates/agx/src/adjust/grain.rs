@@ -290,6 +290,7 @@ pub fn apply_grain_buffer(
     // spreads beyond shadows into midtones and highlights.
     let effective_falloff = config.luma_falloff * (1.0 - GRAIN_FALLOFF_REDUCTION * amount_factor);
 
+    // Chunk size balances rayon scheduling overhead against cache locality.
     buf.par_chunks_mut(1024)
         .enumerate()
         .for_each(|(chunk_idx, chunk)| {
@@ -306,13 +307,11 @@ pub fn apply_grain_buffer(
                 let shadow_chromatic_boost = 2.0 - luma;
                 let effective_chromatic = config.chromatic * pixel_chroma * shadow_chromatic_boost;
 
-                // Per-channel noise: correlated with shared, small independent perturbation
-                let nr =
-                    shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
-                let ng =
-                    shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
-                let nb =
-                    shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
+                // Per-channel noise: blend shared (correlated) with per-channel (independent)
+                let shared_part = shared[idx] * (1.0 - effective_chromatic);
+                let nr = shared_part + noise_r[idx] * effective_chromatic;
+                let ng = shared_part + noise_g[idx] * effective_chromatic;
+                let nb = shared_part + noise_b[idx] * effective_chromatic;
 
                 let ws = luminance_weight(luma, effective_falloff) * scale;
 
