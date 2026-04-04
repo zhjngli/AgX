@@ -131,6 +131,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-27 | [Grain Size Fix Design](docs/plans/2026-03-27-grain-size-fix-design.md)                          |
 | 2026-04-01 | [Pluggable Pipeline Design](docs/plans/2026-04-01-pluggable-pipeline-design.md)                  |
 | 2026-04-02 | [Parallel Render Design](docs/plans/2026-04-02-parallel-render-design.md)                        |
+| 2026-04-03 | [Parallel Render P3+P4 Design](docs/plans/2026-04-03-parallel-render-p3-p4-design.md)            |
 
 ### Backlog
 

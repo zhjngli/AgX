@@ -20,8 +20,8 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 - [x] **P1: Parallelize per-pixel adjustment loop** — the `linear_to_srgb_and_per_pixel` loop is the most frequent bottleneck (27/32 combos, avg 31%). Each pixel is independent — use rayon `par_chunks_mut`. Estimated 3-5x speedup for this stage, saving 3-4s on heavy presets. Low complexity.
 - [x] **P2: Parallelize Gaussian blur** — the separable blur in `detail.rs` is shared by detail, grain, and dehaze. Horizontal pass parallelized by rows, vertical by columns. Estimated 3-5x speedup, saving 2-5s depending on active stages. Medium complexity.
-- [ ] **P3: Parallelize denoise wavelet passes** — a trous wavelet decomposition processes each pixel independently per iteration. 24-32% of total when active. Medium complexity.
-- [ ] **P4: Parallelize grain noise generation and application** — embarrassingly parallel. 17-33% of total. Low complexity. (Blur portion covered by P2.)
+- [x] **P3: Parallelize denoise wavelet passes** — a trous wavelet decomposition processes each pixel independently per iteration. 24-32% of total when active. Medium complexity.
+- [x] **P4: Parallelize grain noise generation and application** — embarrassingly parallel. 17-33% of total. Low complexity. (Blur portion covered by P2.)
 
 ### Advanced optimizations (consider after P1-P2)
 
@@ -30,7 +30,7 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 ### Memory and buffer optimizations
 
-- [ ] **Batch memory pressure with stage-based pipeline** — the pluggable pipeline always materializes intermediate buffers between stages (~300MB per buffer at 26MP). For batch workflows processing many large images in parallel, peak memory could become a bottleneck. Profile memory usage under batch load and consider strategies: buffer pooling, limiting concurrent large-image renders, or lazy buffer allocation.
+- [ ] **Batch memory pressure with stage-based pipeline** — the pluggable pipeline always materializes intermediate buffers between stages (~300MB per buffer at 26MP). For batch workflows processing many large images in parallel, peak memory could become a bottleneck. Profile memory usage under batch load and consider strategies: buffer pooling, limiting concurrent large-image renders, or lazy buffer allocation. **Note:** P3 parallel channel denoising triples peak memory during wavelet decomposition (~1.8GB vs ~600MB sequential at 26MP). This should be included in batch memory profiling.
 - [ ] Decode buffer reduction — convert sRGB-to-linear in-place instead of allocating an intermediate buffer (~1 buffer saved)
 - [ ] Encode buffer reduction — go directly from linear f32 to u8 sRGB in a single pass (~1-2 buffers saved)
 
