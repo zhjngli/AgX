@@ -931,6 +931,29 @@ fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
     Ok(())
 }
 
+/// Render a decoded image with an optional preset and encode to PNG.
+/// Used by `run_multi_apply` for both sequential and parallel paths.
+fn render_and_encode(
+    image: image::Rgb32FImage,
+    preset: Option<&agx::Preset>,
+    output_path: &std::path::Path,
+    metadata: Option<&agx::metadata::ImageMetadata>,
+) -> agx::Result<()> {
+    let mut engine = Engine::new(image);
+    if let Some(p) = preset {
+        engine.apply_preset(p);
+    }
+    let result = engine.render();
+    let final_path = agx::encode::encode_to_file_with_options(
+        &result.image,
+        output_path,
+        &agx::encode::EncodeOptions::default(),
+        metadata,
+    )?;
+    println!("Saved to {}", final_path.display());
+    Ok(())
+}
+
 fn run_multi_apply(
     input: &std::path::Path,
     presets: &[PathBuf],
@@ -943,32 +966,11 @@ fn run_multi_apply(
         .and_then(|s| s.to_str())
         .unwrap_or("output");
 
-    // Create output directory
     std::fs::create_dir_all(output_dir).map_err(agx::AgxError::Io)?;
 
-    // Decode once
     let metadata = agx::metadata::extract_metadata(input);
     let decoded = agx::decode::decode(input)?;
 
-    // Helper: render a single preset (or noop) and encode to PNG
-    let render_one =
-        |image, preset: Option<&agx::Preset>, output_path: &std::path::Path| -> agx::Result<()> {
-            let mut engine = Engine::new(image);
-            if let Some(p) = preset {
-                engine.apply_preset(p);
-            }
-            let result = engine.render();
-            let final_path = agx::encode::encode_to_file_with_options(
-                &result.image,
-                output_path,
-                &agx::encode::EncodeOptions::default(),
-                metadata.as_ref(),
-            )?;
-            println!("Saved to {}", final_path.display());
-            Ok(())
-        };
-
-    // Load all presets upfront (fail fast on bad TOML)
     let loaded: Vec<(String, agx::Preset)> = presets
         .iter()
         .map(|path| {
@@ -982,22 +984,19 @@ fn run_multi_apply(
         })
         .collect::<agx::Result<Vec<_>>>()?;
 
-    // Render noop if requested
     if noop {
         let noop_path = output_dir.join(format!("{image_stem}_noop.png"));
-        render_one(decoded.clone(), None, &noop_path)?;
+        render_and_encode(decoded.clone(), None, &noop_path, metadata.as_ref())?;
     }
 
     if jobs <= 1 {
-        // Sequential: render one at a time
         for (name, preset) in &loaded {
             let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
-            render_one(decoded.clone(), Some(preset), &out_path)?;
+            render_and_encode(decoded.clone(), Some(preset), &out_path, metadata.as_ref())?;
         }
     } else {
-        // Parallel: render `jobs` presets concurrently using OS threads.
-        // Each render's internal rayon parallelism uses the global pool.
-        // std::thread::scope ensures we don't oversubscribe memory.
+        // OS threads for concurrency control; each render's internal rayon
+        // parallelism uses the global pool. Chunks bound concurrent memory usage.
         let errors: std::sync::Mutex<Vec<agx::AgxError>> = std::sync::Mutex::new(Vec::new());
 
         for chunk in loaded.chunks(jobs) {
@@ -1008,17 +1007,13 @@ fn run_multi_apply(
                     let errors = &errors;
                     s.spawn(move || {
                         let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
-                        let mut engine = Engine::new(decoded.clone());
-                        engine.apply_preset(preset);
-                        let result = engine.render();
-                        let encode_result = agx::encode::encode_to_file_with_options(
-                            &result.image,
+                        match render_and_encode(
+                            decoded.clone(),
+                            Some(preset),
                             &out_path,
-                            &agx::encode::EncodeOptions::default(),
                             metadata.as_ref(),
-                        );
-                        match encode_result {
-                            Ok(final_path) => println!("Saved to {}", final_path.display()),
+                        ) {
+                            Ok(()) => {}
                             Err(e) => errors.lock().unwrap().push(e),
                         }
                     });
