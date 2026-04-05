@@ -647,6 +647,24 @@ enum Commands {
         #[command(flatten)]
         batch: BatchOpts,
     },
+    /// Apply multiple presets to a single image (decode once, render per preset)
+    MultiApply {
+        /// Input image path
+        #[arg(short, long)]
+        input: PathBuf,
+        /// Preset TOML file(s) to apply (one output per preset)
+        #[arg(short, long, required = true, num_args = 1..)]
+        preset: Vec<PathBuf>,
+        /// Output directory (created if missing)
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Also render a no-preset (identity) output
+        #[arg(long, default_value_t = false)]
+        noop: bool,
+        /// Number of preset renders to run concurrently (default: 1)
+        #[arg(short, long, default_value_t = 1)]
+        jobs: usize,
+    },
 }
 
 fn main() {
@@ -668,6 +686,13 @@ fn main() {
         } => run_edit(&input, &output, &edit, &output_opts),
         Commands::BatchApply { preset, batch } => run_batch_apply(&preset, &batch),
         Commands::BatchEdit { edit, batch } => run_batch_edit(&edit, &batch),
+        Commands::MultiApply {
+            input,
+            preset,
+            output,
+            noop,
+            jobs,
+        } => run_multi_apply(&input, &preset, &output, noop, jobs),
     };
 
     if let Err(e) = result {
@@ -903,5 +928,71 @@ fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
     if !summary.failed.is_empty() {
         process::exit(1);
     }
+    Ok(())
+}
+
+fn run_multi_apply(
+    input: &std::path::Path,
+    presets: &[PathBuf],
+    output_dir: &std::path::Path,
+    noop: bool,
+    _jobs: usize,
+) -> agx::Result<()> {
+    let image_stem = input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+
+    // Create output directory
+    std::fs::create_dir_all(output_dir).map_err(agx::AgxError::Io)?;
+
+    // Decode once
+    let metadata = agx::metadata::extract_metadata(input);
+    let decoded = agx::decode::decode(input)?;
+
+    // Helper: render a single preset (or noop) and encode to PNG
+    let render_one =
+        |image, preset: Option<&agx::Preset>, output_path: &std::path::Path| -> agx::Result<()> {
+            let mut engine = Engine::new(image);
+            if let Some(p) = preset {
+                engine.apply_preset(p);
+            }
+            let result = engine.render();
+            let final_path = agx::encode::encode_to_file_with_options(
+                &result.image,
+                output_path,
+                &agx::encode::EncodeOptions::default(),
+                metadata.as_ref(),
+            )?;
+            println!("Saved to {}", final_path.display());
+            Ok(())
+        };
+
+    // Load all presets upfront (fail fast on bad TOML)
+    let loaded: Vec<(String, agx::Preset)> = presets
+        .iter()
+        .map(|path| {
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let preset = agx::Preset::load_from_file(path)?;
+            Ok((name, preset))
+        })
+        .collect::<agx::Result<Vec<_>>>()?;
+
+    // Render noop if requested
+    if noop {
+        let noop_path = output_dir.join(format!("{image_stem}_noop.png"));
+        render_one(decoded.clone(), None, &noop_path)?;
+    }
+
+    // Sequential rendering (--jobs support added in Task 2)
+    for (name, preset) in &loaded {
+        let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
+        render_one(decoded.clone(), Some(preset), &out_path)?;
+    }
+
     Ok(())
 }
