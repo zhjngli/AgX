@@ -936,7 +936,7 @@ fn run_multi_apply(
     presets: &[PathBuf],
     output_dir: &std::path::Path,
     noop: bool,
-    _jobs: usize,
+    jobs: usize,
 ) -> agx::Result<()> {
     let image_stem = input
         .file_stem()
@@ -988,10 +988,48 @@ fn run_multi_apply(
         render_one(decoded.clone(), None, &noop_path)?;
     }
 
-    // Sequential rendering (--jobs support added in Task 2)
-    for (name, preset) in &loaded {
-        let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
-        render_one(decoded.clone(), Some(preset), &out_path)?;
+    if jobs <= 1 {
+        // Sequential: render one at a time
+        for (name, preset) in &loaded {
+            let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
+            render_one(decoded.clone(), Some(preset), &out_path)?;
+        }
+    } else {
+        // Parallel: render `jobs` presets concurrently using OS threads.
+        // Each render's internal rayon parallelism uses the global pool.
+        // std::thread::scope ensures we don't oversubscribe memory.
+        let errors: std::sync::Mutex<Vec<agx::AgxError>> = std::sync::Mutex::new(Vec::new());
+
+        for chunk in loaded.chunks(jobs) {
+            std::thread::scope(|s| {
+                for (name, preset) in chunk {
+                    let decoded = &decoded;
+                    let metadata = &metadata;
+                    let errors = &errors;
+                    s.spawn(move || {
+                        let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
+                        let mut engine = Engine::new(decoded.clone());
+                        engine.apply_preset(preset);
+                        let result = engine.render();
+                        let encode_result = agx::encode::encode_to_file_with_options(
+                            &result.image,
+                            &out_path,
+                            &agx::encode::EncodeOptions::default(),
+                            metadata.as_ref(),
+                        );
+                        match encode_result {
+                            Ok(final_path) => println!("Saved to {}", final_path.display()),
+                            Err(e) => errors.lock().unwrap().push(e),
+                        }
+                    });
+                }
+            });
+        }
+
+        let errs = errors.into_inner().unwrap();
+        if let Some(first) = errs.into_iter().next() {
+            return Err(first);
+        }
     }
 
     Ok(())
