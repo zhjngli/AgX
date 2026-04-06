@@ -48,3 +48,15 @@ jobs:
           else
             cargo test -p agx-e2e --release -- ${{ matrix.suite }} --test-threads=1
           fi
+
+  e2e-rollup:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    if: always()
+    needs: e2e-tests
+    steps:
+      - run: |
+          if [ "${{ needs.e2e-tests.result }}" != "success" ]; then
+            echo "E2E matrix failed: ${{ needs.e2e-tests.result }}"
+            exit 1
+          fi
