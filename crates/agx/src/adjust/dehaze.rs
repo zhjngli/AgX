@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Dehaze adjustment parameters. Amount range: -100 to +100. Positive removes haze,
@@ -25,6 +26,19 @@ impl DehazeParams {
 
 const PATCH_SIZE: usize = 15;
 const AIRLIGHT_PERCENTILE: f64 = 0.001;
+
+/// Wrapper to send a raw mutable pointer across threads.
+/// Safety: callers must guarantee disjoint writes — no two threads write the same index.
+#[derive(Clone, Copy)]
+struct UnsafeSlicePtr(*mut f32);
+unsafe impl Send for UnsafeSlicePtr {}
+unsafe impl Sync for UnsafeSlicePtr {}
+
+impl UnsafeSlicePtr {
+    fn ptr(self) -> *mut f32 {
+        self.0
+    }
+}
 
 /// O(n) centered sliding window minimum using a monotonic deque.
 ///
@@ -81,32 +95,43 @@ fn dark_channel(buf: &[[f32; 3]], width: usize, height: usize) -> Vec<f32> {
 
     // Step 1: Per-pixel minimum across RGB channels
     let mut pixel_min = vec![0.0_f32; n];
-    for i in 0..n {
-        let [r, g, b] = buf[i];
-        pixel_min[i] = r.min(g).min(b);
-    }
+    pixel_min
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                let [r, g, b] = buf[base + i];
+                *val = r.min(g).min(b);
+            }
+        });
 
     // Step 2: Horizontal min filter (per row)
     let mut h_filtered = vec![0.0_f32; n];
-    for y in 0..height {
-        let row_start = y * width;
-        let row = &pixel_min[row_start..row_start + width];
-        let filtered = min_filter_1d(row, PATCH_SIZE);
-        h_filtered[row_start..row_start + width].copy_from_slice(&filtered);
-    }
+    h_filtered
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row_out)| {
+            let row_start = y * width;
+            let row = &pixel_min[row_start..row_start + width];
+            let filtered = min_filter_1d(row, PATCH_SIZE);
+            row_out.copy_from_slice(&filtered);
+        });
 
     // Step 3: Vertical min filter (per column)
     let mut result = vec![0.0_f32; n];
-    let mut col_buf = vec![0.0_f32; height];
-    for x in 0..width {
+    let result_send = UnsafeSlicePtr(result.as_mut_ptr());
+    (0..width).into_par_iter().for_each(|x| {
+        let mut col_buf = vec![0.0_f32; height];
         for y in 0..height {
             col_buf[y] = h_filtered[y * width + x];
         }
         let filtered = min_filter_1d(&col_buf, PATCH_SIZE);
+        let ptr = result_send.ptr();
         for y in 0..height {
-            result[y * width + x] = filtered[y];
+            unsafe { *ptr.add(y * width + x) = filtered[y] };
         }
-    }
+    });
 
     result
 }
