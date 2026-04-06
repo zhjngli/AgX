@@ -238,29 +238,55 @@ fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> V
     let mean_p = box_filter_2d(input, width, height, r);
 
     let mut gp = vec![0.0_f32; n];
+    gp.par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                *val = guide[base + i] * input[base + i];
+            }
+        });
     let mut gg = vec![0.0_f32; n];
-    for i in 0..n {
-        gp[i] = guide[i] * input[i];
-        gg[i] = guide[i] * guide[i];
-    }
+    gg.par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                *val = guide[base + i] * guide[base + i];
+            }
+        });
     let mean_gp = box_filter_2d(&gp, width, height, r);
     let mean_gg = box_filter_2d(&gg, width, height, r);
 
     let mut a = vec![0.0_f32; n];
     let mut b = vec![0.0_f32; n];
-    for i in 0..n {
-        let cov_gp = mean_gp[i] - mean_g[i] * mean_p[i];
-        let var_g = mean_gg[i] - mean_g[i] * mean_g[i];
-        a[i] = cov_gp / (var_g + eps);
-        b[i] = mean_p[i] - a[i] * mean_g[i];
-    }
+    a.par_chunks_mut(1024)
+        .zip(b.par_chunks_mut(1024))
+        .enumerate()
+        .for_each(|(chunk_idx, (a_chunk, b_chunk))| {
+            let base = chunk_idx * 1024;
+            for i in 0..a_chunk.len() {
+                let idx = base + i;
+                let cov_gp = mean_gp[idx] - mean_g[idx] * mean_p[idx];
+                let var_g = mean_gg[idx] - mean_g[idx] * mean_g[idx];
+                a_chunk[i] = cov_gp / (var_g + eps);
+                b_chunk[i] = mean_p[idx] - a_chunk[i] * mean_g[idx];
+            }
+        });
 
     let mean_a = box_filter_2d(&a, width, height, r);
     let mean_b = box_filter_2d(&b, width, height, r);
     let mut result = vec![0.0_f32; n];
-    for i in 0..n {
-        result[i] = mean_a[i] * guide[i] + mean_b[i];
-    }
+    result
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                let idx = base + i;
+                *val = mean_a[idx] * guide[idx] + mean_b[idx];
+            }
+        });
     result
 }
 
