@@ -27,8 +27,17 @@ impl DehazeParams {
 const PATCH_SIZE: usize = 15;
 const AIRLIGHT_PERCENTILE: f64 = 0.001;
 
-/// Wrapper to send a raw mutable pointer across threads.
-/// Safety: callers must guarantee disjoint writes — no two threads write the same index.
+/// Wrapper to send a raw mutable pointer across threads for vertical filter passes.
+///
+/// The vertical passes parallelize over columns: each thread owns a unique column index `x`
+/// and writes to positions `[0*width+x, 1*width+x, ...]`, which are disjoint across threads.
+/// Rust's borrow checker can't prove this at compile time, so we use unsafe.
+///
+/// A safe alternative exists: collect each column's filtered result into its own `Vec<f32>`
+/// via `into_par_iter().map().collect()`, then scatter back row-by-row. This avoids unsafe
+/// but allocates ~100MB temporary storage at 26MP (one `Vec<f32>` per column). We use the
+/// unsafe approach to avoid that allocation since dehaze already peaks at ~2.2GB in the
+/// guided filter.
 #[derive(Clone, Copy)]
 struct UnsafeSlicePtr(*mut f32);
 unsafe impl Send for UnsafeSlicePtr {}
