@@ -128,8 +128,8 @@ fn dark_channel(buf: &[[f32; 3]], width: usize, height: usize) -> Vec<f32> {
         }
         let filtered = min_filter_1d(&col_buf, PATCH_SIZE);
         let ptr = result_send.ptr();
-        for y in 0..height {
-            unsafe { *ptr.add(y * width + x) = filtered[y] };
+        for (y, &val) in filtered.iter().enumerate() {
+            unsafe { *ptr.add(y * width + x) = val };
         }
     });
 
@@ -218,8 +218,8 @@ fn box_filter_2d(data: &[f32], width: usize, height: usize, radius: usize) -> Ve
         }
         let filtered = box_filter_1d(&col, radius);
         let ptr = result_send.ptr();
-        for y in 0..height {
-            unsafe { *ptr.add(y * width + x) = filtered[y] };
+        for (y, &val) in filtered.iter().enumerate() {
+            unsafe { *ptr.add(y * width + x) = val };
         }
     });
     result
@@ -320,11 +320,18 @@ pub fn apply_dehaze(
         // Negative amount: add haze by blending toward airlight
         let strength = (-amount / 100.0).min(1.0);
         let mut result = vec![[0.0_f32; 3]; n];
-        for i in 0..n {
-            for c in 0..3 {
-                result[i][c] = (buf[i][c] * (1.0 - strength) + a[c] * strength).clamp(0.0, 1.0);
-            }
-        }
+        result
+            .par_chunks_mut(1024)
+            .enumerate()
+            .for_each(|(chunk_idx, chunk)| {
+                let base = chunk_idx * 1024;
+                for (i, px) in chunk.iter_mut().enumerate() {
+                    let src = buf[base + i];
+                    for c in 0..3 {
+                        px[c] = (src[c] * (1.0 - strength) + a[c] * strength).clamp(0.0, 1.0);
+                    }
+                }
+            });
         return result;
     }
 
@@ -334,38 +341,60 @@ pub fn apply_dehaze(
     // Step 3: Normalize image by airlight and compute dark channel of normalized
     let a_safe = [a[0].max(0.01), a[1].max(0.01), a[2].max(0.01)];
     let mut normalized = vec![[0.0_f32; 3]; n];
-    for i in 0..n {
-        normalized[i] = [
-            buf[i][0] / a_safe[0],
-            buf[i][1] / a_safe[1],
-            buf[i][2] / a_safe[2],
-        ];
-    }
+    normalized
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, px) in chunk.iter_mut().enumerate() {
+                let src = buf[base + i];
+                *px = [src[0] / a_safe[0], src[1] / a_safe[1], src[2] / a_safe[2]];
+            }
+        });
     let dc_norm = dark_channel(&normalized, width, height);
 
     // Raw transmission map
     let mut t_raw = vec![0.0_f32; n];
-    for i in 0..n {
-        t_raw[i] = 1.0 - omega * dc_norm[i];
-    }
+    t_raw
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                *val = 1.0 - omega * dc_norm[base + i];
+            }
+        });
 
     // Step 4: Guided filter refinement
     let mut guide = vec![0.0_f32; n];
-    for i in 0..n {
-        let [r, g, b] = buf[i];
-        guide[i] = super::LUMA_R * r + super::LUMA_G * g + super::LUMA_B * b;
-    }
+    guide
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                let [r, g, b] = buf[base + i];
+                *val = super::LUMA_R * r + super::LUMA_G * g + super::LUMA_B * b;
+            }
+        });
     let t_refined = guided_filter(&guide, &t_raw, width, height);
 
     // Step 5: Scene recovery
     let mut result = vec![[0.0_f32; 3]; n];
-    for i in 0..n {
-        let t = t_refined[i].max(T_MIN);
-        for c in 0..3 {
-            let recovered = (buf[i][c] - a[c]) / t + a[c];
-            result[i][c] = recovered.clamp(0.0, 1.0);
-        }
-    }
+    result
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, px) in chunk.iter_mut().enumerate() {
+                let idx = base + i;
+                let t = t_refined[idx].max(T_MIN);
+                for c in 0..3 {
+                    let recovered = (buf[idx][c] - a[c]) / t + a[c];
+                    px[c] = recovered.clamp(0.0, 1.0);
+                }
+            }
+        });
 
     result
 }
