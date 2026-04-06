@@ -51,7 +51,7 @@ All tone functions operate on a single channel and return a clamped `f32`.
 - Perform file I/O.
 - Know about presets, the engine, or the rendering pipeline order.
 
-**Note:** Some submodules (`detail`, `dehaze`, `denoise`, `grain`) operate on full image buffers rather than individual pixel values. These are still pure math with no I/O or pipeline awareness. Buffer-level functions (`apply_per_pixel_adjustments`, `gaussian_blur`, `convolve_horizontal`, `convolve_vertical`, `apply_grain_buffer`) use rayon for data-parallel processing. Denoise additionally parallelizes across Y/Cb/Cr channels.
+**Note:** Some submodules (`detail`, `dehaze`, `denoise`, `grain`) operate on full image buffers rather than individual pixel values. These are still pure math with no I/O or pipeline awareness. Buffer-level functions (`apply_per_pixel_adjustments`, `gaussian_blur`, `convolve_horizontal`, `convolve_vertical`, `apply_grain_buffer`, `apply_dehaze`) use rayon for data-parallel processing. Denoise additionally parallelizes across Y/Cb/Cr channels.
 
 ## Key Decisions
 - **Stateless functions, not methods.** Each function takes scalar inputs and returns scalar outputs. The engine decides iteration order and pipeline sequencing.

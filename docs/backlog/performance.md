@@ -22,15 +22,16 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 - [x] **P2: Parallelize Gaussian blur** — the separable blur in `detail.rs` is shared by detail, grain, and dehaze. Horizontal pass parallelized by rows, vertical by columns. Estimated 3-5x speedup, saving 2-5s depending on active stages. Medium complexity.
 - [x] **P3: Parallelize denoise wavelet passes** — a trous wavelet decomposition processes each pixel independently per iteration. 24-32% of total when active. Medium complexity.
 - [x] **P4: Parallelize grain noise generation and application** — embarrassingly parallel. 17-33% of total. Low complexity. (Blur portion covered by P2.)
+- [x] **P5: Parallelize dehaze** — dehaze has its own `dark_channel` (separable min filter), `box_filter_2d` (separable box filter), and `guided_filter` (6x box filter + pixel loops) that are all sequential. ~4.6-4.9s at 26MP, the biggest remaining single-stage bottleneck after P1-P4. Same separable row/column pattern as P2. Medium complexity.
 
-### Advanced optimizations (consider after P1-P2)
+### Advanced optimizations (consider after P1-P4)
 
-- [ ] **P5: SIMD for per-pixel adjustments** — vectorize the inner per-pixel loop with explicit SIMD. Additional 2-4x on top of parallelization. High complexity (sRGB gamma `pow` needs fast approximation).
-- [ ] **P6: GPU acceleration (compute shaders)** — offload per-pixel and buffer ops to GPU via wgpu. 10-100x potential. Very high complexity (wgpu dependency, shader compilation, fallback path).
+- [ ] **P6: SIMD for per-pixel adjustments** — vectorize the inner per-pixel loop with explicit SIMD. Additional 2-4x on top of parallelization. High complexity (sRGB gamma `pow` needs fast approximation).
+- [ ] **P7: GPU acceleration (compute shaders)** — offload per-pixel and buffer ops to GPU via wgpu. 10-100x potential. Very high complexity (wgpu dependency, shader compilation, fallback path).
 
 ### Memory and buffer optimizations
 
-- [ ] **Batch memory pressure with stage-based pipeline** — the pluggable pipeline always materializes intermediate buffers between stages (~300MB per buffer at 26MP). For batch workflows processing many large images in parallel, peak memory could become a bottleneck. Profile memory usage under batch load and consider strategies: buffer pooling, limiting concurrent large-image renders, or lazy buffer allocation. **Note:** P3 parallel channel denoising triples peak memory during wavelet decomposition (~1.8GB vs ~600MB sequential at 26MP). **Note:** `batch-apply --jobs N` clones the decoded image per concurrent render (~300MB/clone at 26MP); `--jobs 11` peaks at ~3.6GB. See [Batch Apply design](../plans/2026-04-05-multi-apply-e2e-speed-design.md). Both should be included in batch memory profiling.
+- [ ] **Batch memory pressure with stage-based pipeline** — the pluggable pipeline always materializes intermediate buffers between stages (~300MB per buffer at 26MP). For batch workflows processing many large images in parallel, peak memory could become a bottleneck. Profile memory usage under batch load and consider strategies: buffer pooling, limiting concurrent large-image renders, or lazy buffer allocation. **Note:** P3 parallel channel denoising triples peak memory during wavelet decomposition (~1.8GB vs ~600MB sequential at 26MP). **Note:** `batch-apply --jobs N` clones the decoded image per concurrent render (~300MB/clone at 26MP); `--jobs 11` peaks at ~3.6GB. See [Batch Apply design](../plans/2026-04-05-multi-apply-e2e-speed-design.md). Both should be included in batch memory profiling. **Note:** P5 dehaze parallelization allocates a per-thread `col_buf` for vertical passes (~100KB each at 26MP, negligible) — no meaningful peak memory increase.
 - [ ] Decode buffer reduction — convert sRGB-to-linear in-place instead of allocating an intermediate buffer (~1 buffer saved)
 - [ ] Encode buffer reduction — go directly from linear f32 to u8 sRGB in a single pass (~1-2 buffers saved)
 
