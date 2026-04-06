@@ -199,24 +199,29 @@ fn box_filter_2d(data: &[f32], width: usize, height: usize, radius: usize) -> Ve
     let n = width * height;
     // Horizontal pass
     let mut h_filtered = vec![0.0_f32; n];
-    for y in 0..height {
-        let row_start = y * width;
-        let row = &data[row_start..row_start + width];
-        let filtered = box_filter_1d(row, radius);
-        h_filtered[row_start..row_start + width].copy_from_slice(&filtered);
-    }
+    h_filtered
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row_out)| {
+            let row_start = y * width;
+            let row = &data[row_start..row_start + width];
+            let filtered = box_filter_1d(row, radius);
+            row_out.copy_from_slice(&filtered);
+        });
     // Vertical pass
     let mut result = vec![0.0_f32; n];
-    let mut col = vec![0.0_f32; height];
-    for x in 0..width {
+    let result_send = UnsafeSlicePtr(result.as_mut_ptr());
+    (0..width).into_par_iter().for_each(|x| {
+        let mut col = vec![0.0_f32; height];
         for y in 0..height {
             col[y] = h_filtered[y * width + x];
         }
         let filtered = box_filter_1d(&col, radius);
+        let ptr = result_send.ptr();
         for y in 0..height {
-            result[y * width + x] = filtered[y];
+            unsafe { *ptr.add(y * width + x) = filtered[y] };
         }
-    }
+    });
     result
 }
 
