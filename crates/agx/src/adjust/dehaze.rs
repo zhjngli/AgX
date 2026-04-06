@@ -129,6 +129,8 @@ fn dark_channel(buf: &[[f32; 3]], width: usize, height: usize) -> Vec<f32> {
         let filtered = min_filter_1d(&col_buf, PATCH_SIZE);
         let ptr = result_send.ptr();
         for (y, &val) in filtered.iter().enumerate() {
+            // SAFETY: Each thread owns a unique column `x`, so `y * width + x`
+            // is disjoint across threads. `filtered.len() == height` covers all rows.
             unsafe { *ptr.add(y * width + x) = val };
         }
     });
@@ -219,6 +221,8 @@ fn box_filter_2d(data: &[f32], width: usize, height: usize, radius: usize) -> Ve
         let filtered = box_filter_1d(&col, radius);
         let ptr = result_send.ptr();
         for (y, &val) in filtered.iter().enumerate() {
+            // SAFETY: Each thread owns a unique column `x`, so `y * width + x`
+            // is disjoint across threads. `filtered.len() == height` covers all rows.
             unsafe { *ptr.add(y * width + x) = val };
         }
     });
