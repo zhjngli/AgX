@@ -130,6 +130,10 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-03-27 | [E2E Look Consolidation Design](docs/plans/2026-03-27-e2e-look-consolidation-design.md)          |
 | 2026-03-27 | [Grain Size Fix Design](docs/plans/2026-03-27-grain-size-fix-design.md)                          |
 | 2026-04-01 | [Pluggable Pipeline Design](docs/plans/2026-04-01-pluggable-pipeline-design.md)                  |
+| 2026-04-02 | [Parallel Render Design](docs/plans/2026-04-02-parallel-render-design.md)                        |
+| 2026-04-03 | [Parallel Render P3+P4 Design](docs/plans/2026-04-03-parallel-render-p3-p4-design.md)            |
+| 2026-04-05 | [Multi-Apply & E2E Speed Design](docs/plans/2026-04-05-multi-apply-e2e-speed-design.md)          |
+| 2026-04-05 | [Dehaze Parallelization Design](docs/plans/2026-04-05-dehaze-parallelization-design.md)          |
 
 ### Backlog
 

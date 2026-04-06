@@ -647,6 +647,24 @@ enum Commands {
         #[command(flatten)]
         batch: BatchOpts,
     },
+    /// Apply multiple presets to a single image (decode once, render per preset)
+    MultiApply {
+        /// Input image path
+        #[arg(short, long)]
+        input: PathBuf,
+        /// Preset TOML file(s) to apply (one output per preset)
+        #[arg(short, long, required = true, num_args = 1..)]
+        preset: Vec<PathBuf>,
+        /// Output directory (created if missing)
+        #[arg(short, long)]
+        output: PathBuf,
+        /// Also render a no-preset (identity) output
+        #[arg(long, default_value_t = false)]
+        noop: bool,
+        /// Number of preset renders to run concurrently (default: 1)
+        #[arg(short, long, default_value_t = 1)]
+        jobs: usize,
+    },
 }
 
 fn main() {
@@ -668,6 +686,13 @@ fn main() {
         } => run_edit(&input, &output, &edit, &output_opts),
         Commands::BatchApply { preset, batch } => run_batch_apply(&preset, &batch),
         Commands::BatchEdit { edit, batch } => run_batch_edit(&edit, &batch),
+        Commands::MultiApply {
+            input,
+            preset,
+            output,
+            noop,
+            jobs,
+        } => run_multi_apply(&input, &preset, &output, noop, jobs),
     };
 
     if let Err(e) = result {
@@ -903,5 +928,104 @@ fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
     if !summary.failed.is_empty() {
         process::exit(1);
     }
+    Ok(())
+}
+
+/// Render a decoded image with an optional preset and encode to PNG.
+/// Used by `run_multi_apply` for both sequential and parallel paths.
+fn render_and_encode(
+    image: image::Rgb32FImage,
+    preset: Option<&agx::Preset>,
+    output_path: &std::path::Path,
+    metadata: Option<&agx::metadata::ImageMetadata>,
+) -> agx::Result<()> {
+    let mut engine = Engine::new(image);
+    if let Some(p) = preset {
+        engine.apply_preset(p);
+    }
+    let result = engine.render();
+    let final_path = agx::encode::encode_to_file_with_options(
+        &result.image,
+        output_path,
+        &agx::encode::EncodeOptions::default(),
+        metadata,
+    )?;
+    println!("Saved to {}", final_path.display());
+    Ok(())
+}
+
+fn run_multi_apply(
+    input: &std::path::Path,
+    presets: &[PathBuf],
+    output_dir: &std::path::Path,
+    noop: bool,
+    jobs: usize,
+) -> agx::Result<()> {
+    let image_stem = input
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+
+    std::fs::create_dir_all(output_dir).map_err(agx::AgxError::Io)?;
+
+    let metadata = agx::metadata::extract_metadata(input);
+    let decoded = agx::decode::decode(input)?;
+
+    let loaded: Vec<(String, agx::Preset)> = presets
+        .iter()
+        .map(|path| {
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let preset = agx::Preset::load_from_file(path)?;
+            Ok((name, preset))
+        })
+        .collect::<agx::Result<Vec<_>>>()?;
+
+    if noop {
+        let noop_path = output_dir.join(format!("{image_stem}_noop.png"));
+        render_and_encode(decoded.clone(), None, &noop_path, metadata.as_ref())?;
+    }
+
+    if jobs <= 1 {
+        for (name, preset) in &loaded {
+            let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
+            render_and_encode(decoded.clone(), Some(preset), &out_path, metadata.as_ref())?;
+        }
+    } else {
+        // OS threads for concurrency control; each render's internal rayon
+        // parallelism uses the global pool. Chunks bound concurrent memory usage.
+        let errors: std::sync::Mutex<Vec<agx::AgxError>> = std::sync::Mutex::new(Vec::new());
+
+        for chunk in loaded.chunks(jobs) {
+            std::thread::scope(|s| {
+                for (name, preset) in chunk {
+                    let decoded = &decoded;
+                    let metadata = &metadata;
+                    let errors = &errors;
+                    s.spawn(move || {
+                        let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
+                        match render_and_encode(
+                            decoded.clone(),
+                            Some(preset),
+                            &out_path,
+                            metadata.as_ref(),
+                        ) {
+                            Ok(()) => {}
+                            Err(e) => errors.lock().unwrap().push(e),
+                        }
+                    });
+                }
+            });
+        }
+
+        let errs = errors.into_inner().unwrap();
+        if let Some(first) = errs.into_iter().next() {
+            return Err(first);
+        }
+    }
+
     Ok(())
 }

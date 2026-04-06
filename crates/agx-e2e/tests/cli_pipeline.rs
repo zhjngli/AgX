@@ -57,8 +57,8 @@ fn look_preset_path(look: &str) -> std::path::PathBuf {
     fixture_path(&format!("looks/{look}.toml"))
 }
 
-/// Run noop + specified looks for a single image. This consolidates all CLI invocations
-/// for one image into a single test function, enabling Cargo to parallelize across images.
+/// Run multi-apply for a single image with noop + specified looks, then assert goldens.
+/// This calls the CLI once per image (decode-once), not once per preset.
 fn run_image_matrix(
     image_path: &str,
     image_name: &str,
@@ -67,57 +67,43 @@ fn run_image_matrix(
     max_diff_pct: f64,
     looks: &[&str],
 ) {
-    // Noop (no adjustments)
-    {
-        let input = fixture_path(image_path);
-        let dir = TempDir::new().unwrap();
-        let output = dir.path().join("output.png");
+    let dir = TempDir::new().unwrap();
+    let input = fixture_path(image_path);
 
-        let status = cli_bin()
-            .args([
-                "edit",
-                "-i",
-                input.to_str().unwrap(),
-                "-o",
-                output.to_str().unwrap(),
-            ])
-            .status()
-            .expect("failed to run CLI");
-
-        assert!(status.success(), "CLI edit should succeed for {image_name}");
-        assert_valid_output(&output);
-        assert_golden(
-            &output,
-            &format!("{golden_dir}/{image_name}_noop.png"),
-            tolerance,
-            max_diff_pct,
-        );
+    // Build multi-apply command: decode once, render all presets + noop
+    let mut cmd = cli_bin();
+    cmd.args([
+        "multi-apply",
+        "-i",
+        input.to_str().unwrap(),
+        "-o",
+        dir.path().to_str().unwrap(),
+        "--noop",
+    ]);
+    for look in looks {
+        let preset = look_preset_path(look);
+        cmd.args(["-p", preset.to_str().unwrap()]);
     }
 
-    // Apply each look
+    let status = cmd.status().expect("failed to run multi-apply");
+    assert!(
+        status.success(),
+        "multi-apply should succeed for {image_name}"
+    );
+
+    // Assert noop golden
+    let noop_output = dir.path().join(format!("{image_name}_noop.png"));
+    assert_valid_output(&noop_output);
+    assert_golden(
+        &noop_output,
+        &format!("{golden_dir}/{image_name}_noop.png"),
+        tolerance,
+        max_diff_pct,
+    );
+
+    // Assert each look golden
     for look in looks {
-        let input = fixture_path(image_path);
-        let preset = look_preset_path(look);
-        let dir = TempDir::new().unwrap();
-        let output = dir.path().join("output.png");
-
-        let status = cli_bin()
-            .args([
-                "apply",
-                "-i",
-                input.to_str().unwrap(),
-                "-p",
-                preset.to_str().unwrap(),
-                "-o",
-                output.to_str().unwrap(),
-            ])
-            .status()
-            .expect("failed to run CLI");
-
-        assert!(
-            status.success(),
-            "CLI apply should succeed for {image_name} with {look}"
-        );
+        let output = dir.path().join(format!("{image_name}_{look}.png"));
         assert_valid_output(&output);
         assert_golden(
             &output,

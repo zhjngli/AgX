@@ -1,4 +1,5 @@
 use palette::{Hsl, IntoColor, LinSrgb, Srgb};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub mod detail;
@@ -124,7 +125,7 @@ pub struct PerPixelParams<'a> {
     pub lum_shifts: [f32; 8],
     pub color_grading_pre: Option<ColorGradingPrecomputed>,
     #[allow(clippy::type_complexity)]
-    pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + 'a)>,
+    pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + Sync + 'a)>,
 }
 
 /// Apply all per-pixel adjustments to an sRGB gamma buffer in-place.
@@ -132,59 +133,62 @@ pub struct PerPixelParams<'a> {
 /// Processes contrast, highlights, shadows, whites, blacks, tone curves,
 /// HSL, color grading, and LUT in that order. Operates in sRGB gamma space.
 pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
-    for pixel in buf.iter_mut() {
-        let [mut sr, mut sg, mut sb] = *pixel;
+    buf.par_chunks_mut(1024).for_each(|chunk| {
+        for pixel in chunk.iter_mut() {
+            let [mut sr, mut sg, mut sb] = *pixel;
 
-        if pp.contrast != 0.0 {
-            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_contrast(v, pp.contrast));
-        }
-        if pp.highlights != 0.0 {
-            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_highlights(v, pp.highlights));
-        }
-        if pp.shadows != 0.0 {
-            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_shadows(v, pp.shadows));
-        }
-        if pp.whites != 0.0 {
-            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_whites(v, pp.whites));
-        }
-        if pp.blacks != 0.0 {
-            (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_blacks(v, pp.blacks));
-        }
-        if let Some(pre) = pp.tone_curve_pre {
-            let (tr, tg, tb) = apply_tone_curves_pre(sr, sg, sb, pre);
-            sr = tr;
-            sg = tg;
-            sb = tb;
-        }
-        if pp.hsl_active {
-            let (hr, hg, hb) = apply_hsl(
-                sr,
-                sg,
-                sb,
-                &pp.hue_shifts,
-                &pp.sat_shifts,
-                &pp.lum_shifts,
-                cosine_weight,
-            );
-            sr = hr;
-            sg = hg;
-            sb = hb;
-        }
-        if let Some(ref pre) = pp.color_grading_pre {
-            let (cr, cg, cb) = apply_color_grading_pre(sr, sg, sb, pre);
-            sr = cr;
-            sg = cg;
-            sb = cb;
-        }
-        if let Some(lut_fn) = pp.lut_fn {
-            let (lr, lg, lb) = lut_fn(sr, sg, sb);
-            sr = lr;
-            sg = lg;
-            sb = lb;
-        }
+            if pp.contrast != 0.0 {
+                (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_contrast(v, pp.contrast));
+            }
+            if pp.highlights != 0.0 {
+                (sr, sg, sb) =
+                    apply_per_channel(sr, sg, sb, |v| apply_highlights(v, pp.highlights));
+            }
+            if pp.shadows != 0.0 {
+                (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_shadows(v, pp.shadows));
+            }
+            if pp.whites != 0.0 {
+                (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_whites(v, pp.whites));
+            }
+            if pp.blacks != 0.0 {
+                (sr, sg, sb) = apply_per_channel(sr, sg, sb, |v| apply_blacks(v, pp.blacks));
+            }
+            if let Some(pre) = pp.tone_curve_pre {
+                let (tr, tg, tb) = apply_tone_curves_pre(sr, sg, sb, pre);
+                sr = tr;
+                sg = tg;
+                sb = tb;
+            }
+            if pp.hsl_active {
+                let (hr, hg, hb) = apply_hsl(
+                    sr,
+                    sg,
+                    sb,
+                    &pp.hue_shifts,
+                    &pp.sat_shifts,
+                    &pp.lum_shifts,
+                    cosine_weight,
+                );
+                sr = hr;
+                sg = hg;
+                sb = hb;
+            }
+            if let Some(ref pre) = pp.color_grading_pre {
+                let (cr, cg, cb) = apply_color_grading_pre(sr, sg, sb, pre);
+                sr = cr;
+                sg = cg;
+                sb = cb;
+            }
+            if let Some(lut_fn) = pp.lut_fn {
+                let (lr, lg, lb) = lut_fn(sr, sg, sb);
+                sr = lr;
+                sg = lg;
+                sb = lb;
+            }
 
-        *pixel = [sr, sg, sb];
-    }
+            *pixel = [sr, sg, sb];
+        }
+    });
 }
 
 // --- Contrast (sRGB gamma space) ---

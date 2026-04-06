@@ -66,7 +66,7 @@ impl Stage for PerPixelAdjustmentsStage {
             color_grading_pre: self.color_grading_pre,
             lut_fn: lut_lookup
                 .as_ref()
-                .map(|f| f as &dyn Fn(f32, f32, f32) -> (f32, f32, f32)),
+                .map(|f| f as &(dyn Fn(f32, f32, f32) -> (f32, f32, f32) + Sync)),
         };
         adjust::apply_per_pixel_adjustments(&mut ctx.buf, &pp);
         Ok(())

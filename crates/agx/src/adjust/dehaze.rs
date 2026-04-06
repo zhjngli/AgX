@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Dehaze adjustment parameters. Amount range: -100 to +100. Positive removes haze,
@@ -25,6 +26,28 @@ impl DehazeParams {
 
 const PATCH_SIZE: usize = 15;
 const AIRLIGHT_PERCENTILE: f64 = 0.001;
+
+/// Wrapper to send a raw mutable pointer across threads for vertical filter passes.
+///
+/// The vertical passes parallelize over columns: each thread owns a unique column index `x`
+/// and writes to positions `[0*width+x, 1*width+x, ...]`, which are disjoint across threads.
+/// Rust's borrow checker can't prove this at compile time, so we use unsafe.
+///
+/// A safe alternative exists: collect each column's filtered result into its own `Vec<f32>`
+/// via `into_par_iter().map().collect()`, then scatter back row-by-row. This avoids unsafe
+/// but allocates ~100MB temporary storage at 26MP (one `Vec<f32>` per column). We use the
+/// unsafe approach to avoid that allocation since dehaze already peaks at ~2.2GB in the
+/// guided filter.
+#[derive(Clone, Copy)]
+struct UnsafeSlicePtr(*mut f32);
+unsafe impl Send for UnsafeSlicePtr {}
+unsafe impl Sync for UnsafeSlicePtr {}
+
+impl UnsafeSlicePtr {
+    fn ptr(self) -> *mut f32 {
+        self.0
+    }
+}
 
 /// O(n) centered sliding window minimum using a monotonic deque.
 ///
@@ -81,32 +104,45 @@ fn dark_channel(buf: &[[f32; 3]], width: usize, height: usize) -> Vec<f32> {
 
     // Step 1: Per-pixel minimum across RGB channels
     let mut pixel_min = vec![0.0_f32; n];
-    for i in 0..n {
-        let [r, g, b] = buf[i];
-        pixel_min[i] = r.min(g).min(b);
-    }
+    pixel_min
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                let [r, g, b] = buf[base + i];
+                *val = r.min(g).min(b);
+            }
+        });
 
     // Step 2: Horizontal min filter (per row)
     let mut h_filtered = vec![0.0_f32; n];
-    for y in 0..height {
-        let row_start = y * width;
-        let row = &pixel_min[row_start..row_start + width];
-        let filtered = min_filter_1d(row, PATCH_SIZE);
-        h_filtered[row_start..row_start + width].copy_from_slice(&filtered);
-    }
+    h_filtered
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row_out)| {
+            let row_start = y * width;
+            let row = &pixel_min[row_start..row_start + width];
+            let filtered = min_filter_1d(row, PATCH_SIZE);
+            row_out.copy_from_slice(&filtered);
+        });
 
     // Step 3: Vertical min filter (per column)
     let mut result = vec![0.0_f32; n];
-    let mut col_buf = vec![0.0_f32; height];
-    for x in 0..width {
+    let result_send = UnsafeSlicePtr(result.as_mut_ptr());
+    (0..width).into_par_iter().for_each(|x| {
+        let mut col_buf = vec![0.0_f32; height];
         for y in 0..height {
             col_buf[y] = h_filtered[y * width + x];
         }
         let filtered = min_filter_1d(&col_buf, PATCH_SIZE);
-        for y in 0..height {
-            result[y * width + x] = filtered[y];
+        let ptr = result_send.ptr();
+        for (y, &val) in filtered.iter().enumerate() {
+            // SAFETY: Each thread owns a unique column `x`, so `y * width + x`
+            // is disjoint across threads. `filtered.len() == height` covers all rows.
+            unsafe { *ptr.add(y * width + x) = val };
         }
-    }
+    });
 
     result
 }
@@ -174,24 +210,31 @@ fn box_filter_2d(data: &[f32], width: usize, height: usize, radius: usize) -> Ve
     let n = width * height;
     // Horizontal pass
     let mut h_filtered = vec![0.0_f32; n];
-    for y in 0..height {
-        let row_start = y * width;
-        let row = &data[row_start..row_start + width];
-        let filtered = box_filter_1d(row, radius);
-        h_filtered[row_start..row_start + width].copy_from_slice(&filtered);
-    }
+    h_filtered
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row_out)| {
+            let row_start = y * width;
+            let row = &data[row_start..row_start + width];
+            let filtered = box_filter_1d(row, radius);
+            row_out.copy_from_slice(&filtered);
+        });
     // Vertical pass
     let mut result = vec![0.0_f32; n];
-    let mut col = vec![0.0_f32; height];
-    for x in 0..width {
+    let result_send = UnsafeSlicePtr(result.as_mut_ptr());
+    (0..width).into_par_iter().for_each(|x| {
+        let mut col = vec![0.0_f32; height];
         for y in 0..height {
             col[y] = h_filtered[y * width + x];
         }
         let filtered = box_filter_1d(&col, radius);
-        for y in 0..height {
-            result[y * width + x] = filtered[y];
+        let ptr = result_send.ptr();
+        for (y, &val) in filtered.iter().enumerate() {
+            // SAFETY: Each thread owns a unique column `x`, so `y * width + x`
+            // is disjoint across threads. `filtered.len() == height` covers all rows.
+            unsafe { *ptr.add(y * width + x) = val };
         }
-    }
+    });
     result
 }
 
@@ -208,29 +251,55 @@ fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> V
     let mean_p = box_filter_2d(input, width, height, r);
 
     let mut gp = vec![0.0_f32; n];
+    gp.par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                *val = guide[base + i] * input[base + i];
+            }
+        });
     let mut gg = vec![0.0_f32; n];
-    for i in 0..n {
-        gp[i] = guide[i] * input[i];
-        gg[i] = guide[i] * guide[i];
-    }
+    gg.par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                *val = guide[base + i] * guide[base + i];
+            }
+        });
     let mean_gp = box_filter_2d(&gp, width, height, r);
     let mean_gg = box_filter_2d(&gg, width, height, r);
 
     let mut a = vec![0.0_f32; n];
     let mut b = vec![0.0_f32; n];
-    for i in 0..n {
-        let cov_gp = mean_gp[i] - mean_g[i] * mean_p[i];
-        let var_g = mean_gg[i] - mean_g[i] * mean_g[i];
-        a[i] = cov_gp / (var_g + eps);
-        b[i] = mean_p[i] - a[i] * mean_g[i];
-    }
+    a.par_chunks_mut(1024)
+        .zip(b.par_chunks_mut(1024))
+        .enumerate()
+        .for_each(|(chunk_idx, (a_chunk, b_chunk))| {
+            let base = chunk_idx * 1024;
+            for i in 0..a_chunk.len() {
+                let idx = base + i;
+                let cov_gp = mean_gp[idx] - mean_g[idx] * mean_p[idx];
+                let var_g = mean_gg[idx] - mean_g[idx] * mean_g[idx];
+                a_chunk[i] = cov_gp / (var_g + eps);
+                b_chunk[i] = mean_p[idx] - a_chunk[i] * mean_g[idx];
+            }
+        });
 
     let mean_a = box_filter_2d(&a, width, height, r);
     let mean_b = box_filter_2d(&b, width, height, r);
     let mut result = vec![0.0_f32; n];
-    for i in 0..n {
-        result[i] = mean_a[i] * guide[i] + mean_b[i];
-    }
+    result
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                let idx = base + i;
+                *val = mean_a[idx] * guide[idx] + mean_b[idx];
+            }
+        });
     result
 }
 
@@ -264,11 +333,18 @@ pub fn apply_dehaze(
         // Negative amount: add haze by blending toward airlight
         let strength = (-amount / 100.0).min(1.0);
         let mut result = vec![[0.0_f32; 3]; n];
-        for i in 0..n {
-            for c in 0..3 {
-                result[i][c] = (buf[i][c] * (1.0 - strength) + a[c] * strength).clamp(0.0, 1.0);
-            }
-        }
+        result
+            .par_chunks_mut(1024)
+            .enumerate()
+            .for_each(|(chunk_idx, chunk)| {
+                let base = chunk_idx * 1024;
+                for (i, px) in chunk.iter_mut().enumerate() {
+                    let src = buf[base + i];
+                    for c in 0..3 {
+                        px[c] = (src[c] * (1.0 - strength) + a[c] * strength).clamp(0.0, 1.0);
+                    }
+                }
+            });
         return result;
     }
 
@@ -278,38 +354,60 @@ pub fn apply_dehaze(
     // Step 3: Normalize image by airlight and compute dark channel of normalized
     let a_safe = [a[0].max(0.01), a[1].max(0.01), a[2].max(0.01)];
     let mut normalized = vec![[0.0_f32; 3]; n];
-    for i in 0..n {
-        normalized[i] = [
-            buf[i][0] / a_safe[0],
-            buf[i][1] / a_safe[1],
-            buf[i][2] / a_safe[2],
-        ];
-    }
+    normalized
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, px) in chunk.iter_mut().enumerate() {
+                let src = buf[base + i];
+                *px = [src[0] / a_safe[0], src[1] / a_safe[1], src[2] / a_safe[2]];
+            }
+        });
     let dc_norm = dark_channel(&normalized, width, height);
 
     // Raw transmission map
     let mut t_raw = vec![0.0_f32; n];
-    for i in 0..n {
-        t_raw[i] = 1.0 - omega * dc_norm[i];
-    }
+    t_raw
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                *val = 1.0 - omega * dc_norm[base + i];
+            }
+        });
 
     // Step 4: Guided filter refinement
     let mut guide = vec![0.0_f32; n];
-    for i in 0..n {
-        let [r, g, b] = buf[i];
-        guide[i] = super::LUMA_R * r + super::LUMA_G * g + super::LUMA_B * b;
-    }
+    guide
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, val) in chunk.iter_mut().enumerate() {
+                let [r, g, b] = buf[base + i];
+                *val = super::LUMA_R * r + super::LUMA_G * g + super::LUMA_B * b;
+            }
+        });
     let t_refined = guided_filter(&guide, &t_raw, width, height);
 
     // Step 5: Scene recovery
     let mut result = vec![[0.0_f32; 3]; n];
-    for i in 0..n {
-        let t = t_refined[i].max(T_MIN);
-        for c in 0..3 {
-            let recovered = (buf[i][c] - a[c]) / t + a[c];
-            result[i][c] = recovered.clamp(0.0, 1.0);
-        }
-    }
+    result
+        .par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, px) in chunk.iter_mut().enumerate() {
+                let idx = base + i;
+                let t = t_refined[idx].max(T_MIN);
+                for c in 0..3 {
+                    let recovered = (buf[idx][c] - a[c]) / t + a[c];
+                    px[c] = recovered.clamp(0.0, 1.0);
+                }
+            }
+        });
 
     result
 }

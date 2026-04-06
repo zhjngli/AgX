@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::{LUMA_B, LUMA_G, LUMA_R};
@@ -127,37 +128,34 @@ fn mirror(i: isize, max: usize) -> usize {
     }
 }
 
-/// Horizontal convolution with B3-spline kernel at given tap spacing (gap = 2^level).
-fn convolve_horizontal(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
+/// Separable B3-spline convolution along one axis at the given tap spacing (gap = 2^level).
+/// Horizontal applies the kernel offset to x; vertical applies it to y.
+fn convolve_b3(
+    input: &[f32],
+    width: usize,
+    height: usize,
+    gap: usize,
+    horizontal: bool,
+) -> Vec<f32> {
     let mut output = vec![0.0f32; width * height];
-    for y in 0..height {
-        for x in 0..width {
-            let mut sum = 0.0;
-            for (k, &w_k) in B3_KERNEL.iter().enumerate() {
-                let offset = (k as isize - 2) * gap as isize;
-                let xi = mirror(x as isize + offset, width);
-                sum += w_k * input[y * width + xi];
-            }
-            output[y * width + x] = sum;
-        }
-    }
     output
-}
-
-/// Vertical convolution with B3-spline kernel at given tap spacing (gap = 2^level).
-fn convolve_vertical(input: &[f32], width: usize, height: usize, gap: usize) -> Vec<f32> {
-    let mut output = vec![0.0f32; width * height];
-    for y in 0..height {
-        for x in 0..width {
-            let mut sum = 0.0;
-            for (k, &w_k) in B3_KERNEL.iter().enumerate() {
-                let offset = (k as isize - 2) * gap as isize;
-                let yi = mirror(y as isize + offset, height);
-                sum += w_k * input[yi * width + x];
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, out) in row.iter_mut().enumerate() {
+                let mut sum = 0.0;
+                for (k, &w_k) in B3_KERNEL.iter().enumerate() {
+                    let offset = (k as isize - 2) * gap as isize;
+                    let idx = if horizontal {
+                        y * width + mirror(x as isize + offset, width)
+                    } else {
+                        mirror(y as isize + offset, height) * width + x
+                    };
+                    sum += w_k * input[idx];
+                }
+                *out = sum;
             }
-            output[y * width + x] = sum;
-        }
-    }
+        });
     output
 }
 
@@ -173,11 +171,12 @@ fn atrous_decompose(input: &[f32], width: usize, height: usize) -> (Vec<Vec<f32>
 
     for level in 0..NUM_LEVELS {
         let gap = 1 << level; // 1, 2, 4, 8, 16
-        let smoothed = convolve_vertical(
-            &convolve_horizontal(&approximation, width, height, gap),
+        let smoothed = convolve_b3(
+            &convolve_b3(&approximation, width, height, gap, true),
             width,
             height,
             gap,
+            false,
         );
         let mut detail = vec![0.0f32; n];
         for i in 0..n {
@@ -194,13 +193,43 @@ fn atrous_decompose(input: &[f32], width: usize, height: usize) -> (Vec<Vec<f32>
 /// to avoid over-smoothing structure.
 const LEVEL_SCALE: [f32; NUM_LEVELS] = [1.0, 1.0, 1.2, 1.5, 2.0];
 
+fn denoise_channel(
+    channel: &[f32],
+    width: usize,
+    height: usize,
+    strength: f32,
+    detail_factor: f32,
+    is_luma: bool,
+) -> Vec<f32> {
+    if strength == 0.0 {
+        return channel.to_vec();
+    }
+    let (mut details, residual) = atrous_decompose(channel, width, height);
+    let sigma = estimate_sigma(&details[0]);
+
+    for (level, detail) in details.iter_mut().enumerate() {
+        let mut threshold = sigma * LEVEL_SCALE[level] * strength;
+        if level == 0 && is_luma {
+            threshold *= detail_factor;
+        }
+        soft_threshold(detail, threshold);
+    }
+
+    // Reconstruct: residual + sum(details)
+    let mut result = residual;
+    for detail in &details {
+        for (i, v) in detail.iter().enumerate() {
+            result[i] += v;
+        }
+    }
+    result
+}
+
 /// Apply noise reduction to a linear RGB buffer.
 ///
 /// Separates into YCbCr, applies à trous wavelet decomposition to each channel,
 /// estimates noise via MAD, applies soft thresholding scaled by user parameters,
-/// then reconstructs.
-///
-/// Channels are processed sequentially to limit peak memory.
+/// then reconstructs. All three channels are denoised in parallel.
 pub fn apply_noise_reduction(
     pixels: &[[f32; 3]],
     width: usize,
@@ -219,34 +248,33 @@ pub fn apply_noise_reduction(
     // Inverted: detail=100 → factor=0 (level-0 threshold zeroed, preserving fine detail)
     let detail_factor = 1.0 - params.detail / 100.0;
 
-    let denoise_channel = |channel: &[f32], strength: f32, is_luma: bool| -> Vec<f32> {
-        if strength == 0.0 {
-            return channel.to_vec();
-        }
-        let (mut details, residual) = atrous_decompose(channel, width, height);
-        let sigma = estimate_sigma(&details[0]);
-
-        for (level, detail) in details.iter_mut().enumerate() {
-            let mut threshold = sigma * LEVEL_SCALE[level] * strength;
-            if level == 0 && is_luma {
-                threshold *= detail_factor;
-            }
-            soft_threshold(detail, threshold);
-        }
-
-        // Reconstruct: residual + sum(details)
-        let mut result = residual;
-        for detail in &details {
-            for (i, v) in detail.iter().enumerate() {
-                result[i] += v;
-            }
-        }
-        result
-    };
-
-    let y_denoised = denoise_channel(&y_chan, luma_strength, true);
-    let cb_denoised = denoise_channel(&cb_chan, chroma_strength, false);
-    let cr_denoised = denoise_channel(&cr_chan, chroma_strength, false);
+    let (y_denoised, (cb_denoised, cr_denoised)) = rayon::join(
+        || denoise_channel(&y_chan, width, height, luma_strength, detail_factor, true),
+        || {
+            rayon::join(
+                || {
+                    denoise_channel(
+                        &cb_chan,
+                        width,
+                        height,
+                        chroma_strength,
+                        detail_factor,
+                        false,
+                    )
+                },
+                || {
+                    denoise_channel(
+                        &cr_chan,
+                        width,
+                        height,
+                        chroma_strength,
+                        detail_factor,
+                        false,
+                    )
+                },
+            )
+        },
+    );
 
     ycbcr_to_rgb(&y_denoised, &cb_denoised, &cr_denoised)
 }

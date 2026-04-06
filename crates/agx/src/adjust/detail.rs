@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 fn default_sharpening_radius() -> f32 {
@@ -81,9 +82,11 @@ pub(crate) fn build_gaussian_kernel(sigma: f32) -> Vec<f32> {
 pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f32) -> Vec<f32> {
     let kernel = build_gaussian_kernel(sigma);
     let half = kernel.len() / 2;
+
+    // Horizontal pass: each row reads from `input`, writes to its own row in `temp`.
     let mut temp = vec![0.0f32; width * height];
-    for y in 0..height {
-        for x in 0..width {
+    temp.par_chunks_mut(width).enumerate().for_each(|(y, row)| {
+        for (x, out) in row.iter_mut().enumerate() {
             let mut sum = 0.0f32;
             for (ki, &kw) in kernel.iter().enumerate() {
                 let sx = (x as isize + ki as isize - half as isize)
@@ -91,22 +94,28 @@ pub(crate) fn gaussian_blur(input: &[f32], width: usize, height: usize, sigma: f
                     .min(width as isize - 1) as usize;
                 sum += input[y * width + sx] * kw;
             }
-            temp[y * width + x] = sum;
+            *out = sum;
         }
-    }
+    });
+
+    // Vertical pass: each row reads from `temp` (immutable), writes to its own row in `output`.
     let mut output = vec![0.0f32; width * height];
-    for y in 0..height {
-        for x in 0..width {
-            let mut sum = 0.0f32;
-            for (ki, &kw) in kernel.iter().enumerate() {
-                let sy = (y as isize + ki as isize - half as isize)
-                    .max(0)
-                    .min(height as isize - 1) as usize;
-                sum += temp[sy * width + x] * kw;
+    output
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, out) in row.iter_mut().enumerate() {
+                let mut sum = 0.0f32;
+                for (ki, &kw) in kernel.iter().enumerate() {
+                    let sy = (y as isize + ki as isize - half as isize)
+                        .max(0)
+                        .min(height as isize - 1) as usize;
+                    sum += temp[sy * width + x] * kw;
+                }
+                *out = sum;
             }
-            output[y * width + x] = sum;
-        }
-    }
+        });
+
     output
 }
 

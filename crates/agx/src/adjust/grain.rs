@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::{smoothstep, LUMA_B, LUMA_G, LUMA_R};
@@ -254,11 +255,23 @@ pub fn apply_grain_buffer(
     let amount_factor = (params.amount / GRAIN_PARAM_MAX).powf(config.amount_curve);
     let sigma = grain_sigma(params.size, width, height);
 
-    // Generate 4 independent white noise buffers: 1 shared + 3 per-channel (R, G, B)
-    let [shared_noise, noise_r_raw, noise_g_raw, noise_b_raw] =
-        [0u64, 1, 2, 3].map(|i| generate_white_noise_buffer(width, height, seed.wrapping_add(i)));
+    // Generate 4 independent white noise buffers in parallel: 1 shared + 3 per-channel (R, G, B)
+    let ((shared_noise, noise_r_raw), (noise_g_raw, noise_b_raw)) = rayon::join(
+        || {
+            rayon::join(
+                || generate_white_noise_buffer(width, height, seed),
+                || generate_white_noise_buffer(width, height, seed.wrapping_add(1)),
+            )
+        },
+        || {
+            rayon::join(
+                || generate_white_noise_buffer(width, height, seed.wrapping_add(2)),
+                || generate_white_noise_buffer(width, height, seed.wrapping_add(3)),
+            )
+        },
+    );
 
-    // Blur all 4 buffers with the same sigma
+    // Blur all 4 buffers in parallel with the same sigma
     let blur = |noise: Vec<f32>| -> Vec<f32> {
         if sigma >= GRAIN_BLUR_SIGMA_THRESHOLD {
             super::detail::gaussian_blur(&noise, width, height, sigma)
@@ -266,10 +279,10 @@ pub fn apply_grain_buffer(
             noise
         }
     };
-    let shared = blur(shared_noise);
-    let noise_r = blur(noise_r_raw);
-    let noise_g = blur(noise_g_raw);
-    let noise_b = blur(noise_b_raw);
+    let ((shared, noise_r), (noise_g, noise_b)) = rayon::join(
+        || rayon::join(|| blur(shared_noise), || blur(noise_r_raw)),
+        || rayon::join(|| blur(noise_g_raw), || blur(noise_b_raw)),
+    );
 
     let scale = config.contrast * GRAIN_STRENGTH_MULT * amount_factor;
 
@@ -277,44 +290,43 @@ pub fn apply_grain_buffer(
     // spreads beyond shadows into midtones and highlights.
     let effective_falloff = config.luma_falloff * (1.0 - GRAIN_FALLOFF_REDUCTION * amount_factor);
 
-    for idx in 0..buf.len() {
-        let [r, g, b] = buf[idx];
-        let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+    // Chunk size balances rayon scheduling overhead against cache locality.
+    buf.par_chunks_mut(1024)
+        .enumerate()
+        .for_each(|(chunk_idx, chunk)| {
+            let base = chunk_idx * 1024;
+            for (i, pixel) in chunk.iter_mut().enumerate() {
+                let idx = base + i;
+                let [r, g, b] = *pixel;
+                let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
 
-        // Pixel saturation: how colorful vs neutral this pixel is.
-        // Neutral pixels (chroma ~0) get identical per-channel noise;
-        // saturated pixels get divergent per-channel noise.
-        let pixel_chroma = r.max(g).max(b) - r.min(g).min(b);
+                // Pixel saturation: how colorful vs neutral this pixel is.
+                let pixel_chroma = r.max(g).max(b) - r.min(g).min(b);
 
-        // Boost chromatic divergence in shadows — film grain shows as color
-        // shifts in dark areas where luminance changes are invisible.
-        // Still multiplied by pixel_chroma so BW/desaturated pixels are unaffected.
-        let shadow_chromatic_boost = 2.0 - luma; // ranges [1.0, 2.0] for luma in [0, 1]
-        let effective_chromatic = config.chromatic * pixel_chroma * shadow_chromatic_boost;
+                // Boost chromatic divergence in shadows
+                let shadow_chromatic_boost = 2.0 - luma;
+                let effective_chromatic = config.chromatic * pixel_chroma * shadow_chromatic_boost;
 
-        // Per-channel noise: correlated with shared, small independent perturbation
-        let nr = shared[idx] * (1.0 - effective_chromatic) + noise_r[idx] * effective_chromatic;
-        let ng = shared[idx] * (1.0 - effective_chromatic) + noise_g[idx] * effective_chromatic;
-        let nb = shared[idx] * (1.0 - effective_chromatic) + noise_b[idx] * effective_chromatic;
+                // Per-channel noise: blend shared (correlated) with per-channel (independent)
+                let shared_part = shared[idx] * (1.0 - effective_chromatic);
+                let nr = shared_part + noise_r[idx] * effective_chromatic;
+                let ng = shared_part + noise_g[idx] * effective_chromatic;
+                let nb = shared_part + noise_b[idx] * effective_chromatic;
 
-        let ws = luminance_weight(luma, effective_falloff) * scale;
+                let ws = luminance_weight(luma, effective_falloff) * scale;
 
-        // Blend between additive grain (shadows) and multiplicative grain
-        // (midtones/highlights). In deep shadows, multiplicative changes are
-        // imperceptible — real film shows bright specks from sparse developed
-        // crystals. In midtones/highlights, multiplicative grain gives
-        // perceptually correct proportional density modulation.
-        let blend = smoothstep(GRAIN_ADDITIVE_END, GRAIN_MULTIPLICATIVE_START, luma);
+                let blend = smoothstep(GRAIN_ADDITIVE_END, GRAIN_MULTIPLICATIVE_START, luma);
 
-        let apply = |val: f32, noise: f32| {
-            let nws = noise * ws;
-            let additive_delta = nws * GRAIN_ADDITIVE_SCALE;
-            let multiplicative_delta = val * (nws.exp() - 1.0);
-            let delta = additive_delta + (multiplicative_delta - additive_delta) * blend;
-            (val + delta).clamp(0.0, 1.0)
-        };
-        buf[idx] = [apply(r, nr), apply(g, ng), apply(b, nb)];
-    }
+                let apply = |val: f32, noise: f32| {
+                    let nws = noise * ws;
+                    let additive_delta = nws * GRAIN_ADDITIVE_SCALE;
+                    let multiplicative_delta = val * (nws.exp() - 1.0);
+                    let delta = additive_delta + (multiplicative_delta - additive_delta) * blend;
+                    (val + delta).clamp(0.0, 1.0)
+                };
+                *pixel = [apply(r, nr), apply(g, ng), apply(b, nb)];
+            }
+        });
 }
 
 /// Compute luminance-aware weight.

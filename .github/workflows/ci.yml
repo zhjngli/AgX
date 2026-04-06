@@ -20,13 +20,43 @@ jobs:
         run: ./scripts/verify.sh
 
   e2e-tests:
-    name: E2E tests
+    name: E2E (${{ matrix.suite }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - cli_temple_blossoms
+          - cli_night_city_blur
+          - cli_sunset_river
+          - cli_foggy_forest
+          - cli_dusk_cityscape
+          - cli_night_architecture
+          - misc
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install libraw
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
-      - name: E2E tests
-        run: ./scripts/e2e.sh
+      - name: Build CLI
+        run: cargo build --release -p agx-cli
+      - name: Run E2E tests
+        run: |
+          if [ "${{ matrix.suite }}" = "misc" ]; then
+            cargo test -p agx-e2e --release -- "cli_corrupt|cli_nonexistent|cli_batch|library_" --test-threads=4
+          else
+            cargo test -p agx-e2e --release -- ${{ matrix.suite }} --test-threads=1
+          fi
+
+  e2e-rollup:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    if: always()
+    needs: e2e-tests
+    steps:
+      - run: |
+          if [ "${{ needs.e2e-tests.result }}" != "success" ]; then
+            echo "E2E matrix failed: ${{ needs.e2e-tests.result }}"
+            exit 1
+          fi
