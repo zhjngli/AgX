@@ -53,10 +53,22 @@ check_md_links() {
             continue
         fi
 
+        local fence_re='^[[:space:]]*```'
         for file in "${files[@]}"; do
             local dir
             dir="$(dirname "$file")"
+            local in_code_block=0
             while IFS= read -r line; do
+                # Toggle fenced code block state and skip the fence line itself.
+                # Markdown links inside fenced code blocks are example content,
+                # not real links — don't validate them.
+                if [[ "$line" =~ $fence_re ]]; then
+                    in_code_block=$((1 - in_code_block))
+                    continue
+                fi
+                if [ "$in_code_block" -eq 1 ]; then
+                    continue
+                fi
                 local remaining="$line"
                 while [[ "$remaining" =~ $link_re ]]; do
                     local link="${BASH_REMATCH[2]}"
