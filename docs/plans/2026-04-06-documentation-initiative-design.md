@@ -211,16 +211,17 @@ Enforcement is strict on everything mechanical from day one. The one expensive c
 
 ### Day-one (sub-project #1)
 
-- `#![warn(missing_docs)]` on the `agx` library crate (visible pressure, does not break builds).
-- `#![deny(rustdoc::broken_intra_doc_links)]` on the `agx` library crate (no retrofit cost, only checks existing links).
+- `#![warn(missing_docs)]` on **both `agx` and `agx-cli`** (visible pressure, does not break builds). Excludes `agx-e2e` (test crate, no public API) and `agx-lut-gen` (dev tool, no consumers).
+- `#![deny(rustdoc::broken_intra_doc_links)]` on **both `agx` and `agx-cli`** (no retrofit cost, only checks existing links).
 - `scripts/verify.sh` runs `cargo doc --no-deps --workspace` with `RUSTDOCFLAGS="-D warnings"` so rustdoc warnings become errors in CI.
 - `mdbook-linkcheck` runs on every PR; broken site links fail CI. **Internal links only.** External link checking is deferred until external links actually exist in the book — likely first introduced by sub-project #4 (algorithm explanations referencing papers) or sub-project #5 (conceptual reference refresh). When added, external checks run on a weekly cron and on PRs that touch `docs/book/src/**`, never on every PR, to avoid CI flakiness from rate limits and link rot.
 - `agx-docgen` runs as part of the mdbook build. Generated files are either checked in with a CI diff check, OR gitignored and always regenerated. Final decision deferred to sub-project #3.
 
 ### End of sub-project #2 (API doc retrofit)
 
-- `#![warn(missing_docs)]` → `#![deny(missing_docs)]` as the final commit of the retrofit branch.
-- From that point forward, any new `pub` item without a `///` doc comment fails the build.
+- `#![warn(missing_docs)]` → `#![deny(missing_docs)]` as the final commit of the retrofit branch, on **both `agx` and `agx-cli`**.
+- From that point forward, any new `pub` item without a `///` doc comment fails the build in either crate.
+- Rationale for documenting `agx-cli`: clap struct doc comments feed both `--help` text AND `agx-docgen`'s rendered CLI reference page. Documenting them is high-value, not redundant with rustdoc.
 
 ## Sub-project decomposition
 
@@ -239,10 +240,10 @@ Sub-project #1 blocks everything. Sub-project #2 blocks sub-projects #3–#8 dir
 | # | Name | Scope | Blocking |
 |---|------|-------|----------|
 | 1 | **Docs infrastructure & scaffolding** | mdbook skeleton under `docs/book/`, `SUMMARY.md` with placeholder pages for all four quadrants, GitHub Actions workflow for building and deploying to `gh-pages`, `warn(missing_docs)` + `deny(broken_intra_doc_links)` + `cargo doc` in `verify.sh`, `mdbook-linkcheck` preprocessor, mdbook-mermaid, mdbook-katex, in-code doc conventions doc under `docs/contributing/` | Blocks all |
-| 2 | **API doc retrofit** | Walk every `pub` item in `agx` and add `///` comments. No logic changes. Final commit flips `warn(missing_docs)` → `deny(missing_docs)`. Single focused PR | Blocks #3–#8 |
+| 2 | **API doc retrofit** | Walk every `pub` item in **both `agx` and `agx-cli`** and add `///` comments. No logic changes. Final commit flips `warn(missing_docs)` → `deny(missing_docs)` on both crates. Single focused PR | Blocks #3–#8 |
 | 3 | **Auto-generated reference (`agx-docgen`)** | New `crates/agx-docgen/` crate. CLI reference via `clap-markdown`. Preset reference via `schemars` + custom renderer. Wired into mdbook build via preprocessor or `just` recipe. Drift check in CI | Independent after #2 |
 | 4 | **Algorithm explanations** | `//!` module doc blocks in each `crates/agx/src/adjust/*.rs` file (grain, dehaze, denoise, detail, color grading, tone curves, vignette, per-pixel adjustments). `{{#rustdoc_include}}` wiring in `docs/book/src/explanation/*.md`. Content can draw on existing design docs under `docs/plans/` (e.g., `2026-03-23-grain-design.md`, `2026-03-21-dehaze-design.md`) as reference material, but the canonical explanation lives in code. **If this sub-project introduces external links (paper citations, etc.), it must add the external linkcheck workflow per the Enforcement and CI section** | Independent after #2 |
-| 5 | **Conceptual reference refresh** | Move `docs/reference/{color-spaces,grain-algorithm,lut-format}.md` into `docs/book/src/reference/concepts/`. The "oxiraw" → "AgX" rename happens in sub-project #1 as the first commit of its branch. Expand with new topics: photographic terminology, preset compositional model, render pipeline conceptual overview, image processing basics. **If this sub-project introduces external links, it must add the external linkcheck workflow per the Enforcement and CI section** | Independent after #2 |
+| 5 | **Conceptual reference refresh** | Move `docs/reference/{color-spaces,grain-algorithm,lut-format}.md` into `docs/book/src/reference/concepts/`. The "oxiraw" → "AgX" rename happens in sub-project #1 as the first commit of its branch. Expand with new topics: photographic terminology, preset compositional model, render pipeline conceptual overview, image processing basics. Consider including a "how AgX generates its bundled LUTs" explainer that draws on the `agx-lut-gen` crate's logic — fits the curious-photo-nerd audience. **If this sub-project introduces external links, it must add the external linkcheck workflow per the Enforcement and CI section** | Independent after #2 |
 | 6 | **Tutorials** | Install guide. "Edit your first photo with the CLI." "Apply a look to a whole directory with `batch-apply`." "Compare multiple looks on one image with `multi-apply`." Tutorials reference existing sample images in `example/images/` and existing presets in the e2e test suite | Independent after #2 |
 | 7 | **How-to guides** | "Create your own preset from scratch." "Extend an existing preset using the `extends` mechanism." "Write and load a custom `.cube` LUT." "Compose layered looks." "Match the output of another preset." Each guide is task-focused and assumes the reader knows why they're there | Independent after #2 |
 | 8 | **Prose explanations** | Architecture overview (pulled and expanded from `ARCHITECTURE.md`). Preset-first philosophy (pulled and expanded from `README.md` Philosophy section). Render pipeline conceptual overview (pulled from the stage-based pipeline design doc). Design decisions and trade-offs. `README.md` and `ARCHITECTURE.md` retain short summary content plus clear pointers into `docs/book/src/`, per the repo discoverability constraint — they do not become empty stubs | Independent after #2 |
