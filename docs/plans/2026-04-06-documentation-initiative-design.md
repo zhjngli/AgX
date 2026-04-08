@@ -44,7 +44,7 @@ Primary audiences drive the center of gravity of the site:
 | Priority | Audience | What they need | Served by |
 |----------|----------|----------------|-----------|
 | 1 | **CLI users & preset authors** | Install guide, CLI reference, preset reference, tutorials, how-tos | mdbook site |
-| 1 | **Curious photo nerds** | Algorithm explanations, photography and color reference | mdbook site (algorithm content shared with rustdoc via `{{#rustdoc_include}}`) |
+| 1 | **Curious photo nerds** | Algorithm explanations, photography and color reference | mdbook site (algorithm content shared with rustdoc via sibling `.md` files included from both surfaces) |
 | 2 | **Contributors** | Architecture, design decisions, module contracts, in-code `//!` explanations | mdbook site + rustdoc |
 | 3 | **Library consumers (other Rust projects)** | Comprehensive API reference | rustdoc |
 
@@ -62,7 +62,7 @@ The Diataxis framework organizes documentation by reader intent. Quadrants are a
 | **Reference** (CLI) | Information-oriented, exhaustive | Every command, every flag, usage examples | mdbook (generated at build time from `clap::Command` via `agx-docgen`) |
 | **Reference** (preset schema) | Information-oriented, exhaustive | Every preset field, type, valid range, default, description | mdbook (generated at build time from serde types via `agx-docgen`) |
 | **Reference** (conceptual) | Information-oriented, exhaustive | Color spaces, LUT format, photographic terminology, preset model | mdbook only (prose, doesn't exist in code) |
-| **Explanation** (algorithms) | Understanding-oriented | How grain / dehaze / denoise / detail / color grading / tone curves / vignette work, and why | `//!` module doc comments in `crates/agx/src/adjust/*.rs` — canonical source. Rendered in rustdoc natively; included into mdbook via `{{#rustdoc_include}}` |
+| **Explanation** (algorithms) | Understanding-oriented | How grain / dehaze / denoise / detail / color grading / tone curves / vignette work, and why | Sibling `.md` files next to each `crates/agx/src/adjust/*.rs` — canonical source. Pulled into rustdoc via `#![doc = include_str!("module.md")]`; included into mdbook via `{{#include ...}}` |
 | **Explanation** (architectural) | Understanding-oriented | Preset-first philosophy, render pipeline overview, module dependency model, design decisions | mdbook only (cross-cutting prose) |
 
 ### Physical surfaces
@@ -82,27 +82,34 @@ The Diataxis framework organizes documentation by reader intent. Quadrants are a
                     │  │ (md)     │    │          │  │
                     │  └──────────┘    │ Algo     │  │
                     │                  │ explain  │  │
-                    │                  │ (code ←) │  │
+                    │                  │ (incl ←) │  │
                     │                  └──────────┘  │
                     └────────────────────────────────┘
-                                                 ▲
-                                                 │
-                                                 │ {{#rustdoc_include}}
-                                                 │
-                    ┌────────────────────────────┼───┐
-                    │          RUSTDOC           │   │
-                    │                            │   │
+                                              ▲
+                                              │
+                          ┌───────────────────┴──────┐
+                          │  shared .md file beside  │
+                          │  the Rust source file    │
+                          │  (canonical prose)       │
+                          └───────────────────┬──────┘
+                                              │
+                                              ▼
+                    ┌────────────────────────────────┐
+                    │          RUSTDOC               │
+                    │                                │
         rustdoc →   │  Reference       Explanation   │
                     │  ┌──────────┐    ┌──────────┐  │
-                    │  │ API ref  │    │ //!      │  │
-                    │  │ (auto    │    │ module   │  │
-                    │  │ from     │    │ docs     │  │
-                    │  │ ///)     │    │ (canon.) │  │
+                    │  │ API ref  │    │ module   │  │
+                    │  │ (auto    │    │ docs     │  │
+                    │  │ from     │    │ (incl ←) │  │
+                    │  │ ///)     │    │          │  │
                     │  └──────────┘    └──────────┘  │
                     │                                │
                     │  (no tutorials or how-tos)     │
                     └────────────────────────────────┘
 ```
+
+Both the mdbook explanation page and the rustdoc module page pull from the same shared `.md` file that lives next to the Rust source. Neither surface is the canonical source — the shared file is.
 
 ## Content-split strategy
 
@@ -113,34 +120,40 @@ Content lives in the location that minimizes drift and best matches the source o
 | Public library API | `///` and `//!` doc comments in `crates/agx/src/**/*.rs` | rustdoc renders natively |
 | CLI reference | `clap::Command` definitions in `crates/agx-cli/src/*.rs` | `agx-docgen` generates markdown at build time |
 | Preset reference | Serde struct definitions in `crates/agx/src/preset/` and `crates/agx/src/engine/` | `agx-docgen` derives a JSON Schema via `schemars`, renders as markdown |
-| Algorithm explanations | `//!` module doc comments in `crates/agx/src/adjust/*.rs` | rustdoc renders natively; mdbook includes via `{{#rustdoc_include}}` |
+| Algorithm explanations | Sibling `.md` files next to each `crates/agx/src/adjust/*.rs` | rustdoc pulls via `#![doc = include_str!("module.md")]`; mdbook includes via `{{#include ...}}` |
 | Tutorials | Markdown files in `docs/book/src/tutorials/` | mdbook renders |
 | How-to guides | Markdown files in `docs/book/src/how-to/` | mdbook renders |
 | Conceptual reference | Markdown files in `docs/book/src/reference/concepts/` | mdbook renders |
 | Architectural explanations | Markdown files in `docs/book/src/explanation/` | mdbook renders |
 
-### The `{{#rustdoc_include}}` convention
+### The shared-`.md`-file convention
 
-Algorithm explanations live as module-level `//!` doc comments in the corresponding `.rs` file, using mdbook anchor comments to delimit sections:
+Algorithm explanations live as a sibling markdown file next to the corresponding Rust source. For example, `crates/agx/src/adjust/grain.rs` is paired with `crates/agx/src/adjust/grain.md`. The markdown file contains pure prose with no headers (each surface adds its own outer heading):
+
+```markdown
+AgX's grain simulation models film grain by convolving white noise
+with a Gaussian kernel whose sigma is proportional to the configured
+grain size, then modulating the result by per-pixel luminance ...
+```
+
+The Rust file pulls the prose into rustdoc as the module-level doc via `include_str!`:
 
 ```rust
-//! # Grain
+#![doc = include_str!("grain.md")]
 //!
-//! <!-- ANCHOR: explanation -->
-//! AgX's grain simulation models film grain by convolving white noise
-//! with a Gaussian kernel whose sigma is proportional to the configured
-//! grain size, then modulating the result by per-pixel luminance ...
-//! <!-- ANCHOR_END: explanation -->
+//! See [`super::dehaze`] for the related haze removal pass.
 
 pub struct GrainParams { /* ... */ }
 ```
 
-The corresponding mdbook page `docs/book/src/explanation/grain.md` contains:
+Inline `//!` lines following the `include_str!` attribute are still concatenated into the module doc by rustdoc, so cross-references that need rustdoc-native intra-doc validation (like `[`super::dehaze`]`) live there rather than in the shared `.md` file.
+
+The corresponding mdbook page `docs/book/src/explanation/grain.md` includes the same shared file and adds its own cross-reference block:
 
 ```markdown
 # Grain
 
-{{#rustdoc_include ../../../../crates/agx/src/adjust/grain.rs:explanation}}
+{{#include ../../../../crates/agx/src/adjust/grain.md}}
 
 ## Related
 
@@ -148,13 +161,19 @@ The corresponding mdbook page `docs/book/src/explanation/grain.md` contains:
 - [Grain API reference](../api/agx/adjust/grain/index.html)
 ```
 
-Editing the `//!` block in `grain.rs` updates both rustdoc and the mdbook page on the next build. There is no duplication and no mechanism by which the two surfaces can drift apart.
+Editing `crates/agx/src/adjust/grain.md` updates both rustdoc and the mdbook page on the next build. There is no duplication and no mechanism by which the two surfaces can drift apart.
+
+Cross-surface link rules:
+
+- The shared `.md` file contains no cross-references at all. It is pure prose. This avoids the cross-surface link problem (rustdoc intra-doc syntax does not resolve in mdbook, and mdbook relative links do not always resolve correctly when included in rustdoc output).
+- Rustdoc-only cross-references (intra-doc syntax, validated by `broken_intra_doc_links`) live in `//!` lines or `#![doc = "..."]` attributes on the Rust side, outside the include.
+- Mdbook-only cross-references live in the wrapping mdbook page, outside the include.
 
 ## Tooling architecture
 
 ### Components
 
-- **mdbook** (content site) — reads `docs/book/src/**/*.md` and `docs/book/src/SUMMARY.md`, emits static HTML to `docs/book/book/`. Supports `{{#rustdoc_include}}` natively for pulling content from Rust source.
+- **mdbook** (content site) — reads `docs/book/src/**/*.md` and `docs/book/src/SUMMARY.md`, emits static HTML to `docs/book/book/`. Supports `{{#include ...}}` natively for pulling shared `.md` files from anywhere in the repo.
 - **rustdoc** (API reference) — `cargo doc --workspace --no-deps`, emits HTML to `target/doc/`.
 - **agx-docgen** (new crate, `crates/agx-docgen/`) — a small dev-only Rust binary that:
   - Instantiates the CLI's `clap::Command` and emits `docs/book/src/reference/cli.md` using the `clap-markdown` crate.
@@ -242,7 +261,7 @@ Sub-project #1 blocks everything. Sub-project #2 blocks sub-projects #3–#8 dir
 | 1 | **Docs infrastructure & scaffolding** | mdbook skeleton under `docs/book/`, `SUMMARY.md` with placeholder pages for all four quadrants, GitHub Actions workflow for building and deploying to `gh-pages`, `warn(missing_docs)` + `deny(broken_intra_doc_links)` + `cargo doc` in `verify.sh`, `mdbook-linkcheck` preprocessor, mdbook-mermaid, mdbook-katex, in-code doc conventions doc under `docs/contributing/` | Blocks all |
 | 2 | **API doc retrofit** | Walk every `pub` item in **both `agx` and `agx-cli`** and add `///` comments. No logic changes. Final commit flips `warn(missing_docs)` → `deny(missing_docs)` on both crates. Single focused PR | Blocks #3–#8 |
 | 3 | **Auto-generated reference (`agx-docgen`)** | New `crates/agx-docgen/` crate. CLI reference via `clap-markdown`. Preset reference via `schemars` + custom renderer. Wired into mdbook build via preprocessor or `just` recipe. Drift check in CI | Independent after #2 |
-| 4 | **Algorithm explanations** | `//!` module doc blocks in each `crates/agx/src/adjust/*.rs` file (grain, dehaze, denoise, detail, color grading, tone curves, vignette, per-pixel adjustments). `{{#rustdoc_include}}` wiring in `docs/book/src/explanation/*.md`. Content can draw on existing design docs under `docs/plans/` (e.g., `2026-03-23-grain-design.md`, `2026-03-21-dehaze-design.md`) as reference material, but the canonical explanation lives in code. **If this sub-project introduces external links (paper citations, etc.), it must add the external linkcheck workflow per the Enforcement and CI section** | Independent after #2 |
+| 4 | **Algorithm explanations** | Sibling `.md` file next to each `crates/agx/src/adjust/*.rs` (grain, dehaze, denoise, detail, color grading, tone curves, vignette, per-pixel adjustments) containing the canonical prose. `#![doc = include_str!("module.md")]` wiring on the Rust side and `{{#include ...}}` wiring in `docs/book/src/explanation/*.md`. Content can draw on existing design docs under `docs/plans/` (e.g., `2026-03-23-grain-design.md`, `2026-03-21-dehaze-design.md`) as reference material, but the canonical explanation lives in the sibling `.md` file. **If this sub-project introduces external links (paper citations, etc.), it must add the external linkcheck workflow per the Enforcement and CI section** | Independent after #2 |
 | 5 | **Conceptual reference refresh** | Move `docs/reference/{color-spaces,grain-algorithm,lut-format}.md` into `docs/book/src/reference/concepts/`. The "oxiraw" → "AgX" rename happens in sub-project #1 as the first commit of its branch. Expand with new topics: photographic terminology, preset compositional model, render pipeline conceptual overview, image processing basics. Consider including a "how AgX generates its bundled LUTs" explainer that draws on the `agx-lut-gen` crate's logic — fits the curious-photo-nerd audience. **If this sub-project introduces external links, it must add the external linkcheck workflow per the Enforcement and CI section** | Independent after #2 |
 | 6 | **Tutorials** | Install guide. "Edit your first photo with the CLI." "Apply a look to a whole directory with `batch-apply`." "Compare multiple looks on one image with `multi-apply`." Tutorials reference existing sample images in `example/images/` and existing presets in the e2e test suite | Independent after #2 |
 | 7 | **How-to guides** | "Create your own preset from scratch." "Extend an existing preset using the `extends` mechanism." "Write and load a custom `.cube` LUT." "Compose layered looks." "Match the output of another preset." Each guide is task-focused and assumes the reader knows why they're there | Independent after #2 |
