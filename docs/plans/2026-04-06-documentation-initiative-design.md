@@ -246,7 +246,7 @@ Sub-project #1 blocks everything. Sub-project #2 blocks sub-projects #3–#8 dir
 | 6 | **Tutorials** | Install guide. "Edit your first photo with the CLI." "Apply a look to a whole directory with `batch-apply`." "Compare multiple looks on one image with `multi-apply`." Tutorials reference existing sample images in `example/images/` and existing presets in the e2e test suite | Independent after #2 |
 | 7 | **How-to guides** | "Create your own preset from scratch." "Extend an existing preset using the `extends` mechanism." "Write and load a custom `.cube` LUT." "Compose layered looks." "Match the output of another preset." Each guide is task-focused and assumes the reader knows why they're there | Independent after #2 |
 | 8 | **Prose explanations** | Architecture overview (pulled and expanded from `ARCHITECTURE.md`). Preset-first philosophy (pulled and expanded from `README.md` Philosophy section). Render pipeline conceptual overview (pulled from the stage-based pipeline design doc). Design decisions and trade-offs. `README.md` and `ARCHITECTURE.md` retain short summary content plus clear pointers into `docs/book/src/`, per the repo discoverability constraint — they do not become empty stubs | Independent after #2 |
-| 9 | **Polish / theme** *(optional)* | Custom mdbook theme, logo, landing page styling, OG image. Only tackled if default theme feels inadequate | Optional, deferrable |
+| 9 | **Polish / theme** *(optional)* | Custom mdbook theme, logo, landing page styling, OG image. Could also evaluate GitHub's pre-baked Pages starter workflows for a more customized deploy pipeline. Only tackled if default theme/deploy feels inadequate | Optional, deferrable |
 
 ## Backlog integration
 
