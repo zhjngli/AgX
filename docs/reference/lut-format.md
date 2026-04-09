@@ -1,6 +1,6 @@
 # LUT Format Reference
 
-This document describes 3D LUTs, the `.cube` file format, and how oxiraw handles them.
+This document describes 3D LUTs, the `.cube` file format, and how AgX handles them.
 
 ## What Is a LUT?
 
@@ -16,7 +16,7 @@ LUTs are widely used for:
 
 **1D LUT**: Three separate curves, one per channel (R, G, B). Each channel is transformed independently. Fast but limited: cannot do cross-channel effects (e.g., "when red is high, boost blue"). Essentially the same as three tone curves.
 
-**3D LUT**: A three-dimensional grid indexed by input R, G, B. Each grid point stores an output RGB value. Because the grid is indexed by all three channels simultaneously, 3D LUTs can represent any color transformation, including cross-channel effects. This is what oxiraw supports.
+**3D LUT**: A three-dimensional grid indexed by input R, G, B. Each grid point stores an output RGB value. Because the grid is indexed by all three channels simultaneously, 3D LUTs can represent any color transformation, including cross-channel effects. This is what AgX supports.
 
 ## The `.cube` Format
 
@@ -92,7 +92,7 @@ The result smoothly blends between grid points, producing continuous color trans
 
 Most creative LUTs use size 33, which provides excellent quality with reasonable file size. Larger sizes offer diminishing returns for most color grades.
 
-## What oxiraw Supports
+## What AgX Supports
 
 **Supported:**
 - 3D LUTs in `.cube` format
@@ -117,4 +117,4 @@ Many free LUTs are available online:
 - Black and white conversions
 - Technical conversion LUTs
 
-When using third-party LUTs, verify they expect sRGB gamma input (most creative LUTs do). LUTs designed for video log input (S-Log3, LogC) will produce incorrect results in oxiraw.
+When using third-party LUTs, verify they expect sRGB gamma input (most creative LUTs do). LUTs designed for video log input (S-Log3, LogC) will produce incorrect results in AgX.
