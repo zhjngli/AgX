@@ -1,3 +1,7 @@
+#![doc = include_str!("grain.md")]
+//!
+//! See [`super::dehaze`] and [`super::denoise`] for related passes.
+
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
