@@ -265,10 +265,9 @@ Add at the top of the file, before the existing `pub mod` declarations:
 ```rust
 //! AgX — open-source preset-first photo editing library.
 //!
-//! See the [project site](https://OWNER.github.io/AgX/) for tutorials,
+//! See the [project site](https://zhjngli.github.io/AgX/) for tutorials,
 //! how-to guides, the CLI reference, and the preset format reference.
 
-#![warn(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod adjust;
@@ -285,17 +284,22 @@ Add at the very top of the file:
 ```rust
 //! AgX command-line interface.
 //!
-//! See the [project site](https://OWNER.github.io/AgX/reference/cli.html)
+//! See the [project site](https://zhjngli.github.io/AgX/reference/cli.html)
 //! for the full CLI reference.
 
-#![warn(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
 use std::path::PathBuf;
 // ...
 ```
 
-`agx-cli` is a binary crate, so `missing_docs` only applies to the few `pub` items it does expose (currently the clap structs, several `pub` helpers in `batch.rs`, etc.). Most items in a binary crate are private; the warning surface is small. Sub-project #2 is responsible for actually populating the comments and flipping `warn` → `deny`.
+`agx-cli` is a binary crate, so its `pub` surface is small (a few clap structs and `pub` helpers in `batch.rs`).
+
+### Deferral: `#![warn(missing_docs)]`
+
+The original design called for both crates to also carry `#![warn(missing_docs)]`. This attribute was **dropped from sub-project #1** during implementation because of an unresolvable interaction with `cargo clippy -- -D warnings` (run by `scripts/verify.sh`): the clippy invocation unconditionally promotes the 191 latent missing-docs warnings to hard errors, with no flag combination (`-A missing-docs`, `RUSTFLAGS`, `--cap-lints`) cleanly suppressing it. The result was that `verify.sh` would fail on every commit until every public item across the library got a `///` comment, which is exactly the work scoped to sub-project #2 (API doc retrofit).
+
+The retrofit sub-project will track and retire the missing-docs warning footprint crate-by-crate, and will introduce missing-docs enforcement at the end of that work — either as a source-level `#![warn(missing_docs)]` (once the warning footprint is zero, so the clippy interaction is harmless) or via `RUSTDOCFLAGS="-W missing-docs -D warnings"` in `scripts/verify.sh`. Until then, `#![deny(rustdoc::broken_intra_doc_links)]` is the only crate-level rustdoc lint active in source.
 
 ### Why `agx-e2e` and `agx-lut-gen` are excluded
 
@@ -381,7 +385,7 @@ If either side is missing or differs, the shared-source-file plumbing is broken 
 3. **`//!` module docs.** When to write one (every `crates/agx/src/adjust/*.rs` file at minimum). For modules whose explanation is cross-surface (rustdoc + mdbook), the prose lives in a sibling `.md` file pulled in via `#![doc = include_str!("module.md")]` instead of inline `//!` lines. Inline `//!` lines remain the right tool for short module summaries that do not need to be reused on the site.
 4. **The shared-`.md`-file convention.** How to add a sibling `.md` file next to a Rust module file, how to wire it into rustdoc via `#![doc = include_str!(...)]`, and how to wire it into an mdbook page via `{{#include ...}}`. How to keep cross-references out of the shared file (rustdoc-only links go in `#![doc = "..."]` attributes on the Rust side; mdbook-only links go in the wrapping mdbook page). The grain example is the canonical reference.
 5. **Linking between rustdoc and mdbook.** Rustdoc → mdbook uses raw URLs (no intra-doc syntax exists for cross-surface links). Mdbook → rustdoc uses relative links into `../api/`. Mdbook → mdbook uses `mdbook`'s native relative-link resolution.
-6. **Lints.** Document which lints are active (`warn(missing_docs)` and `deny(rustdoc::broken_intra_doc_links)`) and explain the staging plan: `warn` becomes `deny` at the end of sub-project #2.
+6. **Lints.** Document which lints are active (`deny(rustdoc::broken_intra_doc_links)` in source today; `warn(missing_docs)` deferred to sub-project #2 — see the "Deferral" note in Lint attributes above) and explain the staging plan.
 7. **Local preview commands.** `cargo doc --open` for rustdoc; `cd docs/book && mdbook serve --open` for mdbook (after `cargo install mdbook mdbook-linkcheck mdbook-mermaid mdbook-katex`).
 
 The doc is reference material for future contributors and for the agents working in this repo. It is written in normal prose, not bullet-only, and it crosslinks back to the umbrella design doc.
@@ -393,7 +397,7 @@ The sub-project is "done" when all of these hold:
 1. `mdbook build docs/book` succeeds locally and in CI, with `mdbook-linkcheck`, `mdbook-mermaid`, and `mdbook-katex` all active.
 2. `cargo doc --no-deps --workspace` succeeds with `RUSTDOCFLAGS="-D warnings"`, both locally via `verify.sh` and in `docs.yml`.
 3. `./scripts/verify.sh` runs the new `cargo doc` check as part of its existing sequence and the script as a whole still passes.
-4. `crates/agx/src/lib.rs` and `crates/agx-cli/src/main.rs` both carry `#![warn(missing_docs)]` and `#![deny(rustdoc::broken_intra_doc_links)]`.
+4. `crates/agx/src/lib.rs` and `crates/agx-cli/src/main.rs` both carry `#![deny(rustdoc::broken_intra_doc_links)]`. `#![warn(missing_docs)]` is deferred to sub-project #2 — see the "Deferral" note in Lint attributes above.
 5. `crates/agx/src/adjust/grain.md` exists as the canonical source of the grain explanation. `crates/agx/src/adjust/grain.rs` pulls it in via `#![doc = include_str!("grain.md")]` and the rustdoc page for the grain module renders the prose. `docs/book/src/explanation/grain.md` includes the same `grain.md` file via `{{#include ...}}` and renders identical content.
 6. `docs/book/src/SUMMARY.md` references one placeholder page per Diataxis quadrant plus the grain explanation.
 7. A landing page at `docs/book/src/introduction.md` exists with a one-paragraph summary, at least one image from the small `docs/book/src/images/` subset, and links into each Diataxis quadrant.
