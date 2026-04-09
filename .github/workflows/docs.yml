@@ -1,0 +1,58 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install libraw
+        run: sudo apt-get update && sudo apt-get install -y libraw-dev
+      - name: Install mdbook and preprocessors
+        run: |
+          cargo install --locked mdbook --version 0.4.40
+          cargo install --locked mdbook-linkcheck --version 0.7.7
+          cargo install --locked mdbook-mermaid --version 0.14.0
+          cargo install --locked mdbook-katex --version 0.9.0
+      - name: Build rustdoc
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --workspace
+      - name: Build mdbook
+        run: mdbook build docs/book
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r docs/book/book/html/* _site/
+          mkdir -p _site/api
+          cp -r target/doc/* _site/api/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
