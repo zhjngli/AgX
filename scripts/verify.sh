@@ -54,7 +54,7 @@ check_md_links() {
         fi
 
         local fence_re='^[[:space:]]*```'
-        for file in "${files[@]}"; do
+        for file in "${files[@]+"${files[@]}"}"; do
             local dir
             dir="$(dirname "$file")"
             local in_code_block=0
