@@ -120,6 +120,8 @@ Update documentation alongside code. The rule: if someone reads the docs after y
 | Wrote a design doc | ARCHITECTURE.md: Design Docs table |
 | Changed how to extend a module | Module README: Extension Guide section |
 
+For style guidance on `///` comments, `//!` comments, the shared `.md` file convention for cross-surface explanations, and the active rustdoc lints, see [documentation-conventions.md](documentation-conventions.md).
+
 ## 5. Self-Review
 
 Before declaring done, re-read your diff and ask:
