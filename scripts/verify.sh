@@ -105,7 +105,11 @@ run_check "Library tests (cargo test -p agx)" cargo test -p agx
 # 4. CLI tests
 run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
-# 5. Documentation link validation
+# 5. Rustdoc build (treats warnings as errors)
+run_check "Rustdoc (cargo doc)" \
+    env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
+
+# 6. Documentation link validation
 check_all_doc_links() {
     # Check all committed markdown: root files, docs/ subdirs (excluding gitignored
     # docs/plans/impl/), and per-crate READMEs.
