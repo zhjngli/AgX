@@ -653,7 +653,7 @@ impl ToneCurve {
     }
 
     /// Validate control points: at least 2, endpoints at x=0 and x=1,
-    /// all values in [0,1], strictly increasing x.
+    /// all values in \[0,1\], strictly increasing x.
     pub fn validate(&self) -> std::result::Result<(), String> {
         let points = &self.points;
         if points.len() < 2 {

@@ -1,3 +1,10 @@
+//! AgX — open-source preset-first photo editing library.
+//!
+//! See the [project site](https://zhjngli.github.io/AgX/) for tutorials,
+//! how-to guides, the CLI reference, and the preset format reference.
+
+#![deny(rustdoc::broken_intra_doc_links)]
+
 pub mod adjust;
 pub mod decode;
 pub mod encode;
