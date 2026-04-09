@@ -53,10 +53,22 @@ check_md_links() {
             continue
         fi
 
-        for file in "${files[@]}"; do
+        local fence_re='^[[:space:]]*```'
+        for file in "${files[@]+"${files[@]}"}"; do
             local dir
             dir="$(dirname "$file")"
+            local in_code_block=0
             while IFS= read -r line; do
+                # Toggle fenced code block state and skip the fence line itself.
+                # Markdown links inside fenced code blocks are example content,
+                # not real links — don't validate them.
+                if [[ "$line" =~ $fence_re ]]; then
+                    in_code_block=$((1 - in_code_block))
+                    continue
+                fi
+                if [ "$in_code_block" -eq 1 ]; then
+                    continue
+                fi
                 local remaining="$line"
                 while [[ "$remaining" =~ $link_re ]]; do
                     local link="${BASH_REMATCH[2]}"
@@ -93,7 +105,11 @@ run_check "Library tests (cargo test -p agx)" cargo test -p agx
 # 4. CLI tests
 run_check "CLI tests (cargo test -p agx-cli)" cargo test -p agx-cli
 
-# 5. Documentation link validation
+# 5. Rustdoc build (treats warnings as errors)
+run_check "Rustdoc (cargo doc)" \
+    env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace
+
+# 6. Documentation link validation
 check_all_doc_links() {
     # Check all committed markdown: root files, docs/ subdirs (excluding gitignored
     # docs/plans/impl/), and per-crate READMEs.

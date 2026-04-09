@@ -1,6 +1,6 @@
-# Color Spaces in oxiraw
+# Color Spaces in AgX
 
-This document explains how oxiraw handles color spaces in its rendering pipeline, and why different operations happen in different color spaces.
+This document explains how AgX handles color spaces in its rendering pipeline, and why different operations happen in different color spaces.
 
 ## Linear vs sRGB Gamma
 
@@ -17,7 +17,7 @@ The approximate relationship is a power curve:
 - **Linear to sRGB gamma**: `srgb = linear ^ (1/2.2)`
 - **sRGB gamma to linear**: `linear = srgb ^ 2.2`
 
-The exact sRGB specification uses a piecewise function with a linear segment near zero, but the power approximation captures the essential idea. oxiraw uses the [palette](https://crates.io/crates/palette) crate for precise conversions.
+The exact sRGB specification uses a piecewise function with a linear segment near zero, but the power approximation captures the essential idea. AgX uses the [palette](https://crates.io/crates/palette) crate for precise conversions.
 
 ### Why it matters
 
@@ -28,7 +28,7 @@ A value of 0.5 means different things in each space:
 
 If you do math in the wrong space, you get wrong results. Multiplying linear values by 2 doubles the light (correct exposure adjustment). Multiplying sRGB values by 2 produces a non-physical result that doesn't look right.
 
-## The oxiraw Pipeline
+## The AgX Pipeline
 
 Each operation in the rendering pipeline runs in the color space where it's mathematically correct:
 
@@ -73,11 +73,11 @@ If you applied contrast in linear space, the result would look wrong: the midpoi
 
 LUTs are created by colorists while looking at a screen displaying sRGB. When a colorist tweaks a film emulation LUT, they're working with pixel values as they appear on screen (sRGB gamma). The input-output mapping in the LUT corresponds to sRGB values, not linear light values.
 
-Applying a LUT designed for sRGB input to linear values would produce incorrect colors. oxiraw applies LUTs in sRGB gamma space, which is correct for the vast majority of creative `.cube` LUTs.
+Applying a LUT designed for sRGB input to linear values would produce incorrect colors. AgX applies LUTs in sRGB gamma space, which is correct for the vast majority of creative `.cube` LUTs.
 
 ## Current Limitations
 
-oxiraw currently works exclusively in **sRGB** color space. This is the standard color space for displays, web, and consumer photography. JPEG and PNG files are sRGB by default.
+AgX currently works exclusively in **sRGB** color space. This is the standard color space for displays, web, and consumer photography. JPEG and PNG files are sRGB by default.
 
 For the current scope, this means:
 - Decoded images (JPEG, PNG, TIFF) are assumed to be sRGB

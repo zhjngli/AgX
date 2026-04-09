@@ -1,3 +1,10 @@
+//! AgX command-line interface.
+//!
+//! See the [project site](https://zhjngli.github.io/AgX/reference/cli.html)
+//! for the full CLI reference.
+
+#![deny(rustdoc::broken_intra_doc_links)]
+
 use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
