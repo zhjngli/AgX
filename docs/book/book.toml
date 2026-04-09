@@ -10,8 +10,20 @@ default-theme = "light"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/zhjngli/AgX"
 edit-url-template = "https://github.com/zhjngli/AgX/edit/main/docs/book/{path}"
+additional-css = ["theme/extra.css"]
 mathjax-support = false
 
 [output.html.fold]
 enable = true
 level = 1
+
+[output.linkcheck]
+follow-web-links = false
+warning-policy = "error"
+exclude = ['^api/']
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[preprocessor.katex]
+after = ["links"]
