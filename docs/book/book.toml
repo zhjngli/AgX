@@ -1,0 +1,17 @@
+[book]
+title = "AgX"
+authors = ["AgX contributors"]
+description = "Open-source preset-first photo editing library and CLI"
+src = "src"
+language = "en"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/zhjngli/AgX"
+edit-url-template = "https://github.com/zhjngli/AgX/edit/main/docs/book/{path}"
+mathjax-support = false
+
+[output.html.fold]
+enable = true
+level = 1
