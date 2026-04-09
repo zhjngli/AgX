@@ -20,7 +20,7 @@ level = 1
 [output.linkcheck]
 follow-web-links = false
 warning-policy = "error"
-exclude = ['^api/']
+exclude = ['(^|/)api/']
 
 [preprocessor.mermaid]
 command = "mdbook-mermaid"

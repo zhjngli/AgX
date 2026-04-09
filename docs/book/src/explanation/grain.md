@@ -1,3 +1,7 @@
 # Grain
 
-Stub. Replaced with the real worked-example content in a later task.
+{{#include ../../../../crates/agx/src/adjust/grain.md}}
+
+## Related
+
+- [Grain API reference](../api/agx/adjust/grain/index.html)
