@@ -15,8 +15,11 @@ use crate::metadata::ImageMetadata;
 /// Supported output image formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
+    /// JPEG with quality control.
     Jpeg,
+    /// PNG (lossless).
     Png,
+    /// TIFF (lossless, 16-bit support).
     Tiff,
 }
 
