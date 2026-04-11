@@ -5,6 +5,7 @@ use std::sync::Arc;
 use image::{Rgb, Rgb32FImage};
 use serde::{Deserialize, Serialize};
 
+/// Pluggable pipeline stages (white balance, dehaze, denoise, per-pixel, detail, grain, vignette, color-space conversions).
 pub mod stages;
 
 /// Timing data for a single render pass. Only available when compiled
@@ -12,7 +13,9 @@ pub mod stages;
 #[cfg(feature = "profiling")]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct RenderProfile {
+    /// Per-stage timing in milliseconds, in execution order.
     pub stages: Vec<(String, f64)>,
+    /// Total render duration in milliseconds.
     pub total_ms: f64,
 }
 
@@ -20,6 +23,7 @@ pub struct RenderProfile {
 /// profiling data (when compiled with the `profiling` feature).
 #[derive(Debug, Clone)]
 pub struct RenderResult {
+    /// Rendered image in linear sRGB float.
     pub image: Rgb32FImage,
     #[cfg(feature = "profiling")]
     pub profile: Option<RenderProfile>,
@@ -41,9 +45,13 @@ pub enum ColorSpace {
 pub struct RenderContext<'a> {
     /// Pixel buffer in row-major order: `buf[y * width + x] = [r, g, b]`.
     pub buf: Vec<[f32; 3]>,
+    /// Image width in pixels.
     pub width: u32,
+    /// Image height in pixels.
     pub height: u32,
+    /// Render parameters (read-only for stages).
     pub params: &'a Parameters,
+    /// Optional LUT applied during the per-pixel adjustment stage.
     pub lut: Option<&'a crate::lut::Lut3D>,
 }
 
@@ -203,10 +211,13 @@ impl Pipeline {
 /// Ranges: hue -180.0 to +180.0 (degrees), saturation/luminance -100.0 to +100.0.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannel {
+    /// Hue shift in degrees (range: -180 to +180, default: 0).
     #[serde(default)]
     pub hue: f32,
+    /// Saturation adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
     pub saturation: f32,
+    /// Luminance adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
     pub luminance: f32,
 }
@@ -217,20 +228,28 @@ pub struct HslChannel {
 /// Aqua (180deg), Blue (240deg), Purple (270deg), Magenta (330deg).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannels {
+    /// HSL adjustment for the red channel (~0°).
     #[serde(default)]
     pub red: HslChannel,
+    /// HSL adjustment for the orange channel (~30°).
     #[serde(default)]
     pub orange: HslChannel,
+    /// HSL adjustment for the yellow channel (~60°).
     #[serde(default)]
     pub yellow: HslChannel,
+    /// HSL adjustment for the green channel (~120°).
     #[serde(default)]
     pub green: HslChannel,
+    /// HSL adjustment for the aqua channel (~180°).
     #[serde(default)]
     pub aqua: HslChannel,
+    /// HSL adjustment for the blue channel (~240°).
     #[serde(default)]
     pub blue: HslChannel,
+    /// HSL adjustment for the purple channel (~270°).
     #[serde(default)]
     pub purple: HslChannel,
+    /// HSL adjustment for the magenta channel (~330°).
     #[serde(default)]
     pub magenta: HslChannel,
 }
@@ -289,8 +308,10 @@ impl HslChannels {
 /// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VignetteParams {
+    /// Vignette darkening (negative) or brightening (positive) amount (range: -100 to +100, default: 0).
     #[serde(default)]
     pub amount: f32,
+    /// Vignette shape (circle, oval, or rectangle).
     #[serde(default)]
     pub shape: crate::adjust::VignetteShape,
 }
@@ -372,13 +393,18 @@ impl Default for Parameters {
     }
 }
 
-/// Partial per-channel HSL adjustment — `None` means "not specified".
+/// Optional, mergeable form of [`HslChannel`] used during preset deserialization.
+///
+/// See [`HslChannel`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialHslChannel {
+    /// See [`HslChannel::hue`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hue: Option<f32>,
+    /// See [`HslChannel::saturation`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub saturation: Option<f32>,
+    /// See [`HslChannel::luminance`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub luminance: Option<f32>,
 }
@@ -413,23 +439,33 @@ impl From<&HslChannel> for PartialHslChannel {
     }
 }
 
-/// Partial HSL adjustments for all 8 channels — `None` means channel not specified.
+/// Optional, mergeable form of [`HslChannels`] used during preset deserialization.
+///
+/// See [`HslChannels`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialHslChannels {
+    /// See [`HslChannels::red`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub red: Option<PartialHslChannel>,
+    /// See [`HslChannels::orange`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orange: Option<PartialHslChannel>,
+    /// See [`HslChannels::yellow`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub yellow: Option<PartialHslChannel>,
+    /// See [`HslChannels::green`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub green: Option<PartialHslChannel>,
+    /// See [`HslChannels::aqua`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aqua: Option<PartialHslChannel>,
+    /// See [`HslChannels::blue`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blue: Option<PartialHslChannel>,
+    /// See [`HslChannels::purple`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purple: Option<PartialHslChannel>,
+    /// See [`HslChannels::magenta`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub magenta: Option<PartialHslChannel>,
 }
@@ -523,11 +559,15 @@ impl From<&HslChannels> for PartialHslChannels {
     }
 }
 
-/// Partial vignette parameters — `None` means "not specified".
+/// Optional, mergeable form of [`VignetteParams`] used during preset deserialization.
+///
+/// See [`VignetteParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialVignetteParams {
+    /// See [`VignetteParams::amount`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<f32>,
+    /// See [`VignetteParams::shape`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<crate::adjust::VignetteShape>,
 }
@@ -559,13 +599,18 @@ impl From<&VignetteParams> for PartialVignetteParams {
     }
 }
 
-/// Partial color wheel — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::ColorWheel`] used during preset deserialization.
+///
+/// See [`crate::adjust::ColorWheel`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialColorWheel {
+    /// See [`ColorWheel::hue`](crate::adjust::ColorWheel::hue).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hue: Option<f32>,
+    /// See [`ColorWheel::saturation`](crate::adjust::ColorWheel::saturation).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub saturation: Option<f32>,
+    /// See [`ColorWheel::luminance`](crate::adjust::ColorWheel::luminance).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub luminance: Option<f32>,
 }
@@ -600,17 +645,24 @@ impl From<&crate::adjust::ColorWheel> for PartialColorWheel {
     }
 }
 
-/// Partial color grading parameters — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::ColorGradingParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::ColorGradingParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialColorGradingParams {
+    /// See [`ColorGradingParams::shadows`](crate::adjust::ColorGradingParams::shadows).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadows: Option<PartialColorWheel>,
+    /// See [`ColorGradingParams::midtones`](crate::adjust::ColorGradingParams::midtones).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub midtones: Option<PartialColorWheel>,
+    /// See [`ColorGradingParams::highlights`](crate::adjust::ColorGradingParams::highlights).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub highlights: Option<PartialColorWheel>,
+    /// See [`ColorGradingParams::global`](crate::adjust::ColorGradingParams::global).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub global: Option<PartialColorWheel>,
+    /// See [`ColorGradingParams::balance`](crate::adjust::ColorGradingParams::balance).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub balance: Option<f32>,
 }
@@ -681,18 +733,24 @@ impl From<&crate::adjust::ColorGradingParams> for PartialColorGradingParams {
 
 // --- Partial Tone Curve Types ---
 
+/// Optional, mergeable form of [`crate::adjust::ToneCurve`] used during preset deserialization.
+///
+/// See [`crate::adjust::ToneCurve`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialToneCurve {
+    /// See [`ToneCurve::points`](crate::adjust::ToneCurve::points).
     pub points: Option<Vec<(f32, f32)>>,
 }
 
 impl PartialToneCurve {
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             points: overlay.points.clone().or_else(|| self.points.clone()),
         }
     }
 
+    /// Materialize this partial into a concrete [`ToneCurve`](crate::adjust::ToneCurve). Unset fields become defaults.
     pub fn materialize(&self) -> crate::adjust::ToneCurve {
         crate::adjust::ToneCurve {
             points: self
@@ -711,21 +769,30 @@ impl From<&crate::adjust::ToneCurve> for PartialToneCurve {
     }
 }
 
+/// Optional, mergeable form of [`crate::adjust::ToneCurveParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::ToneCurveParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialToneCurveParams {
+    /// See [`ToneCurveParams::rgb`](crate::adjust::ToneCurveParams::rgb).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rgb: Option<PartialToneCurve>,
+    /// See [`ToneCurveParams::luma`](crate::adjust::ToneCurveParams::luma).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub luma: Option<PartialToneCurve>,
+    /// See [`ToneCurveParams::red`](crate::adjust::ToneCurveParams::red).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub red: Option<PartialToneCurve>,
+    /// See [`ToneCurveParams::green`](crate::adjust::ToneCurveParams::green).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub green: Option<PartialToneCurve>,
+    /// See [`ToneCurveParams::blue`](crate::adjust::ToneCurveParams::blue).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blue: Option<PartialToneCurve>,
 }
 
 impl PartialToneCurveParams {
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             rgb: merge_opt_tone_curve(&self.rgb, &overlay.rgb),
@@ -736,6 +803,7 @@ impl PartialToneCurveParams {
         }
     }
 
+    /// Materialize this partial into a concrete [`ToneCurveParams`](crate::adjust::ToneCurveParams). Unset fields become defaults.
     pub fn materialize(&self) -> crate::adjust::ToneCurveParams {
         crate::adjust::ToneCurveParams {
             rgb: self
@@ -791,20 +859,27 @@ impl From<&crate::adjust::ToneCurveParams> for PartialToneCurveParams {
     }
 }
 
-/// Partial sharpening parameters — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::SharpeningParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::SharpeningParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialSharpeningParams {
+    /// See [`SharpeningParams::amount`](crate::adjust::SharpeningParams::amount).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<f32>,
+    /// See [`SharpeningParams::radius`](crate::adjust::SharpeningParams::radius).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radius: Option<f32>,
+    /// See [`SharpeningParams::threshold`](crate::adjust::SharpeningParams::threshold).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold: Option<f32>,
+    /// See [`SharpeningParams::masking`](crate::adjust::SharpeningParams::masking).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub masking: Option<f32>,
 }
 
 impl PartialSharpeningParams {
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             amount: overlay.amount.or(self.amount),
@@ -814,6 +889,7 @@ impl PartialSharpeningParams {
         }
     }
 
+    /// Materialize this partial into a concrete [`SharpeningParams`](crate::adjust::SharpeningParams). Unset fields become defaults.
     pub fn materialize(&self) -> crate::adjust::SharpeningParams {
         let d = crate::adjust::SharpeningParams::default();
         crate::adjust::SharpeningParams {
@@ -836,13 +912,18 @@ impl From<&crate::adjust::SharpeningParams> for PartialSharpeningParams {
     }
 }
 
-/// Partial detail parameters — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::DetailParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::DetailParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialDetailParams {
+    /// See [`DetailParams::sharpening`](crate::adjust::DetailParams::sharpening).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sharpening: Option<PartialSharpeningParams>,
+    /// See [`DetailParams::clarity`](crate::adjust::DetailParams::clarity).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clarity: Option<f32>,
+    /// See [`DetailParams::texture`](crate::adjust::DetailParams::texture).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub texture: Option<f32>,
 }
@@ -860,6 +941,7 @@ impl PartialDetailParams {
         }
     }
 
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             sharpening: Self::merge_sharpening(&self.sharpening, &overlay.sharpening),
@@ -868,6 +950,7 @@ impl PartialDetailParams {
         }
     }
 
+    /// Materialize this partial into a concrete [`DetailParams`](crate::adjust::DetailParams). Unset fields become defaults.
     pub fn materialize(&self) -> crate::adjust::DetailParams {
         crate::adjust::DetailParams {
             sharpening: self
@@ -891,20 +974,25 @@ impl From<&crate::adjust::DetailParams> for PartialDetailParams {
     }
 }
 
-/// Partial dehaze parameters — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::DehazeParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::DehazeParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialDehazeParams {
+    /// See [`DehazeParams::amount`](crate::adjust::DehazeParams::amount).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<f32>,
 }
 
 impl PartialDehazeParams {
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             amount: overlay.amount.or(self.amount),
         }
     }
 
+    /// Materialize this partial into a concrete [`DehazeParams`](crate::adjust::DehazeParams). Unset fields become `0.0`.
     pub fn materialize(&self) -> crate::adjust::DehazeParams {
         crate::adjust::DehazeParams {
             amount: self.amount.unwrap_or(0.0),
@@ -920,18 +1008,24 @@ impl From<&crate::adjust::DehazeParams> for PartialDehazeParams {
     }
 }
 
-/// Partial noise reduction parameters — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::NoiseReductionParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::NoiseReductionParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialNoiseReductionParams {
+    /// See [`NoiseReductionParams::luminance`](crate::adjust::NoiseReductionParams::luminance).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub luminance: Option<f32>,
+    /// See [`NoiseReductionParams::color`](crate::adjust::NoiseReductionParams::color).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<f32>,
+    /// See [`NoiseReductionParams::detail`](crate::adjust::NoiseReductionParams::detail).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<f32>,
 }
 
 impl PartialNoiseReductionParams {
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             luminance: overlay.luminance.or(self.luminance),
@@ -940,6 +1034,7 @@ impl PartialNoiseReductionParams {
         }
     }
 
+    /// Materialize this partial into a concrete [`NoiseReductionParams`](crate::adjust::NoiseReductionParams). Unset fields become `0.0`.
     pub fn materialize(&self) -> crate::adjust::NoiseReductionParams {
         crate::adjust::NoiseReductionParams {
             luminance: self.luminance.unwrap_or(0.0),
@@ -959,20 +1054,27 @@ impl From<&crate::adjust::NoiseReductionParams> for PartialNoiseReductionParams 
     }
 }
 
-/// Partial grain parameters — `None` means "not specified".
+/// Optional, mergeable form of [`crate::adjust::GrainParams`] used during preset deserialization.
+///
+/// See [`crate::adjust::GrainParams`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialGrainParams {
+    /// See [`GrainParams::grain_type`](crate::adjust::GrainParams::grain_type).
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "type")]
     pub grain_type: Option<crate::adjust::GrainType>,
+    /// See [`GrainParams::amount`](crate::adjust::GrainParams::amount).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<f32>,
+    /// See [`GrainParams::size`](crate::adjust::GrainParams::size).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<f32>,
+    /// See [`GrainParams::seed`](crate::adjust::GrainParams::seed).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
 }
 
 impl PartialGrainParams {
+    /// Merge `overlay` on top of `self`. Last-write-wins per field.
     pub fn merge(&self, overlay: &Self) -> Self {
         Self {
             grain_type: overlay.grain_type.or(self.grain_type),
@@ -982,6 +1084,7 @@ impl PartialGrainParams {
         }
     }
 
+    /// Materialize this partial into a concrete [`GrainParams`](crate::adjust::GrainParams). Unset fields become defaults.
     pub fn materialize(&self) -> crate::adjust::GrainParams {
         crate::adjust::GrainParams {
             grain_type: self.grain_type.unwrap_or_default(),
@@ -1003,42 +1106,57 @@ impl From<&crate::adjust::GrainParams> for PartialGrainParams {
     }
 }
 
-/// Partial parameter set — `None` means "not specified by this preset".
+/// Optional, mergeable form of [`Parameters`] used during preset deserialization.
 ///
-/// Used for preset deserialization and merging. Convert to concrete
-/// `Parameters` via `materialize()` for the engine.
+/// See [`Parameters`] for field semantics.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialParameters {
+    /// See [`Parameters::exposure`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exposure: Option<f32>,
+    /// See [`Parameters::contrast`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contrast: Option<f32>,
+    /// See [`Parameters::highlights`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub highlights: Option<f32>,
+    /// See [`Parameters::shadows`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadows: Option<f32>,
+    /// See [`Parameters::whites`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub whites: Option<f32>,
+    /// See [`Parameters::blacks`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blacks: Option<f32>,
+    /// See [`Parameters::temperature`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
+    /// See [`Parameters::tint`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tint: Option<f32>,
+    /// See [`Parameters::hsl`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hsl: Option<PartialHslChannels>,
+    /// See [`Parameters::vignette`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vignette: Option<PartialVignetteParams>,
+    /// See [`Parameters::color_grading`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color_grading: Option<PartialColorGradingParams>,
+    /// See [`Parameters::tone_curve`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tone_curve: Option<PartialToneCurveParams>,
+    /// See [`Parameters::detail`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<PartialDetailParams>,
+    /// See [`Parameters::dehaze`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dehaze: Option<PartialDehazeParams>,
+    /// See [`Parameters::noise_reduction`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noise_reduction: Option<PartialNoiseReductionParams>,
+    /// See [`Parameters::grain`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grain: Option<PartialGrainParams>,
 }
