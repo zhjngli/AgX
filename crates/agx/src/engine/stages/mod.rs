@@ -1,10 +1,20 @@
+//! Pluggable pipeline stages that the render engine executes in sequence.
+
+/// Linear-to-sRGB and sRGB-to-linear color space conversion stages.
 pub mod color_space_conversion;
+/// Atmospheric haze removal/addition stage.
 pub mod dehaze;
+/// Wavelet-based noise reduction stage.
 pub mod denoise;
+/// Sharpening, clarity, and texture stage.
 pub mod detail;
+/// Film grain simulation stage.
 pub mod grain;
+/// Per-pixel adjustments: contrast, tone curves, HSL, color grading, LUT.
 pub mod per_pixel;
+/// Edge vignette darkening/brightening stage.
 pub mod vignette;
+/// White balance and exposure correction stage.
 pub mod white_balance_exposure;
 
 pub use color_space_conversion::{LinearToSrgbStage, SrgbToLinearStage};

@@ -12,6 +12,7 @@ impl Default for DehazeStage {
 }
 
 impl DehazeStage {
+    /// Create a new dehaze stage.
     pub fn new() -> Self {
         Self
     }

@@ -12,6 +12,7 @@ impl Default for LinearToSrgbStage {
 }
 
 impl LinearToSrgbStage {
+    /// Create a new linear-to-sRGB conversion stage.
     pub fn new() -> Self {
         Self
     }
@@ -55,6 +56,7 @@ impl Default for SrgbToLinearStage {
 }
 
 impl SrgbToLinearStage {
+    /// Create a new sRGB-to-linear conversion stage.
     pub fn new() -> Self {
         Self
     }

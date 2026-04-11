@@ -15,6 +15,7 @@ impl Default for GrainStage {
 }
 
 impl GrainStage {
+    /// Create a new grain stage with a zero seed (overwritten during prepare).
     pub fn new() -> Self {
         Self { seed: 0 }
     }

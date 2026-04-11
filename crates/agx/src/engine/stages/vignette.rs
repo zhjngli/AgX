@@ -13,6 +13,7 @@ impl Default for VignetteStage {
 }
 
 impl VignetteStage {
+    /// Create a new vignette stage.
     pub fn new() -> Self {
         Self
     }

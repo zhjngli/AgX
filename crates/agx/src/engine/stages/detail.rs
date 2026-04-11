@@ -13,6 +13,7 @@ impl Default for DetailStage {
 }
 
 impl DetailStage {
+    /// Create a new detail stage.
     pub fn new() -> Self {
         Self
     }

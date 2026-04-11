@@ -14,10 +14,13 @@ use crate::error::{AgxError, Result};
 /// Preset metadata (name, version, author).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PresetMetadata {
+    /// Human-readable preset name.
     #[serde(default)]
     pub name: String,
+    /// Semantic version string (e.g. "1.0.0").
     #[serde(default)]
     pub version: String,
+    /// Preset author name.
     #[serde(default)]
     pub author: String,
     /// Optional path to a base preset this preset extends.
@@ -243,8 +246,11 @@ fn build_partial_params(raw: &PresetRaw) -> PartialParameters {
 /// Call `params()` to get concrete `Parameters` with defaults filled in.
 #[derive(Debug, Clone, Default)]
 pub struct Preset {
+    /// Name, version, author, and optional base preset path.
     pub metadata: PresetMetadata,
+    /// Partially-specified parameters. `None` fields inherit from the base or defaults.
     pub partial_params: PartialParameters,
+    /// Optional 3D LUT loaded from the preset's `.cube` file reference.
     pub lut: Option<Arc<crate::lut::Lut3D>>,
 }
 
