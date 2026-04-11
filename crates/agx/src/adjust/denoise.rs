@@ -1,3 +1,5 @@
+//! Noise reduction adjustment using an à trous wavelet decomposition with per-band thresholding.
+
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -12,10 +14,13 @@ use super::{LUMA_B, LUMA_G, LUMA_R};
 /// When all three are zero, the noise reduction pass is skipped entirely.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NoiseReductionParams {
+    /// Luminance denoising strength, 0–100. Default 0 (off).
     #[serde(default)]
     pub luminance: f32,
+    /// Chroma denoising strength, 0–100. Default 0 (off).
     #[serde(default)]
     pub color: f32,
+    /// Finest-scale detail preservation, 0–100. Higher keeps more fine detail. Default 0.
     #[serde(default)]
     pub detail: f32,
 }

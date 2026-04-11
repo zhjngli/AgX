@@ -14,9 +14,12 @@ use super::{smoothstep, LUMA_B, LUMA_G, LUMA_R};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GrainType {
+    /// Tight, low-contrast grain with minimal chromatic divergence.
     Fine,
+    /// Classic medium-contrast film grain (default).
     #[default]
     Silver,
+    /// Heavy, punchy grain with visible color fringing on saturated pixels.
     Harsh,
 }
 
@@ -52,10 +55,13 @@ impl std::str::FromStr for GrainType {
 /// - `seed`: optional fixed seed for deterministic grain (None = random each render)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrainParams {
+    /// Grain character preset. Default: Silver.
     #[serde(default)]
     pub grain_type: GrainType,
+    /// Grain intensity, 0–100. Default 0 (no grain).
     #[serde(default)]
     pub amount: f32,
+    /// Grain particle size, 0 (fine) to 100 (coarse). Default 50.
     #[serde(default = "default_size")]
     pub size: f32,
     /// Optional fixed seed for deterministic grain. When None, the engine

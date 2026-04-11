@@ -1,3 +1,5 @@
+//! Detail pass: sharpening, clarity, and texture controls built on a multi-scale unsharp mask.
+
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -8,14 +10,19 @@ fn default_sharpening_threshold() -> f32 {
     25.0
 }
 
+/// Sharpening parameters controlling unsharp-mask strength, radius, threshold, and edge masking.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SharpeningParams {
+    /// Sharpening intensity, 0–100. Default 0 (off).
     #[serde(default)]
     pub amount: f32,
+    /// Gaussian blur radius in pixels. Larger radius sharpens coarser detail. Default 1.0.
     #[serde(default = "default_sharpening_radius")]
     pub radius: f32,
+    /// Minimum luminance delta (0–255 scale) below which sharpening is suppressed. Default 25.
     #[serde(default = "default_sharpening_threshold")]
     pub threshold: f32,
+    /// Edge-aware masking strength, 0–100. Higher restricts sharpening to strong edges. Default 0.
     #[serde(default)]
     pub masking: f32,
 }
@@ -31,12 +38,18 @@ impl Default for SharpeningParams {
     }
 }
 
+/// Combined detail parameters: sharpening, clarity, and texture.
+///
+/// Each control targets a different spatial frequency range via unsharp mask sigma.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetailParams {
+    /// Sharpening sub-parameters (amount, radius, threshold, masking).
     #[serde(default)]
     pub sharpening: SharpeningParams,
+    /// Mid-frequency local contrast, -100 to +100. Positive adds punch, negative softens.
     #[serde(default)]
     pub clarity: f32,
+    /// Fine-frequency detail, -100 to +100. Positive enhances fine texture, negative smooths.
     #[serde(default)]
     pub texture: f32,
 }
