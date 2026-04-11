@@ -1,21 +1,36 @@
+//! Error types for the AgX library. See [`AgxError`].
+
 use thiserror::Error;
 
+/// All errors that can occur in the AgX rendering pipeline.
+///
+/// `AgxError` is the unified error type returned by every fallible AgX function:
+/// decoding raw or encoded images, applying presets, building LUTs, encoding output.
+/// Variants wrap underlying errors with a short context string so callers can match
+/// on the kind without losing the original message.
 #[derive(Debug, Error)]
 pub enum AgxError {
+    /// Failure during image decoding (raw, JPEG, PNG, TIFF, etc.).
     #[error("Decode error: {0}")]
     Decode(String),
+    /// Failure during image encoding to an output file or buffer.
     #[error("Encode error: {0}")]
     Encode(String),
+    /// Failure parsing or applying a preset.
     #[error("Preset error: {0}")]
     Preset(String),
+    /// Failure parsing or applying a LUT (e.g. invalid `.cube` file).
     #[error("LUT error: {0}")]
     Lut(String),
+    /// Underlying error from the `image` crate.
     #[error("Image error: {0}")]
     Image(#[from] image::ImageError),
+    /// Underlying I/O error from the standard library.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }
 
+/// Convenience alias for `Result<T, AgxError>` used throughout the AgX API.
 pub type Result<T> = std::result::Result<T, AgxError>;
 
 #[cfg(test)]

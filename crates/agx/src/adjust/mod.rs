@@ -1,3 +1,5 @@
+//! Pure-function adjustment math: per-pixel, dehaze, denoise, detail, grain, color grading, tone curves, vignette.
+
 use palette::{Hsl, IntoColor, LinSrgb, Srgb};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};

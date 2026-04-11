@@ -1,3 +1,5 @@
+//! Render engine: pipeline executor, parameter types, and the [`Engine`] entry point.
+
 use std::sync::Arc;
 
 use image::{Rgb, Rgb32FImage};

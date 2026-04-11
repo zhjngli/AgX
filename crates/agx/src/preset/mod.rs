@@ -1,3 +1,5 @@
+//! Preset format: serialization, composition, materialization to a fully-specified parameters object.
+
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};

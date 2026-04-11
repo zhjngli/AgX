@@ -1,3 +1,5 @@
+//! Image encoding: writing rendered output to JPEG, PNG, TIFF.
+
 use std::io::Cursor;
 use std::path::PathBuf;
 
