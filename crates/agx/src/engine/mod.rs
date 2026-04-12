@@ -214,12 +214,15 @@ impl Pipeline {
 pub struct HslChannel {
     /// Hue shift in degrees (range: -180 to +180, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -180.0, max = 180.0)))]
     pub hue: f32,
     /// Saturation adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub saturation: f32,
     /// Luminance adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub luminance: f32,
 }
 
@@ -305,6 +308,43 @@ impl HslChannels {
     }
 }
 
+/// Minimum supported exposure in stops.
+pub const EXPOSURE_MIN: f32 = -5.0;
+/// Maximum supported exposure in stops.
+pub const EXPOSURE_MAX: f32 = 5.0;
+/// Minimum supported value for tone sliders.
+pub const TONE_SLIDER_MIN: f32 = -100.0;
+/// Maximum supported value for tone sliders.
+pub const TONE_SLIDER_MAX: f32 = 100.0;
+/// Minimum supported HSL hue shift in degrees.
+pub const HSL_HUE_MIN: f32 = -180.0;
+/// Maximum supported HSL hue shift in degrees.
+pub const HSL_HUE_MAX: f32 = 180.0;
+/// Minimum supported HSL saturation/luminance slider value.
+pub const HSL_SL_MIN: f32 = -100.0;
+/// Maximum supported HSL saturation/luminance slider value.
+pub const HSL_SL_MAX: f32 = 100.0;
+/// Minimum supported vignette amount.
+pub const VIGNETTE_AMOUNT_MIN: f32 = -100.0;
+/// Maximum supported vignette amount.
+pub const VIGNETTE_AMOUNT_MAX: f32 = 100.0;
+/// Minimum supported color grading balance value.
+pub const CG_BALANCE_MIN: f32 = -100.0;
+/// Maximum supported color grading balance value.
+pub const CG_BALANCE_MAX: f32 = 100.0;
+/// Minimum supported color wheel hue in degrees.
+pub const CW_HUE_MIN: f32 = 0.0;
+/// Maximum supported color wheel hue in degrees.
+pub const CW_HUE_MAX: f32 = 360.0;
+/// Minimum supported color wheel saturation.
+pub const CW_SATURATION_MIN: f32 = 0.0;
+/// Maximum supported color wheel saturation.
+pub const CW_SATURATION_MAX: f32 = 100.0;
+/// Minimum supported color wheel luminance.
+pub const CW_LUMINANCE_MIN: f32 = -100.0;
+/// Maximum supported color wheel luminance.
+pub const CW_LUMINANCE_MAX: f32 = 100.0;
+
 /// Vignette adjustment parameters.
 ///
 /// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
@@ -313,6 +353,7 @@ impl HslChannels {
 pub struct VignetteParams {
     /// Vignette darkening (negative) or brightening (positive) amount (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub amount: f32,
     /// Vignette shape (circle, oval, or rectangle).
     #[serde(default)]
@@ -333,16 +374,22 @@ impl VignetteParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Parameters {
     /// Exposure in stops, range -5.0 to +5.0
+    #[cfg_attr(feature = "docgen", schemars(range(min = -5.0, max = 5.0)))]
     pub exposure: f32,
     /// Contrast, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub contrast: f32,
     /// Highlights, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub highlights: f32,
     /// Shadows, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub shadows: f32,
     /// Whites, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub whites: f32,
     /// Blacks, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub blacks: f32,
     /// White balance temperature shift
     pub temperature: f32,
@@ -2413,5 +2460,13 @@ mod docgen_tests {
         let json = serde_json::to_string_pretty(&schema).unwrap();
         assert!(json.contains("exposure"));
         assert!(json.contains("grain"));
+    }
+
+    #[test]
+    fn schema_contains_ranges() {
+        let schema = schemars::schema_for!(Parameters);
+        let json = serde_json::to_string_pretty(&schema).unwrap();
+        assert!(json.contains("\"minimum\""));
+        assert!(json.contains("\"maximum\""));
     }
 }

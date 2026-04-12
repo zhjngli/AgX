@@ -62,9 +62,11 @@ pub struct GrainParams {
     pub grain_type: GrainType,
     /// Grain intensity, 0–100. Default 0 (no grain).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub amount: f32,
     /// Grain particle size, 0 (fine) to 100 (coarse). Default 50.
     #[serde(default = "default_size")]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub size: f32,
     /// Optional fixed seed for deterministic grain. When None, the engine
     /// generates a random seed each render. Set in e2e test presets.
@@ -153,11 +155,15 @@ const AMOUNT_CURVE_FINE: f32 = 0.7;
 const AMOUNT_CURVE_SILVER: f32 = 0.6;
 const AMOUNT_CURVE_HARSH: f32 = 0.5;
 
-/// Maximum value for user-facing amount and size parameters.
-const GRAIN_PARAM_MAX: f32 = 100.0;
+/// Minimum supported grain amount/size value.
+pub const GRAIN_PARAM_MIN: f32 = 0.0;
+/// Maximum supported grain amount/size value.
+pub const GRAIN_PARAM_MAX: f32 = 100.0;
 
 /// Default grain size when not specified.
-const GRAIN_DEFAULT_SIZE: f32 = 50.0;
+///
+/// Used for schema/default drift checks and serde defaults.
+pub const GRAIN_DEFAULT_SIZE: f32 = 50.0;
 
 /// Exponent for the size-to-sigma curve. Higher values keep grain tight
 /// at low sizes and only spread at high sizes.

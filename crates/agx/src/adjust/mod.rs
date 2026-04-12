@@ -373,12 +373,15 @@ pub fn apply_hsl(
 pub struct ColorWheel {
     /// Hue angle in degrees (0–360).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 360.0)))]
     pub hue: f32,
     /// Saturation amount (0–100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub saturation: f32,
     /// Luminance shift (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub luminance: f32,
 }
 
@@ -400,6 +403,7 @@ pub struct ColorGradingParams {
     pub global: ColorWheel,
     /// Shadow/highlight balance point (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub balance: f32,
 }
 

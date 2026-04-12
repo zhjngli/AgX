@@ -5,6 +5,11 @@ use std::collections::VecDeque;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// Minimum supported dehaze amount.
+pub const DEHAZE_AMOUNT_MIN: f32 = -100.0;
+/// Maximum supported dehaze amount.
+pub const DEHAZE_AMOUNT_MAX: f32 = 100.0;
+
 /// Dehaze adjustment parameters. Amount range: -100 to +100. Positive removes haze,
 /// negative adds haze/fog. When amount is 0, the dehaze pass is skipped entirely.
 #[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
@@ -12,6 +17,7 @@ use serde::{Deserialize, Serialize};
 pub struct DehazeParams {
     /// Dehaze strength from -100 (add fog) to +100 (remove haze). Default 0 (neutral).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub amount: f32,
 }
 
