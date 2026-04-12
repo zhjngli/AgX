@@ -2453,20 +2453,246 @@ mod tests {
 #[cfg(all(test, feature = "docgen"))]
 mod docgen_tests {
     use super::*;
+    use schemars::schema::{RootSchema, Schema, SchemaObject};
 
-    #[test]
-    fn parameters_schema_generates() {
-        let schema = schemars::schema_for!(Parameters);
-        let json = serde_json::to_string_pretty(&schema).unwrap();
-        assert!(json.contains("exposure"));
-        assert!(json.contains("grain"));
+    fn schema_object(schema: &Schema) -> &SchemaObject {
+        match schema {
+            Schema::Object(object) => object,
+            Schema::Bool(_) => panic!("expected object schema"),
+        }
+    }
+
+    fn resolve_schema_object<'a>(
+        root: &'a RootSchema,
+        schema: &'a SchemaObject,
+    ) -> &'a SchemaObject {
+        let mut current = schema;
+        loop {
+            if let Some(reference) = current.reference.as_deref() {
+                let definition = reference
+                    .strip_prefix("#/definitions/")
+                    .unwrap_or_else(|| panic!("unsupported schema reference '{reference}'"));
+                current = schema_object(
+                    root.definitions
+                        .get(definition)
+                        .unwrap_or_else(|| panic!("missing schema definition '{definition}'")),
+                );
+                continue;
+            }
+
+            if let Some(all_of) = current
+                .subschemas
+                .as_ref()
+                .and_then(|subschemas| subschemas.all_of.as_deref())
+            {
+                if all_of.len() == 1 {
+                    current = schema_object(&all_of[0]);
+                    continue;
+                }
+            }
+
+            return current;
+        }
+    }
+
+    fn property_schema<'a>(
+        root: &'a RootSchema,
+        schema: &'a SchemaObject,
+        property: &str,
+    ) -> &'a SchemaObject {
+        let properties = &resolve_schema_object(root, schema)
+            .object
+            .as_ref()
+            .unwrap_or_else(|| panic!("schema has no object validation for {property}"))
+            .properties;
+        resolve_schema_object(
+            root,
+            properties
+                .get(property)
+                .map(schema_object)
+                .unwrap_or_else(|| panic!("missing property '{property}'")),
+        )
+    }
+
+    fn property_range(root: &RootSchema, path: &[&str]) -> (f64, f64) {
+        let mut current = &root.schema;
+        for property in path {
+            current = property_schema(root, current, property);
+        }
+
+        let number = resolve_schema_object(root, current)
+            .number
+            .as_ref()
+            .unwrap_or_else(|| panic!("property '{}' is missing number validation", path.join(".")));
+        (
+            number
+                .minimum
+                .unwrap_or_else(|| panic!("property '{}' is missing minimum", path.join("."))),
+            number
+                .maximum
+                .unwrap_or_else(|| panic!("property '{}' is missing maximum", path.join("."))),
+        )
+    }
+
+    fn assert_range(root: &RootSchema, path: &[&str], min: f32, max: f32) {
+        let actual = property_range(root, path);
+        let expected = (f64::from(min), f64::from(max));
+        assert_eq!(actual, expected, "schema range drift for {}", path.join("."));
     }
 
     #[test]
-    fn schema_contains_ranges() {
-        let schema = schemars::schema_for!(Parameters);
-        let json = serde_json::to_string_pretty(&schema).unwrap();
-        assert!(json.contains("\"minimum\""));
-        assert!(json.contains("\"maximum\""));
+    fn schema_ranges_match_constants() {
+        let parameters_schema = schemars::schema_for!(Parameters);
+        assert_range(&parameters_schema, &["hsl", "red", "hue"], HSL_HUE_MIN, HSL_HUE_MAX);
+        assert_range(
+            &parameters_schema,
+            &["hsl", "red", "saturation"],
+            HSL_SL_MIN,
+            HSL_SL_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["hsl", "red", "luminance"],
+            HSL_SL_MIN,
+            HSL_SL_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["vignette", "amount"],
+            VIGNETTE_AMOUNT_MIN,
+            VIGNETTE_AMOUNT_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["exposure"],
+            EXPOSURE_MIN,
+            EXPOSURE_MAX,
+        );
+        for field in ["contrast", "highlights", "shadows", "whites", "blacks"] {
+            assert_range(
+                &parameters_schema,
+                &[field],
+                TONE_SLIDER_MIN,
+                TONE_SLIDER_MAX,
+            );
+        }
+
+        let hsl_channel_schema = schemars::schema_for!(HslChannel);
+        assert_range(&hsl_channel_schema, &["hue"], HSL_HUE_MIN, HSL_HUE_MAX);
+        assert_range(
+            &hsl_channel_schema,
+            &["saturation"],
+            HSL_SL_MIN,
+            HSL_SL_MAX,
+        );
+        assert_range(
+            &hsl_channel_schema,
+            &["luminance"],
+            HSL_SL_MIN,
+            HSL_SL_MAX,
+        );
+
+        let vignette_schema = schemars::schema_for!(VignetteParams);
+        assert_range(
+            &vignette_schema,
+            &["amount"],
+            VIGNETTE_AMOUNT_MIN,
+            VIGNETTE_AMOUNT_MAX,
+        );
+
+        let color_wheel_schema = schemars::schema_for!(crate::adjust::ColorWheel);
+        assert_range(&color_wheel_schema, &["hue"], CW_HUE_MIN, CW_HUE_MAX);
+        assert_range(
+            &color_wheel_schema,
+            &["saturation"],
+            CW_SATURATION_MIN,
+            CW_SATURATION_MAX,
+        );
+        assert_range(
+            &color_wheel_schema,
+            &["luminance"],
+            CW_LUMINANCE_MIN,
+            CW_LUMINANCE_MAX,
+        );
+
+        let color_grading_schema = schemars::schema_for!(crate::adjust::ColorGradingParams);
+        assert_range(
+            &color_grading_schema,
+            &["balance"],
+            CG_BALANCE_MIN,
+            CG_BALANCE_MAX,
+        );
+
+        let grain_schema = schemars::schema_for!(crate::adjust::GrainParams);
+        assert_range(
+            &grain_schema,
+            &["amount"],
+            crate::adjust::grain::GRAIN_PARAM_MIN,
+            crate::adjust::grain::GRAIN_PARAM_MAX,
+        );
+        assert_range(
+            &grain_schema,
+            &["size"],
+            crate::adjust::grain::GRAIN_PARAM_MIN,
+            crate::adjust::grain::GRAIN_PARAM_MAX,
+        );
+
+        let dehaze_schema = schemars::schema_for!(crate::adjust::DehazeParams);
+        assert_range(
+            &dehaze_schema,
+            &["amount"],
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MIN,
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MAX,
+        );
+
+        let noise_reduction_schema = schemars::schema_for!(crate::adjust::NoiseReductionParams);
+        for field in ["luminance", "color", "detail"] {
+            assert_range(
+                &noise_reduction_schema,
+                &[field],
+                crate::adjust::denoise::NR_MIN,
+                crate::adjust::denoise::NR_MAX,
+            );
+        }
+
+        let sharpening_schema = schemars::schema_for!(crate::adjust::SharpeningParams);
+        assert_range(
+            &sharpening_schema,
+            &["amount"],
+            crate::adjust::detail::SHARPEN_AMOUNT_MIN,
+            crate::adjust::detail::SHARPEN_AMOUNT_MAX,
+        );
+        assert_range(
+            &sharpening_schema,
+            &["radius"],
+            crate::adjust::detail::SHARPEN_RADIUS_MIN,
+            crate::adjust::detail::SHARPEN_RADIUS_MAX,
+        );
+        assert_range(
+            &sharpening_schema,
+            &["threshold"],
+            crate::adjust::detail::SHARPEN_THRESHOLD_MIN,
+            crate::adjust::detail::SHARPEN_THRESHOLD_MAX,
+        );
+        assert_range(
+            &sharpening_schema,
+            &["masking"],
+            crate::adjust::detail::SHARPEN_MASKING_MIN,
+            crate::adjust::detail::SHARPEN_MASKING_MAX,
+        );
+
+        let detail_schema = schemars::schema_for!(crate::adjust::DetailParams);
+        assert_range(
+            &detail_schema,
+            &["clarity"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
+        assert_range(
+            &detail_schema,
+            &["texture"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
     }
 }
