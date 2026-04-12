@@ -12,6 +12,7 @@ impl Default for WhiteBalanceExposureStage {
 }
 
 impl WhiteBalanceExposureStage {
+    /// Create a new white balance and exposure stage.
     pub fn new() -> Self {
         Self
     }

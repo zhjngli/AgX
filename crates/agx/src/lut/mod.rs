@@ -1,3 +1,6 @@
+//! 3D color lookup table (`.cube` format) loading and application.
+
+/// `.cube` file format parser.
 pub mod cube;
 
 /// A 3D Look-Up Table for color transformation.

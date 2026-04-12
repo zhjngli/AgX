@@ -1,3 +1,5 @@
+//! Dehaze adjustment: removes or adds atmospheric haze using a dark-channel prior estimator.
+
 use std::collections::VecDeque;
 
 use rayon::prelude::*;
@@ -7,6 +9,7 @@ use serde::{Deserialize, Serialize};
 /// negative adds haze/fog. When amount is 0, the dehaze pass is skipped entirely.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DehazeParams {
+    /// Dehaze strength from -100 (add fog) to +100 (remove haze). Default 0 (neutral).
     #[serde(default)]
     pub amount: f32,
 }

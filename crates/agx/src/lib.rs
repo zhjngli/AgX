@@ -3,6 +3,7 @@
 //! See the [project site](https://zhjngli.github.io/AgX/) for tutorials,
 //! how-to guides, the CLI reference, and the preset format reference.
 
+#![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod adjust;

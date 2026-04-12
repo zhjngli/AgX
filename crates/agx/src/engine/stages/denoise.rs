@@ -12,6 +12,7 @@ impl Default for DenoiseStage {
 }
 
 impl DenoiseStage {
+    /// Create a new denoise stage.
     pub fn new() -> Self {
         Self
     }

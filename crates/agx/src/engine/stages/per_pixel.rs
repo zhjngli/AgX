@@ -16,6 +16,7 @@ impl Default for PerPixelAdjustmentsStage {
 }
 
 impl PerPixelAdjustmentsStage {
+    /// Create a new per-pixel adjustments stage with no precomputed state.
     pub fn new() -> Self {
         Self {
             tone_curve_pre: None,

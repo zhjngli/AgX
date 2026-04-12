@@ -1,3 +1,5 @@
+//! Image decoding: raw, JPEG, PNG, TIFF, and other formats supported by the image crate and libraw.
+
 mod orientation;
 
 #[cfg(feature = "raw")]

@@ -1,3 +1,5 @@
+//! Image encoding: writing rendered output to JPEG, PNG, TIFF.
+
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -13,8 +15,11 @@ use crate::metadata::ImageMetadata;
 /// Supported output image formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
+    /// JPEG with quality control.
     Jpeg,
+    /// PNG (lossless).
     Png,
+    /// TIFF (lossless, 16-bit support).
     Tiff,
 }
 

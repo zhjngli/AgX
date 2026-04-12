@@ -1,13 +1,18 @@
+//! Pure-function adjustment math: per-pixel, dehaze, denoise, detail, grain, color grading, tone curves, vignette.
+
 use palette::{Hsl, IntoColor, LinSrgb, Srgb};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// Detail pass: sharpening, clarity, and texture.
 pub mod detail;
 pub use detail::{DetailParams, SharpeningParams};
 
+/// Dehaze adjustment.
 pub mod dehaze;
 pub use dehaze::DehazeParams;
 
+/// Noise reduction.
 pub mod denoise;
 pub use denoise::NoiseReductionParams;
 
@@ -113,17 +118,29 @@ pub fn apply_white_balance_exposure_buffer(
 /// The `lut_fn` closure abstracts over the LUT lookup so that `adjust`
 /// does not depend on the `lut` module (architecture rule).
 pub struct PerPixelParams<'a> {
+    /// Contrast adjustment (range: -100 to +100, default: 0).
     pub contrast: f32,
+    /// Highlight recovery / boost (range: -100 to +100, default: 0).
     pub highlights: f32,
+    /// Shadow lift / deepen (range: -100 to +100, default: 0).
     pub shadows: f32,
+    /// White point adjustment (range: -100 to +100, default: 0).
     pub whites: f32,
+    /// Black point adjustment (range: -100 to +100, default: 0).
     pub blacks: f32,
+    /// Precomputed tone curve lookup, if active.
     pub tone_curve_pre: Option<&'a ToneCurvePrecomputed>,
+    /// Whether any HSL channel has a non-zero shift.
     pub hsl_active: bool,
+    /// Per-channel hue shifts indexed by color channel.
     pub hue_shifts: [f32; 8],
+    /// Per-channel saturation shifts indexed by color channel.
     pub sat_shifts: [f32; 8],
+    /// Per-channel luminance shifts indexed by color channel.
     pub lum_shifts: [f32; 8],
+    /// Precomputed color grading data, if active.
     pub color_grading_pre: Option<ColorGradingPrecomputed>,
+    /// Optional LUT lookup closure (abstracts over the `lut` module).
     #[allow(clippy::type_complexity)]
     pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + Sync + 'a)>,
 }
@@ -353,10 +370,13 @@ pub fn apply_hsl(
 /// Hue: 0-360 degrees, Saturation: 0-100, Luminance: -100 to +100.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ColorWheel {
+    /// Hue angle in degrees (0–360).
     #[serde(default)]
     pub hue: f32,
+    /// Saturation amount (0–100, default: 0).
     #[serde(default)]
     pub saturation: f32,
+    /// Luminance shift (range: -100 to +100, default: 0).
     #[serde(default)]
     pub luminance: f32,
 }
@@ -364,14 +384,19 @@ pub struct ColorWheel {
 /// 3-way color grading parameters (shadows, midtones, highlights, global + balance).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ColorGradingParams {
+    /// Shadow tones color wheel.
     #[serde(default)]
     pub shadows: ColorWheel,
+    /// Midtone color wheel.
     #[serde(default)]
     pub midtones: ColorWheel,
+    /// Highlight tones color wheel.
     #[serde(default)]
     pub highlights: ColorWheel,
+    /// Global color wheel (applied uniformly).
     #[serde(default)]
     pub global: ColorWheel,
+    /// Shadow/highlight balance point (range: -100 to +100, default: 0).
     #[serde(default)]
     pub balance: f32,
 }
@@ -412,6 +437,7 @@ impl ColorGradingPrecomputed {
         ]
     }
 
+    /// Precompute tints and luminance values from the given parameters.
     pub fn new(params: &ColorGradingParams) -> Self {
         Self {
             shadow_tint: Self::wheel_to_tint(&params.shadows),
@@ -493,8 +519,10 @@ pub fn apply_color_grading_pre(
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VignetteShape {
+    /// Elliptical falloff matching the image aspect ratio (default).
     #[default]
     Elliptical,
+    /// Circular falloff centered on the image.
     Circular,
 }
 
@@ -535,6 +563,7 @@ pub struct VignettePrecomputed {
 }
 
 impl VignettePrecomputed {
+    /// Precompute vignette geometry from amount, shape, and image dimensions.
     pub fn new(amount: f32, shape: VignetteShape, w: u32, h: u32) -> Self {
         let half_w = w as f32 / 2.0;
         let half_h = h as f32 / 2.0;
@@ -636,6 +665,7 @@ pub fn apply_vignette_buffer(
 /// First point must have x=0.0, last must have x=1.0.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToneCurve {
+    /// Control points as (input, output) pairs in [0.0, 1.0], sorted by input.
     pub points: Vec<(f32, f32)>,
 }
 
@@ -648,6 +678,7 @@ impl Default for ToneCurve {
 }
 
 impl ToneCurve {
+    /// Return `true` if this is the identity curve (two endpoints, no adjustment).
     pub fn is_identity(&self) -> bool {
         self.points.len() == 2 && self.points[0] == (0.0, 0.0) && self.points[1] == (1.0, 1.0)
     }
@@ -689,19 +720,25 @@ impl ToneCurve {
 /// Parameters for 5-channel tone curves.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ToneCurveParams {
+    /// Master RGB curve applied to all channels.
     #[serde(default)]
     pub rgb: ToneCurve,
+    /// Luminance-only curve.
     #[serde(default)]
     pub luma: ToneCurve,
+    /// Red channel curve.
     #[serde(default)]
     pub red: ToneCurve,
+    /// Green channel curve.
     #[serde(default)]
     pub green: ToneCurve,
+    /// Blue channel curve.
     #[serde(default)]
     pub blue: ToneCurve,
 }
 
 impl ToneCurveParams {
+    /// Return `true` if all five curves are identity (no adjustment).
     pub fn is_default(&self) -> bool {
         self.rgb.is_identity()
             && self.luma.is_identity()
@@ -825,6 +862,7 @@ pub struct ToneCurvePrecomputed {
 }
 
 impl ToneCurvePrecomputed {
+    /// Precompute 256-entry LUTs for each non-identity curve.
     pub fn new(params: &ToneCurveParams) -> Self {
         Self {
             rgb: (!params.rgb.is_identity()).then(|| build_tone_curve_lut(&params.rgb)),

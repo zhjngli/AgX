@@ -1,3 +1,5 @@
+//! Build script for the agx crate. Discovers libraw via pkg-config.
+
 fn main() {
     #[cfg(feature = "raw")]
     {
