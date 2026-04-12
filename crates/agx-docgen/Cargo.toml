@@ -1,0 +1,12 @@
+[package]
+name = "agx-docgen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Generates CLI and preset reference markdown for the AgX documentation site"
+
+[dependencies]
+agx = { path = "../agx", features = ["docgen"] }
+agx-cli = { path = "../agx-cli" }
+schemars = "0.8"
+clap-markdown = "0.1"
