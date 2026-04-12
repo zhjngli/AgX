@@ -90,13 +90,12 @@ Cross-references that need rustdoc validation live in inline `//!` lines on the 
 
 ## Active lints
 
-Both `crates/agx/` and `crates/agx-cli/` carry one crate-level rustdoc lint today:
+Both `crates/agx/` and `crates/agx-cli/` carry two crate-level lints:
 
-- `#![deny(rustdoc::broken_intra_doc_links)]` — every broken intra-doc link in a `///` or `//!` comment fails `cargo doc`. There is no retrofit cost for this lint because the existing surface is link-free; new doc comments are validated as they are written.
+- `#![deny(missing_docs)]` — every public item without a `///` or `//!` doc comment fails the build. This ensures new public API surface is documented before it compiles.
+- `#![deny(rustdoc::broken_intra_doc_links)]` — every broken intra-doc link in a `///` or `//!` comment fails `cargo doc`.
 
-A `missing_docs` lint is **not** active at the source level yet. The API doc retrofit sub-project will track and retire the missing-docs warning footprint crate-by-crate, and will introduce missing-docs enforcement at the end of that work — either as a source-level `#![warn(missing_docs)]` (once the warning footprint is zero) or via `RUSTDOCFLAGS` in `scripts/verify.sh`. Until then, contributors should still add `///` comments to every public item they touch, even though the linter is not enforcing it.
-
-`scripts/verify.sh` runs `cargo doc --no-deps --workspace` with `RUSTDOCFLAGS="-D warnings"` so any rustdoc warning becomes a local verify failure. Today this enforces `broken_intra_doc_links` and any default rustdoc warnings; it will extend to `missing_docs` once the retrofit is ready.
+`scripts/verify.sh` runs `cargo doc --no-deps --workspace` with `RUSTDOCFLAGS="-D warnings"` so any rustdoc warning becomes a local verify failure.
 
 ## Local preview
 
