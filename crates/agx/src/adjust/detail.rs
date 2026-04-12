@@ -14,7 +14,7 @@ pub const SHARPEN_RADIUS_MAX: f32 = 3.0;
 /// Minimum supported sharpening threshold.
 pub const SHARPEN_THRESHOLD_MIN: f32 = 0.0;
 /// Maximum supported sharpening threshold.
-pub const SHARPEN_THRESHOLD_MAX: f32 = 255.0;
+pub const SHARPEN_THRESHOLD_MAX: f32 = 100.0;
 /// Minimum supported sharpening masking value.
 pub const SHARPEN_MASKING_MIN: f32 = 0.0;
 /// Maximum supported sharpening masking value.
@@ -49,7 +49,7 @@ pub struct SharpeningParams {
     pub radius: f32,
     /// Minimum luminance delta (0–255 scale) below which sharpening is suppressed. Default 25.
     #[serde(default = "default_sharpening_threshold")]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 255.0)))]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub threshold: f32,
     /// Edge-aware masking strength, 0–100. Higher restricts sharpening to strong edges. Default 0.
     #[serde(default)]
