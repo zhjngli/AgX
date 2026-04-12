@@ -12,6 +12,7 @@ use super::{LUMA_B, LUMA_G, LUMA_R};
 /// - `detail`: 0–100, finest-scale protection (higher = more detail kept)
 ///
 /// When all three are zero, the noise reduction pass is skipped entirely.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NoiseReductionParams {
     /// Luminance denoising strength, 0–100. Default 0 (off).

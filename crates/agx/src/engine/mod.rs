@@ -209,6 +209,7 @@ impl Pipeline {
 /// Per-channel HSL adjustment (hue shift, saturation, luminance).
 ///
 /// Ranges: hue -180.0 to +180.0 (degrees), saturation/luminance -100.0 to +100.0.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannel {
     /// Hue shift in degrees (range: -180 to +180, default: 0).
@@ -226,6 +227,7 @@ pub struct HslChannel {
 ///
 /// Channel order: Red (0deg), Orange (30deg), Yellow (60deg), Green (120deg),
 /// Aqua (180deg), Blue (240deg), Purple (270deg), Magenta (330deg).
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannels {
     /// HSL adjustment for the red channel (~0°).
@@ -306,6 +308,7 @@ impl HslChannels {
 /// Vignette adjustment parameters.
 ///
 /// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VignetteParams {
     /// Vignette darkening (negative) or brightening (positive) amount (range: -100 to +100, default: 0).
@@ -326,6 +329,7 @@ impl VignetteParams {
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Parameters {
     /// Exposure in stops, range -5.0 to +5.0
@@ -2396,5 +2400,18 @@ mod tests {
             }
         }
         assert!(changed, "grain should change render output");
+    }
+}
+
+#[cfg(all(test, feature = "docgen"))]
+mod docgen_tests {
+    use super::*;
+
+    #[test]
+    fn parameters_schema_generates() {
+        let schema = schemars::schema_for!(Parameters);
+        let json = serde_json::to_string_pretty(&schema).unwrap();
+        assert!(json.contains("exposure"));
+        assert!(json.contains("grain"));
     }
 }

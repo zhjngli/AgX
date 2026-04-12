@@ -368,6 +368,7 @@ pub fn apply_hsl(
 ///
 /// Used for shadows, midtones, highlights, and global wheels in color grading.
 /// Hue: 0-360 degrees, Saturation: 0-100, Luminance: -100 to +100.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ColorWheel {
     /// Hue angle in degrees (0–360).
@@ -382,6 +383,7 @@ pub struct ColorWheel {
 }
 
 /// 3-way color grading parameters (shadows, midtones, highlights, global + balance).
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ColorGradingParams {
     /// Shadow tones color wheel.
@@ -516,6 +518,7 @@ pub fn apply_color_grading_pre(
 // --- Vignette (sRGB gamma space, position-dependent) ---
 
 /// Vignette falloff geometry.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VignetteShape {
@@ -663,6 +666,7 @@ pub fn apply_vignette_buffer(
 /// A single tone curve defined by control points.
 /// Points are (input, output) pairs in [0.0, 1.0], sorted by input.
 /// First point must have x=0.0, last must have x=1.0.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToneCurve {
     /// Control points as (input, output) pairs in [0.0, 1.0], sorted by input.
@@ -718,6 +722,7 @@ impl ToneCurve {
 }
 
 /// Parameters for 5-channel tone curves.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ToneCurveParams {
     /// Master RGB curve applied to all channels.

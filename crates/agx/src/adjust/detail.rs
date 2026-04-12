@@ -11,6 +11,7 @@ fn default_sharpening_threshold() -> f32 {
 }
 
 /// Sharpening parameters controlling unsharp-mask strength, radius, threshold, and edge masking.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SharpeningParams {
     /// Sharpening intensity, 0–100. Default 0 (off).
@@ -41,6 +42,7 @@ impl Default for SharpeningParams {
 /// Combined detail parameters: sharpening, clarity, and texture.
 ///
 /// Each control targets a different spatial frequency range via unsharp mask sigma.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetailParams {
     /// Sharpening sub-parameters (amount, radius, threshold, masking).

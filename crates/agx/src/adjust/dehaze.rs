@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Dehaze adjustment parameters. Amount range: -100 to +100. Positive removes haze,
 /// negative adds haze/fog. When amount is 0, the dehaze pass is skipped entirely.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DehazeParams {
     /// Dehaze strength from -100 (add fog) to +100 (remove haze). Default 0 (neutral).

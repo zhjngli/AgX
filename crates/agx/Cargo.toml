@@ -30,4 +30,4 @@ cc = "1"
 default = []
 raw = []
 profiling = ["serde_json"]
-docgen = ["schemars"]
+docgen = ["schemars", "serde_json"]
