@@ -2540,6 +2540,63 @@ mod docgen_tests {
         assert_eq!(actual, expected, "schema range drift for {}", path.join("."));
     }
 
+    fn assert_color_wheel_ranges(root: &RootSchema, base_path: &[&str]) {
+        let mut hue_path = base_path.to_vec();
+        hue_path.push("hue");
+        assert_range(root, &hue_path, CW_HUE_MIN, CW_HUE_MAX);
+
+        let mut saturation_path = base_path.to_vec();
+        saturation_path.push("saturation");
+        assert_range(
+            root,
+            &saturation_path,
+            CW_SATURATION_MIN,
+            CW_SATURATION_MAX,
+        );
+
+        let mut luminance_path = base_path.to_vec();
+        luminance_path.push("luminance");
+        assert_range(root, &luminance_path, CW_LUMINANCE_MIN, CW_LUMINANCE_MAX);
+    }
+
+    fn assert_sharpening_ranges(root: &RootSchema, base_path: &[&str]) {
+        let mut amount_path = base_path.to_vec();
+        amount_path.push("amount");
+        assert_range(
+            root,
+            &amount_path,
+            crate::adjust::detail::SHARPEN_AMOUNT_MIN,
+            crate::adjust::detail::SHARPEN_AMOUNT_MAX,
+        );
+
+        let mut radius_path = base_path.to_vec();
+        radius_path.push("radius");
+        assert_range(
+            root,
+            &radius_path,
+            crate::adjust::detail::SHARPEN_RADIUS_MIN,
+            crate::adjust::detail::SHARPEN_RADIUS_MAX,
+        );
+
+        let mut threshold_path = base_path.to_vec();
+        threshold_path.push("threshold");
+        assert_range(
+            root,
+            &threshold_path,
+            crate::adjust::detail::SHARPEN_THRESHOLD_MIN,
+            crate::adjust::detail::SHARPEN_THRESHOLD_MAX,
+        );
+
+        let mut masking_path = base_path.to_vec();
+        masking_path.push("masking");
+        assert_range(
+            root,
+            &masking_path,
+            crate::adjust::detail::SHARPEN_MASKING_MIN,
+            crate::adjust::detail::SHARPEN_MASKING_MAX,
+        );
+    }
+
     #[test]
     fn schema_ranges_match_constants() {
         let parameters_schema = schemars::schema_for!(Parameters);
@@ -2562,6 +2619,51 @@ mod docgen_tests {
             VIGNETTE_AMOUNT_MIN,
             VIGNETTE_AMOUNT_MAX,
         );
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "shadows"]);
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "midtones"]);
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "highlights"]);
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "global"]);
+        assert_range(
+            &parameters_schema,
+            &["color_grading", "balance"],
+            CG_BALANCE_MIN,
+            CG_BALANCE_MAX,
+        );
+        assert_sharpening_ranges(&parameters_schema, &["detail", "sharpening"]);
+        assert_range(
+            &parameters_schema,
+            &["detail", "clarity"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["detail", "texture"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["dehaze", "amount"],
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MIN,
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MAX,
+        );
+        for field in ["luminance", "color", "detail"] {
+            assert_range(
+                &parameters_schema,
+                &["noise_reduction", field],
+                crate::adjust::denoise::NR_MIN,
+                crate::adjust::denoise::NR_MAX,
+            );
+        }
+        for field in ["amount", "size"] {
+            assert_range(
+                &parameters_schema,
+                &["grain", field],
+                crate::adjust::grain::GRAIN_PARAM_MIN,
+                crate::adjust::grain::GRAIN_PARAM_MAX,
+            );
+        }
         assert_range(
             &parameters_schema,
             &["exposure"],
@@ -2616,6 +2718,10 @@ mod docgen_tests {
         );
 
         let color_grading_schema = schemars::schema_for!(crate::adjust::ColorGradingParams);
+        assert_color_wheel_ranges(&color_grading_schema, &["shadows"]);
+        assert_color_wheel_ranges(&color_grading_schema, &["midtones"]);
+        assert_color_wheel_ranges(&color_grading_schema, &["highlights"]);
+        assert_color_wheel_ranges(&color_grading_schema, &["global"]);
         assert_range(
             &color_grading_schema,
             &["balance"],
@@ -2656,32 +2762,10 @@ mod docgen_tests {
         }
 
         let sharpening_schema = schemars::schema_for!(crate::adjust::SharpeningParams);
-        assert_range(
-            &sharpening_schema,
-            &["amount"],
-            crate::adjust::detail::SHARPEN_AMOUNT_MIN,
-            crate::adjust::detail::SHARPEN_AMOUNT_MAX,
-        );
-        assert_range(
-            &sharpening_schema,
-            &["radius"],
-            crate::adjust::detail::SHARPEN_RADIUS_MIN,
-            crate::adjust::detail::SHARPEN_RADIUS_MAX,
-        );
-        assert_range(
-            &sharpening_schema,
-            &["threshold"],
-            crate::adjust::detail::SHARPEN_THRESHOLD_MIN,
-            crate::adjust::detail::SHARPEN_THRESHOLD_MAX,
-        );
-        assert_range(
-            &sharpening_schema,
-            &["masking"],
-            crate::adjust::detail::SHARPEN_MASKING_MIN,
-            crate::adjust::detail::SHARPEN_MASKING_MAX,
-        );
+        assert_sharpening_ranges(&sharpening_schema, &[]);
 
         let detail_schema = schemars::schema_for!(crate::adjust::DetailParams);
+        assert_sharpening_ranges(&detail_schema, &["sharpening"]);
         assert_range(
             &detail_schema,
             &["clarity"],
