@@ -488,18 +488,16 @@ fn parse_curve_points(s: &str) -> Result<agx::ToneCurve, String> {
 
 impl EditArgs {
     /// Convert CLI edit flags into render parameters.
-    pub fn to_params(&self) -> agx::Parameters {
-        fn parse_tc(flag: &Option<String>) -> agx::ToneCurve {
+    pub fn to_params(&self) -> agx::Result<agx::Parameters> {
+        fn parse_tc(flag: &Option<String>) -> agx::Result<agx::ToneCurve> {
             match flag {
-                Some(s) => parse_curve_points(s).unwrap_or_else(|e| {
-                    eprintln!("Error parsing tone curve: {e}");
-                    std::process::exit(1);
-                }),
-                None => agx::ToneCurve::default(),
+                Some(s) => parse_curve_points(s)
+                    .map_err(|e| agx::AgxError::Preset(format!("Error parsing tone curve: {e}"))),
+                None => Ok(agx::ToneCurve::default()),
             }
         }
 
-        agx::Parameters {
+        Ok(agx::Parameters {
             exposure: self.exposure,
             contrast: self.contrast,
             highlights: self.highlights,
@@ -537,11 +535,11 @@ impl EditArgs {
                 balance: self.cg_balance,
             },
             tone_curve: agx::ToneCurveParams {
-                rgb: parse_tc(&self.tc_rgb),
-                luma: parse_tc(&self.tc_luma),
-                red: parse_tc(&self.tc_red),
-                green: parse_tc(&self.tc_green),
-                blue: parse_tc(&self.tc_blue),
+                rgb: parse_tc(&self.tc_rgb)?,
+                luma: parse_tc(&self.tc_luma)?,
+                red: parse_tc(&self.tc_red)?,
+                green: parse_tc(&self.tc_green)?,
+                blue: parse_tc(&self.tc_blue)?,
             },
             detail: agx::DetailParams {
                 sharpening: agx::SharpeningParams {
@@ -567,7 +565,7 @@ impl EditArgs {
                 size: self.grain_size,
                 seed: None,
             },
-        }
+        })
     }
 
     /// Load the optional LUT file referenced by the CLI flags.
@@ -699,11 +697,15 @@ pub fn build_cli() -> clap::Command {
 
 #[cfg(test)]
 mod tests {
-    use super::build_cli;
+    use clap::Parser;
+
+    use super::{build_cli, Cli, Commands};
 
     #[test]
     fn build_cli_returns_valid_command() {
         let command = build_cli();
+
+        command.clone().debug_assert();
 
         assert_eq!(command.get_name(), "agx");
 
@@ -717,5 +719,27 @@ mod tests {
         assert!(subcommands.iter().any(|name| name == "batch-apply"));
         assert!(subcommands.iter().any(|name| name == "batch-edit"));
         assert!(subcommands.iter().any(|name| name == "multi-apply"));
+    }
+
+    #[test]
+    fn edit_to_params_returns_error_for_invalid_tone_curve() {
+        let cli = Cli::parse_from([
+            "agx",
+            "edit",
+            "--input",
+            "input.png",
+            "--output",
+            "output.png",
+            "--tc-rgb",
+            "not-a-curve",
+        ]);
+
+        let Commands::Edit { edit, .. } = cli.command else {
+            panic!("expected edit command");
+        };
+
+        let error = edit.to_params().unwrap_err();
+
+        assert!(error.to_string().contains("Error parsing tone curve"));
     }
 }

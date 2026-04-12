@@ -192,7 +192,7 @@ fn run_edit(
     let decode_ms = decode_start.elapsed().as_secs_f64() * 1000.0;
 
     let mut engine = Engine::new(linear);
-    engine.set_params(edit.to_params());
+    engine.set_params(edit.to_params()?);
     if let Some(lut) = edit.load_lut()? {
         engine.set_lut(Some(lut));
     }
@@ -251,7 +251,7 @@ fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> agx::Res
 }
 
 fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
-    let params = edit.to_params();
+    let params = edit.to_params()?;
     let lut_data = edit.load_lut()?;
     let fmt = batch.output.parse_format()?;
     let summary = batch::run_batch_edit(
