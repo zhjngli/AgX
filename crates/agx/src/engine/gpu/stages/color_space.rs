@@ -60,10 +60,16 @@ mod tests {
             eprintln!("skipping: no GPU adapter");
             return;
         }
-        let runtime = GpuRuntime::new(2, 1).unwrap();
+        // Use a larger image to catch alignment/stride bugs
+        let runtime = GpuRuntime::new(4, 2).unwrap();
         let shaders = ShaderCache::new(&runtime.device).unwrap();
 
-        let pixels = vec![[0.5, 0.3, 0.1], [0.0, 1.0, 0.25]];
+        let pixels: Vec<[f32; 3]> = (0..8)
+            .map(|i| {
+                let t = i as f32 / 7.0;
+                [t, 1.0 - t, 0.5 * t]
+            })
+            .collect();
         runtime.upload_pixels(&pixels);
 
         let to_srgb = shaders.get("linear_to_srgb").unwrap();
@@ -73,6 +79,7 @@ mod tests {
         dispatch_srgb_to_linear(&runtime, to_linear);
 
         let result = runtime.download_pixels();
+        assert_eq!(result.len(), pixels.len());
         for (i, (a, b)) in pixels.iter().zip(result.iter()).enumerate() {
             for c in 0..3 {
                 assert!(
