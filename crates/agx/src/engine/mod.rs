@@ -2523,7 +2523,9 @@ mod docgen_tests {
         let number = resolve_schema_object(root, current)
             .number
             .as_ref()
-            .unwrap_or_else(|| panic!("property '{}' is missing number validation", path.join(".")));
+            .unwrap_or_else(|| {
+                panic!("property '{}' is missing number validation", path.join("."))
+            });
         (
             number
                 .minimum
@@ -2537,7 +2539,12 @@ mod docgen_tests {
     fn assert_range(root: &RootSchema, path: &[&str], min: f32, max: f32) {
         let actual = property_range(root, path);
         let expected = (f64::from(min), f64::from(max));
-        assert_eq!(actual, expected, "schema range drift for {}", path.join("."));
+        assert_eq!(
+            actual,
+            expected,
+            "schema range drift for {}",
+            path.join(".")
+        );
     }
 
     fn assert_color_wheel_ranges(root: &RootSchema, base_path: &[&str]) {
@@ -2547,12 +2554,7 @@ mod docgen_tests {
 
         let mut saturation_path = base_path.to_vec();
         saturation_path.push("saturation");
-        assert_range(
-            root,
-            &saturation_path,
-            CW_SATURATION_MIN,
-            CW_SATURATION_MAX,
-        );
+        assert_range(root, &saturation_path, CW_SATURATION_MIN, CW_SATURATION_MAX);
 
         let mut luminance_path = base_path.to_vec();
         luminance_path.push("luminance");
@@ -2600,7 +2602,12 @@ mod docgen_tests {
     #[test]
     fn schema_ranges_match_constants() {
         let parameters_schema = schemars::schema_for!(Parameters);
-        assert_range(&parameters_schema, &["hsl", "red", "hue"], HSL_HUE_MIN, HSL_HUE_MAX);
+        assert_range(
+            &parameters_schema,
+            &["hsl", "red", "hue"],
+            HSL_HUE_MIN,
+            HSL_HUE_MAX,
+        );
         assert_range(
             &parameters_schema,
             &["hsl", "red", "saturation"],
@@ -2681,18 +2688,8 @@ mod docgen_tests {
 
         let hsl_channel_schema = schemars::schema_for!(HslChannel);
         assert_range(&hsl_channel_schema, &["hue"], HSL_HUE_MIN, HSL_HUE_MAX);
-        assert_range(
-            &hsl_channel_schema,
-            &["saturation"],
-            HSL_SL_MIN,
-            HSL_SL_MAX,
-        );
-        assert_range(
-            &hsl_channel_schema,
-            &["luminance"],
-            HSL_SL_MIN,
-            HSL_SL_MAX,
-        );
+        assert_range(&hsl_channel_schema, &["saturation"], HSL_SL_MIN, HSL_SL_MAX);
+        assert_range(&hsl_channel_schema, &["luminance"], HSL_SL_MIN, HSL_SL_MAX);
 
         let vignette_schema = schemars::schema_for!(VignetteParams);
         assert_range(
