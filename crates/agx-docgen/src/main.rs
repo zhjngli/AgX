@@ -706,15 +706,249 @@ fn strip_alias_annotations(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        canonical_default_string, documented_leaf_paths, generate_preset_reference,
-        render_preset_reference, repo_root, sanitize_markdown, schema_at_path, schema_leaf_paths,
+        documented_leaf_paths, generate_preset_reference, render_preset_reference, repo_root,
+        sanitize_markdown, schema_leaf_paths,
         strip_alias_annotations, strip_clap_markdown_title, GENERATED_HEADER,
         PRESET_PAGE_TITLE,
     };
+    use std::collections::BTreeMap;
 
     fn preset_markdown() -> String {
         let schema = schemars::schema_for!(agx::Parameters);
         render_preset_reference(&schema)
+    }
+
+    fn rendered_default_column_by_path(markdown: &str) -> BTreeMap<Vec<String>, String> {
+        let mut defaults = BTreeMap::new();
+        let mut current_section = None;
+
+        for line in markdown.lines() {
+            if let Some(section) = line.strip_prefix("## ") {
+                current_section = Some(section.to_owned());
+                continue;
+            }
+
+            if !line.starts_with("| `") {
+                continue;
+            }
+
+            let columns = line.split('|').map(str::trim).collect::<Vec<_>>();
+            if columns.len() < 5 {
+                continue;
+            }
+
+            let field = columns[1].trim_matches('`');
+            let default = columns[3].to_owned();
+            let path = rendered_path_for_row(current_section.as_deref(), field);
+            defaults.insert(path, default);
+        }
+
+        defaults
+    }
+
+    fn rendered_path_for_row(section: Option<&str>, field: &str) -> Vec<String> {
+        let parts = field.split('.').map(str::to_owned).collect::<Vec<_>>();
+        match section {
+            Some("Per-pixel Adjustments") => parts,
+            Some("HSL Adjustments") => {
+                let mut path = vec!["hsl".to_owned()];
+                path.extend(parts);
+                path
+            }
+            Some("Vignette") => prefixed_path("vignette", parts),
+            Some("Color Grading") => prefixed_path("color_grading", parts),
+            Some("Tone Curve") => prefixed_path("tone_curve", parts),
+            Some("Detail") => prefixed_path("detail", parts),
+            Some("Dehaze") => prefixed_path("dehaze", parts),
+            Some("Noise Reduction") => prefixed_path("noise_reduction", parts),
+            Some("Grain") => prefixed_path("grain", parts),
+            other => panic!("unexpected preset section for row parsing: {other:?}"),
+        }
+    }
+
+    fn prefixed_path(prefix: &str, parts: Vec<String>) -> Vec<String> {
+        let mut path = vec![prefix.to_owned()];
+        path.extend(parts);
+        path
+    }
+
+    fn expected_canonical_defaults() -> BTreeMap<Vec<String>, String> {
+        let defaults = agx::Parameters::default();
+        let mut values = BTreeMap::new();
+
+        values.insert(vec!["exposure".to_owned()], fmt_f32(defaults.exposure));
+        values.insert(vec!["contrast".to_owned()], fmt_f32(defaults.contrast));
+        values.insert(vec!["highlights".to_owned()], fmt_f32(defaults.highlights));
+        values.insert(vec!["shadows".to_owned()], fmt_f32(defaults.shadows));
+        values.insert(vec!["whites".to_owned()], fmt_f32(defaults.whites));
+        values.insert(vec!["blacks".to_owned()], fmt_f32(defaults.blacks));
+        values.insert(vec!["temperature".to_owned()], fmt_f32(defaults.temperature));
+        values.insert(vec!["tint".to_owned()], fmt_f32(defaults.tint));
+
+        for (channel, value) in [
+            ("red", defaults.hsl.red),
+            ("orange", defaults.hsl.orange),
+            ("yellow", defaults.hsl.yellow),
+            ("green", defaults.hsl.green),
+            ("aqua", defaults.hsl.aqua),
+            ("blue", defaults.hsl.blue),
+            ("purple", defaults.hsl.purple),
+            ("magenta", defaults.hsl.magenta),
+        ] {
+            values.insert(
+                vec!["hsl".to_owned(), channel.to_owned(), "hue".to_owned()],
+                fmt_f32(value.hue),
+            );
+            values.insert(
+                vec!["hsl".to_owned(), channel.to_owned(), "saturation".to_owned()],
+                fmt_f32(value.saturation),
+            );
+            values.insert(
+                vec!["hsl".to_owned(), channel.to_owned(), "luminance".to_owned()],
+                fmt_f32(value.luminance),
+            );
+        }
+
+        values.insert(
+            vec!["vignette".to_owned(), "amount".to_owned()],
+            fmt_f32(defaults.vignette.amount),
+        );
+        values.insert(
+            vec!["vignette".to_owned(), "shape".to_owned()],
+            format!("`{}`", defaults.vignette.shape),
+        );
+
+        for (wheel, value) in [
+            ("shadows", defaults.color_grading.shadows),
+            ("midtones", defaults.color_grading.midtones),
+            ("highlights", defaults.color_grading.highlights),
+            ("global", defaults.color_grading.global),
+        ] {
+            values.insert(
+                vec![
+                    "color_grading".to_owned(),
+                    wheel.to_owned(),
+                    "hue".to_owned(),
+                ],
+                fmt_f32(value.hue),
+            );
+            values.insert(
+                vec![
+                    "color_grading".to_owned(),
+                    wheel.to_owned(),
+                    "saturation".to_owned(),
+                ],
+                fmt_f32(value.saturation),
+            );
+            values.insert(
+                vec![
+                    "color_grading".to_owned(),
+                    wheel.to_owned(),
+                    "luminance".to_owned(),
+                ],
+                fmt_f32(value.luminance),
+            );
+        }
+        values.insert(
+            vec!["color_grading".to_owned(), "balance".to_owned()],
+            fmt_f32(defaults.color_grading.balance),
+        );
+
+        for (curve, points) in [
+            ("rgb", &defaults.tone_curve.rgb.points),
+            ("luma", &defaults.tone_curve.luma.points),
+            ("red", &defaults.tone_curve.red.points),
+            ("green", &defaults.tone_curve.green.points),
+            ("blue", &defaults.tone_curve.blue.points),
+        ] {
+            values.insert(
+                vec!["tone_curve".to_owned(), curve.to_owned(), "points".to_owned()],
+                fmt_points(points),
+            );
+        }
+
+        values.insert(
+            vec![
+                "detail".to_owned(),
+                "sharpening".to_owned(),
+                "amount".to_owned(),
+            ],
+            fmt_f32(defaults.detail.sharpening.amount),
+        );
+        values.insert(
+            vec![
+                "detail".to_owned(),
+                "sharpening".to_owned(),
+                "radius".to_owned(),
+            ],
+            fmt_f32(defaults.detail.sharpening.radius),
+        );
+        values.insert(
+            vec![
+                "detail".to_owned(),
+                "sharpening".to_owned(),
+                "threshold".to_owned(),
+            ],
+            fmt_f32(defaults.detail.sharpening.threshold),
+        );
+        values.insert(
+            vec![
+                "detail".to_owned(),
+                "sharpening".to_owned(),
+                "masking".to_owned(),
+            ],
+            fmt_f32(defaults.detail.sharpening.masking),
+        );
+        values.insert(vec!["detail".to_owned(), "clarity".to_owned()], fmt_f32(defaults.detail.clarity));
+        values.insert(vec!["detail".to_owned(), "texture".to_owned()], fmt_f32(defaults.detail.texture));
+
+        values.insert(vec!["dehaze".to_owned(), "amount".to_owned()], fmt_f32(defaults.dehaze.amount));
+
+        values.insert(
+            vec!["noise_reduction".to_owned(), "luminance".to_owned()],
+            fmt_f32(defaults.noise_reduction.luminance),
+        );
+        values.insert(
+            vec!["noise_reduction".to_owned(), "color".to_owned()],
+            fmt_f32(defaults.noise_reduction.color),
+        );
+        values.insert(
+            vec!["noise_reduction".to_owned(), "detail".to_owned()],
+            fmt_f32(defaults.noise_reduction.detail),
+        );
+
+        values.insert(
+            vec!["grain".to_owned(), "grain_type".to_owned()],
+            format!("`{}`", defaults.grain.grain_type),
+        );
+        values.insert(vec!["grain".to_owned(), "amount".to_owned()], fmt_f32(defaults.grain.amount));
+        values.insert(vec!["grain".to_owned(), "size".to_owned()], fmt_f32(defaults.grain.size));
+        values.insert(
+            vec!["grain".to_owned(), "seed".to_owned()],
+            defaults
+                .grain
+                .seed
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "null".to_owned()),
+        );
+
+        values
+    }
+
+    fn fmt_f32(value: f32) -> String {
+        let mut formatted = value.to_string();
+        if let Some(stripped) = formatted.strip_suffix(".0") {
+            formatted = stripped.to_owned();
+        }
+        formatted
+    }
+
+    fn fmt_points(points: &[(f32, f32)]) -> String {
+        let pairs = points
+            .iter()
+            .map(|(x, y)| format!("({}, {})", fmt_f32(*x), fmt_f32(*y)))
+            .collect::<Vec<_>>();
+        format!("[{}]", pairs.join(", "))
     }
 
     #[test]
@@ -818,17 +1052,10 @@ mod tests {
     }
 
     #[test]
-    fn canonical_defaults_match_generated_defaults_for_documented_paths() {
-        let schema = schemars::schema_for!(agx::Parameters);
+    fn rendered_preset_defaults_match_canonical_runtime_defaults() {
+        let rendered_defaults = rendered_default_column_by_path(&preset_markdown());
+        let expected_defaults = expected_canonical_defaults();
 
-        for path in documented_leaf_paths() {
-            let path_refs = path.iter().map(String::as_str).collect::<Vec<_>>();
-            let field_schema = schema_at_path(&schema, &path_refs);
-            let schema_default = super::get_default_string(&path_refs, field_schema);
-            let canonical_default = canonical_default_string(&path_refs)
-                .unwrap_or_else(|| format!("missing canonical default for {:?}", path));
-
-            assert_eq!(schema_default, canonical_default, "default drift at {:?}", path);
-        }
+        assert_eq!(rendered_defaults, expected_defaults);
     }
 }
