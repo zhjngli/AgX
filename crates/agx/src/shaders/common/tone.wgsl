@@ -1,6 +1,5 @@
+#define_import_path common::tone
 // Tone adjustment functions for AgX compute shaders.
-
-#import common::math
 
 // Apply contrast to a single channel. Range: -100 to +100.
 fn apply_contrast(value: f32, contrast: f32) -> f32 {

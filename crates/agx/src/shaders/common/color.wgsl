@@ -1,6 +1,5 @@
+#define_import_path common::color
 // Color space conversion and HSL utilities for AgX compute shaders.
-
-#import common::math
 
 // Convert a single linear sRGB channel to sRGB gamma.
 fn linear_to_srgb_channel(v: f32) -> f32 {

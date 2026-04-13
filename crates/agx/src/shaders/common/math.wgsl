@@ -1,3 +1,4 @@
+#define_import_path common::math
 // Shared math utilities for AgX compute shaders.
 
 // Hermite smoothstep: 0 at edge0, 1 at edge1, smooth cubic transition.
