@@ -11,6 +11,8 @@ pub struct GpuRuntime {
     pub(crate) queue: wgpu::Queue,
     /// GPU-side pixel buffer (storage, read/write).
     pub(crate) pixel_buffer: wgpu::Buffer,
+    /// GPU-side uniform buffer for [`super::params::GpuParameters`].
+    pub(crate) params_buffer: wgpu::Buffer,
     /// GPU-side staging buffer for reading pixels back to CPU.
     pub(crate) staging_buffer: wgpu::Buffer,
     /// Image width in pixels.
@@ -55,6 +57,13 @@ impl GpuRuntime {
             mapped_at_creation: false,
         });
 
+        let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("params_buffer"),
+            size: std::mem::size_of::<super::params::GpuParameters>() as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging_buffer"),
             size: buffer_size,
@@ -66,6 +75,7 @@ impl GpuRuntime {
             device,
             queue,
             pixel_buffer,
+            params_buffer,
             staging_buffer,
             width,
             height,
@@ -77,6 +87,12 @@ impl GpuRuntime {
     pub fn upload_pixels(&self, pixels: &[[f32; 3]]) {
         let bytes: &[u8] = bytemuck::cast_slice(pixels);
         self.queue.write_buffer(&self.pixel_buffer, 0, bytes);
+    }
+
+    /// Upload a [`GpuParameters`](super::params::GpuParameters) struct to the uniform buffer.
+    pub fn upload_params(&self, params: &super::params::GpuParameters) {
+        let bytes: &[u8] = bytemuck::bytes_of(params);
+        self.queue.write_buffer(&self.params_buffer, 0, bytes);
     }
 
     /// Download pixel data from GPU to CPU.

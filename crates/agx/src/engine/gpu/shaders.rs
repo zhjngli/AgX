@@ -47,7 +47,7 @@ impl ShaderCache {
             include_str!("../../shaders/common/tone.wgsl"),
         )?;
 
-        // Compile stage shaders (per-pixel stages added in subsequent tasks)
+        // Compile stage shaders
         let stage_shaders = [
             (
                 "linear_to_srgb",
@@ -56,6 +56,14 @@ impl ShaderCache {
             (
                 "srgb_to_linear",
                 include_str!("../../shaders/srgb_to_linear.wgsl"),
+            ),
+            (
+                "linear_adjustments",
+                include_str!("../../shaders/linear_adjustments.wgsl"),
+            ),
+            (
+                "gamma_adjustments",
+                include_str!("../../shaders/gamma_adjustments.wgsl"),
             ),
         ];
 
