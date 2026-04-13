@@ -5,6 +5,11 @@ use serde::{Deserialize, Serialize};
 
 use super::{LUMA_B, LUMA_G, LUMA_R};
 
+/// Minimum supported noise reduction value.
+pub const NR_MIN: f32 = 0.0;
+/// Maximum supported noise reduction value.
+pub const NR_MAX: f32 = 100.0;
+
 /// Noise reduction parameters.
 ///
 /// - `luminance`: 0–100, strength of luminance denoising
@@ -12,16 +17,20 @@ use super::{LUMA_B, LUMA_G, LUMA_R};
 /// - `detail`: 0–100, finest-scale protection (higher = more detail kept)
 ///
 /// When all three are zero, the noise reduction pass is skipped entirely.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NoiseReductionParams {
     /// Luminance denoising strength, 0–100. Default 0 (off).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub luminance: f32,
     /// Chroma denoising strength, 0–100. Default 0 (off).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub color: f32,
     /// Finest-scale detail preservation, 0–100. Higher keeps more fine detail. Default 0.
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
     pub detail: f32,
 }
 

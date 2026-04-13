@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/agx",
     "crates/agx-cli",
+    "crates/agx-docgen",
     "crates/agx-e2e",
     "crates/agx-lut-gen",
 ]

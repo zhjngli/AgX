@@ -209,16 +209,20 @@ impl Pipeline {
 /// Per-channel HSL adjustment (hue shift, saturation, luminance).
 ///
 /// Ranges: hue -180.0 to +180.0 (degrees), saturation/luminance -100.0 to +100.0.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannel {
     /// Hue shift in degrees (range: -180 to +180, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -180.0, max = 180.0)))]
     pub hue: f32,
     /// Saturation adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub saturation: f32,
     /// Luminance adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub luminance: f32,
 }
 
@@ -226,6 +230,7 @@ pub struct HslChannel {
 ///
 /// Channel order: Red (0deg), Orange (30deg), Yellow (60deg), Green (120deg),
 /// Aqua (180deg), Blue (240deg), Purple (270deg), Magenta (330deg).
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannels {
     /// HSL adjustment for the red channel (~0°).
@@ -303,13 +308,52 @@ impl HslChannels {
     }
 }
 
+/// Minimum supported exposure in stops.
+pub const EXPOSURE_MIN: f32 = -5.0;
+/// Maximum supported exposure in stops.
+pub const EXPOSURE_MAX: f32 = 5.0;
+/// Minimum supported value for tone sliders.
+pub const TONE_SLIDER_MIN: f32 = -100.0;
+/// Maximum supported value for tone sliders.
+pub const TONE_SLIDER_MAX: f32 = 100.0;
+/// Minimum supported HSL hue shift in degrees.
+pub const HSL_HUE_MIN: f32 = -180.0;
+/// Maximum supported HSL hue shift in degrees.
+pub const HSL_HUE_MAX: f32 = 180.0;
+/// Minimum supported HSL saturation/luminance slider value.
+pub const HSL_SL_MIN: f32 = -100.0;
+/// Maximum supported HSL saturation/luminance slider value.
+pub const HSL_SL_MAX: f32 = 100.0;
+/// Minimum supported vignette amount.
+pub const VIGNETTE_AMOUNT_MIN: f32 = -100.0;
+/// Maximum supported vignette amount.
+pub const VIGNETTE_AMOUNT_MAX: f32 = 100.0;
+/// Minimum supported color grading balance value.
+pub const CG_BALANCE_MIN: f32 = -100.0;
+/// Maximum supported color grading balance value.
+pub const CG_BALANCE_MAX: f32 = 100.0;
+/// Minimum supported color wheel hue in degrees.
+pub const CW_HUE_MIN: f32 = 0.0;
+/// Maximum supported color wheel hue in degrees.
+pub const CW_HUE_MAX: f32 = 360.0;
+/// Minimum supported color wheel saturation.
+pub const CW_SATURATION_MIN: f32 = 0.0;
+/// Maximum supported color wheel saturation.
+pub const CW_SATURATION_MAX: f32 = 100.0;
+/// Minimum supported color wheel luminance.
+pub const CW_LUMINANCE_MIN: f32 = -100.0;
+/// Maximum supported color wheel luminance.
+pub const CW_LUMINANCE_MAX: f32 = 100.0;
+
 /// Vignette adjustment parameters.
 ///
 /// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VignetteParams {
     /// Vignette darkening (negative) or brightening (positive) amount (range: -100 to +100, default: 0).
     #[serde(default)]
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub amount: f32,
     /// Vignette shape (circle, oval, or rectangle).
     #[serde(default)]
@@ -326,19 +370,26 @@ impl VignetteParams {
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
+#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Parameters {
     /// Exposure in stops, range -5.0 to +5.0
+    #[cfg_attr(feature = "docgen", schemars(range(min = -5.0, max = 5.0)))]
     pub exposure: f32,
     /// Contrast, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub contrast: f32,
     /// Highlights, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub highlights: f32,
     /// Shadows, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub shadows: f32,
     /// Whites, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub whites: f32,
     /// Blacks, range -100 to +100
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub blacks: f32,
     /// White balance temperature shift
     pub temperature: f32,
@@ -2396,5 +2447,333 @@ mod tests {
             }
         }
         assert!(changed, "grain should change render output");
+    }
+}
+
+#[cfg(all(test, feature = "docgen"))]
+mod docgen_tests {
+    use super::*;
+    use schemars::schema::{RootSchema, Schema, SchemaObject};
+
+    fn schema_object(schema: &Schema) -> &SchemaObject {
+        match schema {
+            Schema::Object(object) => object,
+            Schema::Bool(_) => panic!("expected object schema"),
+        }
+    }
+
+    fn resolve_schema_object<'a>(
+        root: &'a RootSchema,
+        schema: &'a SchemaObject,
+    ) -> &'a SchemaObject {
+        let mut current = schema;
+        loop {
+            if let Some(reference) = current.reference.as_deref() {
+                let definition = reference
+                    .strip_prefix("#/definitions/")
+                    .unwrap_or_else(|| panic!("unsupported schema reference '{reference}'"));
+                current = schema_object(
+                    root.definitions
+                        .get(definition)
+                        .unwrap_or_else(|| panic!("missing schema definition '{definition}'")),
+                );
+                continue;
+            }
+
+            if let Some(all_of) = current
+                .subschemas
+                .as_ref()
+                .and_then(|subschemas| subschemas.all_of.as_deref())
+            {
+                if all_of.len() == 1 {
+                    current = schema_object(&all_of[0]);
+                    continue;
+                }
+            }
+
+            return current;
+        }
+    }
+
+    fn property_schema<'a>(
+        root: &'a RootSchema,
+        schema: &'a SchemaObject,
+        property: &str,
+    ) -> &'a SchemaObject {
+        let properties = &resolve_schema_object(root, schema)
+            .object
+            .as_ref()
+            .unwrap_or_else(|| panic!("schema has no object validation for {property}"))
+            .properties;
+        resolve_schema_object(
+            root,
+            properties
+                .get(property)
+                .map(schema_object)
+                .unwrap_or_else(|| panic!("missing property '{property}'")),
+        )
+    }
+
+    fn property_range(root: &RootSchema, path: &[&str]) -> (f64, f64) {
+        let mut current = &root.schema;
+        for property in path {
+            current = property_schema(root, current, property);
+        }
+
+        let number = resolve_schema_object(root, current)
+            .number
+            .as_ref()
+            .unwrap_or_else(|| {
+                panic!("property '{}' is missing number validation", path.join("."))
+            });
+        (
+            number
+                .minimum
+                .unwrap_or_else(|| panic!("property '{}' is missing minimum", path.join("."))),
+            number
+                .maximum
+                .unwrap_or_else(|| panic!("property '{}' is missing maximum", path.join("."))),
+        )
+    }
+
+    fn assert_range(root: &RootSchema, path: &[&str], min: f32, max: f32) {
+        let actual = property_range(root, path);
+        let expected = (f64::from(min), f64::from(max));
+        assert_eq!(
+            actual,
+            expected,
+            "schema range drift for {}",
+            path.join(".")
+        );
+    }
+
+    fn assert_color_wheel_ranges(root: &RootSchema, base_path: &[&str]) {
+        let mut hue_path = base_path.to_vec();
+        hue_path.push("hue");
+        assert_range(root, &hue_path, CW_HUE_MIN, CW_HUE_MAX);
+
+        let mut saturation_path = base_path.to_vec();
+        saturation_path.push("saturation");
+        assert_range(root, &saturation_path, CW_SATURATION_MIN, CW_SATURATION_MAX);
+
+        let mut luminance_path = base_path.to_vec();
+        luminance_path.push("luminance");
+        assert_range(root, &luminance_path, CW_LUMINANCE_MIN, CW_LUMINANCE_MAX);
+    }
+
+    fn assert_sharpening_ranges(root: &RootSchema, base_path: &[&str]) {
+        let mut amount_path = base_path.to_vec();
+        amount_path.push("amount");
+        assert_range(
+            root,
+            &amount_path,
+            crate::adjust::detail::SHARPEN_AMOUNT_MIN,
+            crate::adjust::detail::SHARPEN_AMOUNT_MAX,
+        );
+
+        let mut radius_path = base_path.to_vec();
+        radius_path.push("radius");
+        assert_range(
+            root,
+            &radius_path,
+            crate::adjust::detail::SHARPEN_RADIUS_MIN,
+            crate::adjust::detail::SHARPEN_RADIUS_MAX,
+        );
+
+        let mut threshold_path = base_path.to_vec();
+        threshold_path.push("threshold");
+        assert_range(
+            root,
+            &threshold_path,
+            crate::adjust::detail::SHARPEN_THRESHOLD_MIN,
+            crate::adjust::detail::SHARPEN_THRESHOLD_MAX,
+        );
+
+        let mut masking_path = base_path.to_vec();
+        masking_path.push("masking");
+        assert_range(
+            root,
+            &masking_path,
+            crate::adjust::detail::SHARPEN_MASKING_MIN,
+            crate::adjust::detail::SHARPEN_MASKING_MAX,
+        );
+    }
+
+    #[test]
+    fn schema_ranges_match_constants() {
+        let parameters_schema = schemars::schema_for!(Parameters);
+        assert_range(
+            &parameters_schema,
+            &["hsl", "red", "hue"],
+            HSL_HUE_MIN,
+            HSL_HUE_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["hsl", "red", "saturation"],
+            HSL_SL_MIN,
+            HSL_SL_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["hsl", "red", "luminance"],
+            HSL_SL_MIN,
+            HSL_SL_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["vignette", "amount"],
+            VIGNETTE_AMOUNT_MIN,
+            VIGNETTE_AMOUNT_MAX,
+        );
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "shadows"]);
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "midtones"]);
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "highlights"]);
+        assert_color_wheel_ranges(&parameters_schema, &["color_grading", "global"]);
+        assert_range(
+            &parameters_schema,
+            &["color_grading", "balance"],
+            CG_BALANCE_MIN,
+            CG_BALANCE_MAX,
+        );
+        assert_sharpening_ranges(&parameters_schema, &["detail", "sharpening"]);
+        assert_range(
+            &parameters_schema,
+            &["detail", "clarity"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["detail", "texture"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
+        assert_range(
+            &parameters_schema,
+            &["dehaze", "amount"],
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MIN,
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MAX,
+        );
+        for field in ["luminance", "color", "detail"] {
+            assert_range(
+                &parameters_schema,
+                &["noise_reduction", field],
+                crate::adjust::denoise::NR_MIN,
+                crate::adjust::denoise::NR_MAX,
+            );
+        }
+        for field in ["amount", "size"] {
+            assert_range(
+                &parameters_schema,
+                &["grain", field],
+                crate::adjust::grain::GRAIN_PARAM_MIN,
+                crate::adjust::grain::GRAIN_PARAM_MAX,
+            );
+        }
+        assert_range(
+            &parameters_schema,
+            &["exposure"],
+            EXPOSURE_MIN,
+            EXPOSURE_MAX,
+        );
+        for field in ["contrast", "highlights", "shadows", "whites", "blacks"] {
+            assert_range(
+                &parameters_schema,
+                &[field],
+                TONE_SLIDER_MIN,
+                TONE_SLIDER_MAX,
+            );
+        }
+
+        let hsl_channel_schema = schemars::schema_for!(HslChannel);
+        assert_range(&hsl_channel_schema, &["hue"], HSL_HUE_MIN, HSL_HUE_MAX);
+        assert_range(&hsl_channel_schema, &["saturation"], HSL_SL_MIN, HSL_SL_MAX);
+        assert_range(&hsl_channel_schema, &["luminance"], HSL_SL_MIN, HSL_SL_MAX);
+
+        let vignette_schema = schemars::schema_for!(VignetteParams);
+        assert_range(
+            &vignette_schema,
+            &["amount"],
+            VIGNETTE_AMOUNT_MIN,
+            VIGNETTE_AMOUNT_MAX,
+        );
+
+        let color_wheel_schema = schemars::schema_for!(crate::adjust::ColorWheel);
+        assert_range(&color_wheel_schema, &["hue"], CW_HUE_MIN, CW_HUE_MAX);
+        assert_range(
+            &color_wheel_schema,
+            &["saturation"],
+            CW_SATURATION_MIN,
+            CW_SATURATION_MAX,
+        );
+        assert_range(
+            &color_wheel_schema,
+            &["luminance"],
+            CW_LUMINANCE_MIN,
+            CW_LUMINANCE_MAX,
+        );
+
+        let color_grading_schema = schemars::schema_for!(crate::adjust::ColorGradingParams);
+        assert_color_wheel_ranges(&color_grading_schema, &["shadows"]);
+        assert_color_wheel_ranges(&color_grading_schema, &["midtones"]);
+        assert_color_wheel_ranges(&color_grading_schema, &["highlights"]);
+        assert_color_wheel_ranges(&color_grading_schema, &["global"]);
+        assert_range(
+            &color_grading_schema,
+            &["balance"],
+            CG_BALANCE_MIN,
+            CG_BALANCE_MAX,
+        );
+
+        let grain_schema = schemars::schema_for!(crate::adjust::GrainParams);
+        assert_range(
+            &grain_schema,
+            &["amount"],
+            crate::adjust::grain::GRAIN_PARAM_MIN,
+            crate::adjust::grain::GRAIN_PARAM_MAX,
+        );
+        assert_range(
+            &grain_schema,
+            &["size"],
+            crate::adjust::grain::GRAIN_PARAM_MIN,
+            crate::adjust::grain::GRAIN_PARAM_MAX,
+        );
+
+        let dehaze_schema = schemars::schema_for!(crate::adjust::DehazeParams);
+        assert_range(
+            &dehaze_schema,
+            &["amount"],
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MIN,
+            crate::adjust::dehaze::DEHAZE_AMOUNT_MAX,
+        );
+
+        let noise_reduction_schema = schemars::schema_for!(crate::adjust::NoiseReductionParams);
+        for field in ["luminance", "color", "detail"] {
+            assert_range(
+                &noise_reduction_schema,
+                &[field],
+                crate::adjust::denoise::NR_MIN,
+                crate::adjust::denoise::NR_MAX,
+            );
+        }
+
+        let sharpening_schema = schemars::schema_for!(crate::adjust::SharpeningParams);
+        assert_sharpening_ranges(&sharpening_schema, &[]);
+
+        let detail_schema = schemars::schema_for!(crate::adjust::DetailParams);
+        assert_sharpening_ranges(&detail_schema, &["sharpening"]);
+        assert_range(
+            &detail_schema,
+            &["clarity"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
+        assert_range(
+            &detail_schema,
+            &["texture"],
+            crate::adjust::detail::DETAIL_SLIDER_MIN,
+            crate::adjust::detail::DETAIL_SLIDER_MAX,
+        );
     }
 }
