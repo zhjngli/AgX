@@ -59,6 +59,7 @@ These rules are enforced by `crates/agx/tests/architecture.rs`.
 | `engine`   | no restrictions within library                     | adjust, lut, preset, error                               |
 | agx-cli    | —                                                  | agx (library API only)                                   |
 | agx-e2e    | —                                                  | agx, agx-cli (test-only crate, not part of the library/CLI dependency graph) |
+| agx-docgen | —                                                  | agx (`docgen` feature), agx-cli (dev-only tool for generating reference docs) |
 | agx-lut-gen| —                                                  | none (standalone build tool for generating .cube LUT files; no runtime deps) |
 
 ## Negative Constraints
@@ -73,6 +74,7 @@ What does NOT exist in each module -- violations of these constraints indicate a
 - **preset**: No I/O beyond TOML file reading. No pixel math. Does not execute adjustments -- it only declares parameter values.
 - **engine**: No direct file I/O for decoding/encoding (delegates to decode/encode modules). Does not define adjustment algorithms (delegates to adjust module). Pipeline stages are orchestrated by the Pipeline executor in a fixed order; stages are not reorderable by consumers.
 - **agx-cli**: No image processing logic. Thin wrapper that parses CLI arguments and calls library API.
+- **agx-docgen**: No image processing logic. Dev-only build tool that generates CLI and preset reference markdown for the documentation site.
 
 ## Core Invariants
 
@@ -134,6 +136,10 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | 2026-04-03 | [Parallel Render P3+P4 Design](docs/plans/2026-04-03-parallel-render-p3-p4-design.md)            |
 | 2026-04-05 | [Multi-Apply & E2E Speed Design](docs/plans/2026-04-05-multi-apply-e2e-speed-design.md)          |
 | 2026-04-05 | [Dehaze Parallelization Design](docs/plans/2026-04-05-dehaze-parallelization-design.md)          |
+| 2026-04-06 | [Documentation Initiative Design](docs/plans/2026-04-06-documentation-initiative-design.md)      |
+| 2026-04-06 | [Docs Infrastructure Design](docs/plans/2026-04-06-docs-infrastructure-design.md)                |
+| 2026-04-09 | [API Doc Retrofit Design](docs/plans/2026-04-09-api-doc-retrofit-design.md)                      |
+| 2026-04-11 | [AgX Docgen Design](docs/plans/2026-04-11-agx-docgen-design.md)                                 |
 
 ### Backlog
 
