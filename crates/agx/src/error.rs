@@ -28,6 +28,9 @@ pub enum AgxError {
     /// Underlying I/O error from the standard library.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    /// Failure initializing the GPU runtime (no adapter, device creation failed, etc.).
+    #[error("GPU error: {0}")]
+    Gpu(String),
 }
 
 /// Convenience alias for `Result<T, AgxError>` used throughout the AgX API.
@@ -59,6 +62,12 @@ mod tests {
     fn error_display_lut() {
         let err = AgxError::Lut("invalid size".into());
         assert_eq!(err.to_string(), "LUT error: invalid size");
+    }
+
+    #[test]
+    fn error_display_gpu() {
+        let err = AgxError::Gpu("no adapter found".into());
+        assert_eq!(err.to_string(), "GPU error: no adapter found");
     }
 
     #[test]
