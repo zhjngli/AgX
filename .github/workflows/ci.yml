@@ -18,6 +18,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
       - name: Verify
         run: ./scripts/verify.sh
+      - name: Docgen tests
+        run: cargo test -p agx --features docgen && cargo test -p agx-docgen
 
   e2e-tests:
     name: E2E (${{ matrix.suite }})
