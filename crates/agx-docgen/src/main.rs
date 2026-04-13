@@ -1225,9 +1225,9 @@ mod tests {
         let markdown = preset_markdown();
 
         assert!(markdown.contains("| `tone.exposure` | -5 to 5 | 0 |"));
-        assert!(markdown.contains(
-            "| `white_balance.temperature` | number (no validated range) | 0 |"
-        ));
+        assert!(
+            markdown.contains("| `white_balance.temperature` | number (no validated range) | 0 |")
+        );
         assert!(markdown.contains("| `hsl.red.hue` | -180 to 180 | 0 |"));
         assert!(markdown.contains("| `vignette.shape` | `elliptical`, `circular` | `elliptical` |"));
         assert!(markdown.contains("| `detail.sharpening.radius` | 0.5 to 3 | 1 |"));
