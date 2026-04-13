@@ -1,7 +1,9 @@
-// Gamma-space per-pixel tone adjustments: contrast, highlights, shadows, whites, blacks.
-// Runs after linear-to-sRGB, before HSL/color grading/LUT stages.
+// Gamma-space per-pixel adjustments: contrast, highlights, shadows, whites, blacks,
+// tone curves, HSL, color grading, LUT.
 
 #import common::tone
+#import common::color
+#import common::math
 
 struct Params {
     exposure: f32,
@@ -41,13 +43,170 @@ struct Params {
     grain_type: f32,
     grain_seed: f32,
 
+    tc_rgb_active: f32,
+    tc_luma_active: f32,
+    tc_red_active: f32,
+    tc_green_active: f32,
+    tc_blue_active: f32,
+    lut_active: f32,
+    _pad_tc: vec2f,
+
     width: f32,
     height: f32,
     _pad5: vec2f,
 }
 
+// HSL channel centers (Red, Orange, Yellow, Green, Aqua, Blue, Purple, Magenta)
+const CHANNEL_CENTERS = array<f32, 8>(0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 330.0);
+const CHANNEL_HALF_WIDTHS = array<f32, 8>(30.0, 30.0, 30.0, 60.0, 60.0, 30.0, 30.0, 30.0);
+
 @group(0) @binding(0) var<storage, read_write> pixels: array<f32>;
 @group(0) @binding(1) var<storage, read> params: Params;
+@group(0) @binding(2) var<storage, read> tone_curves: array<f32>;
+@group(0) @binding(3) var lut_texture: texture_3d<f32>;
+@group(0) @binding(4) var lut_sampler: sampler;
+
+// --- Tone curve helpers ---
+
+fn tone_curve_lookup(curve_offset: u32, value: f32) -> f32 {
+    let idx = clamp(value * 255.0, 0.0, 255.0);
+    let lo = u32(floor(idx));
+    let hi = min(lo + 1u, 255u);
+    let frac = idx - floor(idx);
+    let v_lo = tone_curves[curve_offset + lo];
+    let v_hi = tone_curves[curve_offset + hi];
+    return v_lo + frac * (v_hi - v_lo);
+}
+
+fn apply_tone_curves(r_in: f32, g_in: f32, b_in: f32) -> vec3f {
+    var r = r_in;
+    var g = g_in;
+    var b = b_in;
+
+    // Step 1: RGB master curve (offset 0)
+    if params.tc_rgb_active > 0.5 {
+        r = tone_curve_lookup(0u, r);
+        g = tone_curve_lookup(0u, g);
+        b = tone_curve_lookup(0u, b);
+    }
+
+    // Step 2: Per-channel curves (red=512, green=768, blue=1024)
+    if params.tc_red_active > 0.5 {
+        r = tone_curve_lookup(512u, r);
+    }
+    if params.tc_green_active > 0.5 {
+        g = tone_curve_lookup(768u, g);
+    }
+    if params.tc_blue_active > 0.5 {
+        b = tone_curve_lookup(1024u, b);
+    }
+
+    // Step 3: Luminance curve (offset 256)
+    if params.tc_luma_active > 0.5 {
+        let l = common::math::luminance(r, g, b);
+        let l_new = tone_curve_lookup(256u, l);
+        if l > 1e-6 {
+            let scale = l_new / l;
+            r = clamp(r * scale, 0.0, 1.0);
+            g = clamp(g * scale, 0.0, 1.0);
+            b = clamp(b * scale, 0.0, 1.0);
+        } else {
+            r = l_new;
+            g = l_new;
+            b = l_new;
+        }
+    }
+
+    return vec3f(r, g, b);
+}
+
+// --- HSL ---
+
+fn apply_hsl_pixel(r: f32, g: f32, b: f32) -> vec3f {
+    let hsl = common::color::rgb_to_hsl(vec3f(r, g, b));
+    let pixel_hue = hsl.x;
+    let pixel_sat = hsl.y;
+
+    // Gray/near-gray pixels: hue is undefined, skip HSL adjustments
+    if pixel_sat < 1e-4 {
+        return vec3f(r, g, b);
+    }
+
+    var total_hue_shift = 0.0;
+    var total_sat_shift = 0.0;
+    var total_lum_shift = 0.0;
+
+    for (var i = 0u; i < 8u; i = i + 1u) {
+        let dist = common::color::hue_distance(pixel_hue, CHANNEL_CENTERS[i]);
+        // Scale weight by pixel saturation to fade effect for low-saturation pixels
+        let weight = common::color::cosine_weight(dist, CHANNEL_HALF_WIDTHS[i]) * pixel_sat;
+        if weight > 0.0 {
+            total_hue_shift = total_hue_shift + weight * params.hue_shifts[i];
+            total_sat_shift = total_sat_shift + weight * (params.sat_shifts[i] / 100.0);
+            total_lum_shift = total_lum_shift + weight * (params.lum_shifts[i] / 100.0);
+        }
+    }
+
+    let new_hue = ((pixel_hue + total_hue_shift) % 360.0 + 360.0) % 360.0;
+    let new_sat = clamp(hsl.y + total_sat_shift, 0.0, 1.0);
+    let new_lum = clamp(hsl.z + total_lum_shift, 0.0, 1.0);
+
+    return common::color::hsl_to_rgb(vec3f(new_hue, new_sat, new_lum));
+}
+
+// --- Color Grading ---
+
+fn apply_color_grading_pixel(r: f32, g: f32, b: f32) -> vec3f {
+    // Pixel luminance (Rec. 709 on gamma-encoded values)
+    let lum = common::math::luminance(r, g, b);
+
+    // Balance remapping (skip powf when balance is neutral)
+    var lum_adj: f32;
+    if params.cg_balance_active > 0.5 {
+        lum_adj = pow(clamp(lum, 0.0, 1.0), params.cg_balance_factor);
+    } else {
+        lum_adj = clamp(lum, 0.0, 1.0);
+    }
+
+    // 3-way weights (always sum to 1.0) — SQUARED weights
+    let w_shadow = (1.0 - lum_adj) * (1.0 - lum_adj);
+    let w_highlight = lum_adj * lum_adj;
+    let w_midtone = 1.0 - w_shadow - w_highlight;
+
+    // Weighted blend of regional tints
+    let regional_r = params.cg_shadow_tint.x * w_shadow + params.cg_midtone_tint.x * w_midtone + params.cg_highlight_tint.x * w_highlight;
+    let regional_g = params.cg_shadow_tint.y * w_shadow + params.cg_midtone_tint.y * w_midtone + params.cg_highlight_tint.y * w_highlight;
+    let regional_b = params.cg_shadow_tint.z * w_shadow + params.cg_midtone_tint.z * w_midtone + params.cg_highlight_tint.z * w_highlight;
+
+    // Apply global tint on top
+    let combined_r = regional_r * params.cg_global_tint.x;
+    let combined_g = regional_g * params.cg_global_tint.y;
+    let combined_b = regional_b * params.cg_global_tint.z;
+
+    // Multiply pixel by combined tint
+    var out_r = clamp(r * combined_r, 0.0, 1.0);
+    var out_g = clamp(g * combined_g, 0.0, 1.0);
+    var out_b = clamp(b * combined_b, 0.0, 1.0);
+
+    // Luminance shifts (weighted additive, pre-divided by 100 via the .w component)
+    let adjustment = params.cg_shadow_tint.w * w_shadow
+        + params.cg_midtone_tint.w * w_midtone
+        + params.cg_highlight_tint.w * w_highlight
+        + params.cg_global_tint.w;
+    out_r = clamp(out_r + adjustment, 0.0, 1.0);
+    out_g = clamp(out_g + adjustment, 0.0, 1.0);
+    out_b = clamp(out_b + adjustment, 0.0, 1.0);
+
+    return vec3f(out_r, out_g, out_b);
+}
+
+// --- LUT ---
+
+fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
+    let coord = vec3f(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0));
+    let result = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
+    return vec3f(result.x, result.y, result.z);
+}
 
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -83,6 +242,32 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     r = common::tone::apply_blacks(r, params.blacks);
     g = common::tone::apply_blacks(g, params.blacks);
     b = common::tone::apply_blacks(b, params.blacks);
+
+    // Tone curves
+    let tc = apply_tone_curves(r, g, b);
+    r = tc.x;
+    g = tc.y;
+    b = tc.z;
+
+    // HSL
+    let hsl_result = apply_hsl_pixel(r, g, b);
+    r = hsl_result.x;
+    g = hsl_result.y;
+    b = hsl_result.z;
+
+    // Color grading
+    let cg = apply_color_grading_pixel(r, g, b);
+    r = cg.x;
+    g = cg.y;
+    b = cg.z;
+
+    // LUT
+    if params.lut_active > 0.5 {
+        let lut_result = apply_lut(r, g, b);
+        r = lut_result.x;
+        g = lut_result.y;
+        b = lut_result.z;
+    }
 
     pixels[base] = r;
     pixels[base + 1u] = g;

@@ -105,7 +105,12 @@ mod tests {
         let runtime = GpuRuntime::new(2, 2).unwrap();
         let shaders = ShaderCache::new(&runtime.device).unwrap();
 
-        let pixels = vec![[0.3, 0.5, 0.7], [0.1, 0.9, 0.4], [0.6, 0.2, 0.8], [0.0, 1.0, 0.5]];
+        let pixels = vec![
+            [0.3, 0.5, 0.7],
+            [0.1, 0.9, 0.4],
+            [0.6, 0.2, 0.8],
+            [0.0, 1.0, 0.5],
+        ];
         runtime.upload_pixels(&pixels);
 
         let params = Parameters::default();

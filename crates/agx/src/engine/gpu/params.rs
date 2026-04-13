@@ -54,6 +54,15 @@ pub struct GpuParameters {
     pub grain_type: f32, // 0.0 = Fine, 1.0 = Silver, 2.0 = Harsh
     pub grain_seed: f32,
 
+    // Tone curve active flags (1.0 = active, 0.0 = inactive)
+    pub tc_rgb_active: f32,
+    pub tc_luma_active: f32,
+    pub tc_red_active: f32,
+    pub tc_green_active: f32,
+    pub tc_blue_active: f32,
+    pub lut_active: f32,
+    pub _pad_tc: [f32; 2],
+
     // Image dimensions (needed by vignette, grain, etc.)
     pub width: f32,
     pub height: f32,
@@ -108,11 +117,62 @@ impl From<&Parameters> for GpuParameters {
                 crate::adjust::grain::GrainType::Harsh => 2.0,
             },
             grain_seed: 0.0,
+            tc_rgb_active: if p.tone_curve.rgb.is_identity() {
+                0.0
+            } else {
+                1.0
+            },
+            tc_luma_active: if p.tone_curve.luma.is_identity() {
+                0.0
+            } else {
+                1.0
+            },
+            tc_red_active: if p.tone_curve.red.is_identity() {
+                0.0
+            } else {
+                1.0
+            },
+            tc_green_active: if p.tone_curve.green.is_identity() {
+                0.0
+            } else {
+                1.0
+            },
+            tc_blue_active: if p.tone_curve.blue.is_identity() {
+                0.0
+            } else {
+                1.0
+            },
+            lut_active: 0.0, // set by GpuPipeline when LUT is present
+            _pad_tc: [0.0; 2],
             width: 0.0,
             height: 0.0,
             _pad5: [0.0; 2],
         }
     }
+}
+
+/// Build the 5x256 tone curve data for GPU upload.
+/// Layout: [rgb_256, luma_256, red_256, green_256, blue_256] contiguous.
+/// Inactive curves are identity (value[i] = i / 255.0).
+pub fn build_tone_curve_data(params: &crate::engine::Parameters) -> [f32; 1280] {
+    let mut data = [0.0f32; 1280];
+    let identity: [f32; 256] = std::array::from_fn(|i| i as f32 / 255.0);
+    let curves = [
+        &params.tone_curve.rgb,
+        &params.tone_curve.luma,
+        &params.tone_curve.red,
+        &params.tone_curve.green,
+        &params.tone_curve.blue,
+    ];
+    for (ci, curve) in curves.iter().enumerate() {
+        let lut = if curve.is_identity() {
+            identity
+        } else {
+            crate::adjust::build_tone_curve_lut(curve)
+        };
+        data[ci * 256..(ci + 1) * 256].copy_from_slice(&lut);
+    }
+    data
 }
 
 fn wheel_to_tint_and_lum(wheel: &ColorWheel) -> [f32; 4] {

@@ -41,6 +41,14 @@ struct Params {
     grain_type: f32,
     grain_seed: f32,
 
+    tc_rgb_active: f32,
+    tc_luma_active: f32,
+    tc_red_active: f32,
+    tc_green_active: f32,
+    tc_blue_active: f32,
+    lut_active: f32,
+    _pad_tc: vec2f,
+
     width: f32,
     height: f32,
     _pad5: vec2f,

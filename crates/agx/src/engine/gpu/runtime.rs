@@ -15,6 +15,18 @@ pub struct GpuRuntime {
     pub(crate) params_buffer: wgpu::Buffer,
     /// GPU-side staging buffer for reading pixels back to CPU.
     pub(crate) staging_buffer: wgpu::Buffer,
+    /// Tone curve lookup tables (5 x 256 entries).
+    pub(crate) tone_curve_buffer: wgpu::Buffer,
+    /// Optional 3D LUT texture.
+    pub(crate) lut_texture: Option<wgpu::Texture>,
+    /// Optional 3D LUT texture view.
+    pub(crate) lut_texture_view: Option<wgpu::TextureView>,
+    /// Optional 3D LUT sampler.
+    pub(crate) lut_sampler: Option<wgpu::Sampler>,
+    /// Fallback 1x1x1 identity LUT texture view (used when no LUT loaded).
+    pub(crate) fallback_lut_view: wgpu::TextureView,
+    /// Fallback LUT sampler.
+    pub(crate) fallback_lut_sampler: wgpu::Sampler,
     /// Image width in pixels.
     pub(crate) width: u32,
     /// Image height in pixels.
@@ -71,12 +83,74 @@ impl GpuRuntime {
             mapped_at_creation: false,
         });
 
+        let tone_curve_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("tone_curve_buffer"),
+            size: (5 * 256 * 4) as u64,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // 1x1x1 identity LUT (passthrough) — uses Rgba16Float for filterable sampling
+        let fallback_lut = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("fallback_lut"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        // Write a single [0,0,0,1] texel — identity doesn't matter since lut_active will be 0
+        let fallback_data: [half::f16; 4] = [
+            half::f16::from_f32(0.0),
+            half::f16::from_f32(0.0),
+            half::f16::from_f32(0.0),
+            half::f16::from_f32(1.0),
+        ];
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &fallback_lut,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&fallback_data),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(8),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        let fallback_lut_view = fallback_lut.create_view(&wgpu::TextureViewDescriptor::default());
+        let fallback_lut_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("fallback_lut_sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
         Ok(Self {
             device,
             queue,
             pixel_buffer,
             params_buffer,
             staging_buffer,
+            tone_curve_buffer,
+            lut_texture: None,
+            lut_texture_view: None,
+            lut_sampler: None,
+            fallback_lut_view,
+            fallback_lut_sampler,
             width,
             height,
         })
@@ -93,6 +167,76 @@ impl GpuRuntime {
     pub fn upload_params(&self, params: &super::params::GpuParameters) {
         let bytes: &[u8] = bytemuck::bytes_of(params);
         self.queue.write_buffer(&self.params_buffer, 0, bytes);
+    }
+
+    /// Upload precomputed tone curve LUTs to GPU.
+    pub fn upload_tone_curves(&self, data: &[f32; 1280]) {
+        self.queue
+            .write_buffer(&self.tone_curve_buffer, 0, bytemuck::cast_slice(data));
+    }
+
+    /// Upload a 3D LUT as a GPU texture with trilinear sampling.
+    ///
+    /// Uses `Rgba16Float` format for filterable texture sampling.
+    /// Half-float precision is more than sufficient for LUT entries in 0.0-1.0 range.
+    pub fn upload_lut(&mut self, lut: &crate::lut::Lut3D) {
+        let size = lut.size as u32;
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("lut_3d"),
+            size: wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: size,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: wgpu::TextureFormat::Rgba16Float,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let rgba: Vec<[half::f16; 4]> = lut
+            .table
+            .iter()
+            .map(|rgb| {
+                [
+                    half::f16::from_f32(rgb[0]),
+                    half::f16::from_f32(rgb[1]),
+                    half::f16::from_f32(rgb[2]),
+                    half::f16::from_f32(1.0),
+                ]
+            })
+            .collect();
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytemuck::cast_slice(&rgba),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(size * 8),
+                rows_per_image: Some(size),
+            },
+            wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: size,
+            },
+        );
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("lut_sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        self.lut_texture = Some(texture);
+        self.lut_texture_view = Some(view);
+        self.lut_sampler = Some(sampler);
     }
 
     /// Download pixel data from GPU to CPU.
