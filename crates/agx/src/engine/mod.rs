@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 /// CPU render pipeline (and future GPU pipeline behind the `gpu` feature).
 pub mod pipeline;
 
+/// GPU render pipeline using wgpu + WGSL compute shaders.
+#[cfg(feature = "gpu")]
+pub mod gpu;
+
 /// Pluggable pipeline stages (white balance, dehaze, denoise, per-pixel, detail, grain, vignette, color-space conversions).
 pub mod stages;
 
