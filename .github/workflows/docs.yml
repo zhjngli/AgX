@@ -34,8 +34,8 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
         run: cargo doc --no-deps --workspace
-      - name: Build mdbook
-        run: mdbook build docs/book
+      - name: Generate reference pages and build mdbook
+        run: ./scripts/build-docs.sh
       - name: Assemble site
         run: |
           mkdir -p _site
