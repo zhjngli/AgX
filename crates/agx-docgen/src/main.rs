@@ -2,7 +2,7 @@
 //!
 //! Output is written to `docs/book/src/reference/` and consumed by mdbook.
 
-use std::{fs, io, path::PathBuf};
+use std::{fs, io, path::{Path, PathBuf}};
 
 use clap_markdown::MarkdownOptions;
 use schemars::schema::{InstanceType, RootSchema, Schema, SchemaObject, SingleOrVec};
@@ -58,17 +58,23 @@ fn generate_cli_reference() -> io::Result<PathBuf> {
 
 fn generate_preset_reference() -> io::Result<PathBuf> {
     let output_dir = repo_root().join(OUTPUT_DIR);
-    fs::create_dir_all(&output_dir)?;
+    let output_path = output_dir.join(PRESET_OUTPUT_FILE);
+    generate_preset_reference_to(&output_path)
+}
+
+fn generate_preset_reference_to(output_path: &Path) -> io::Result<PathBuf> {
+    let output_dir = output_path
+        .parent()
+        .expect("preset output path should have a parent directory");
+    fs::create_dir_all(output_dir)?;
 
     let schema = schemars::schema_for!(agx::Parameters);
     let contents = render_preset_reference(&schema);
-
-    let output_path = output_dir.join(PRESET_OUTPUT_FILE);
-    fs::write(&output_path, contents)?;
+    fs::write(output_path, contents)?;
 
     println!("generated {}", output_path.display());
 
-    Ok(output_path)
+    Ok(output_path.to_path_buf())
 }
 
 fn render_preset_reference(schema: &RootSchema) -> String {
@@ -706,7 +712,7 @@ fn strip_alias_annotations(markdown: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        documented_leaf_paths, generate_preset_reference, render_preset_reference, repo_root,
+        documented_leaf_paths, generate_preset_reference_to, render_preset_reference, repo_root,
         sanitize_markdown, schema_leaf_paths,
         strip_alias_annotations, strip_clap_markdown_title, GENERATED_HEADER,
         PRESET_PAGE_TITLE,
@@ -951,6 +957,16 @@ mod tests {
         format!("[{}]", pairs.join(", "))
     }
 
+    fn unique_temp_output_path() -> std::path::PathBuf {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir()
+            .join(format!("agx-docgen-test-{}-{timestamp}", std::process::id()))
+            .join("preset.md")
+    }
+
     #[test]
     fn repo_root_points_at_workspace_root() {
         let root = repo_root();
@@ -1037,11 +1053,18 @@ mod tests {
 
     #[test]
     fn generate_preset_reference_writes_generated_page() {
-        let output_path = generate_preset_reference().expect("preset reference should generate");
+        let output_path = unique_temp_output_path();
+        let output_path = generate_preset_reference_to(&output_path)
+            .expect("preset reference should generate");
         let contents = std::fs::read_to_string(&output_path).expect("preset file should be readable");
 
         assert!(contents.starts_with(&format!("{GENERATED_HEADER}\n{PRESET_PAGE_TITLE}\n")));
         assert!(contents.contains("## Grain"));
+
+        let _ = std::fs::remove_file(&output_path);
+        if let Some(parent) = output_path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
     }
 
     #[test]
