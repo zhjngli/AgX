@@ -65,6 +65,7 @@ impl ShaderCache {
                 "gamma_adjustments",
                 include_str!("../../shaders/gamma_adjustments.wgsl"),
             ),
+            ("vignette", include_str!("../../shaders/vignette.wgsl")),
         ];
 
         for (name, source) in stage_shaders {
