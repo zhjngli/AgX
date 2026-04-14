@@ -1,7 +1,4 @@
-// Linear-space adjustments: white balance + exposure.
-// Runs before the linear-to-sRGB conversion.
-
-#import common::tone
+// Apply unsharp mask: adds (original_lum - blurred_lum) * strength to RGB pixels.
 
 struct Params {
     exposure: f32,
@@ -60,28 +57,28 @@ struct Params {
 }
 
 @group(0) @binding(0) var<storage, read_write> pixels: array<f32>;
-@group(0) @binding(1) var<storage, read> params: Params;
+@group(0) @binding(1) var<storage, read> original_lum: array<f32>;
+@group(0) @binding(2) var<storage, read> blurred_lum: array<f32>;
+@group(0) @binding(3) var<storage, read> params: Params;
 
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
     let idx = id.x;
-    let pixel_count = arrayLength(&pixels) / 3u;
+    let pixel_count = arrayLength(&original_lum);
     if idx >= pixel_count { return; }
+
+    let high_freq = original_lum[idx] - blurred_lum[idx];
+
+    // If threshold > 0 and |high_freq| < threshold, skip this pixel
+    if params.detail_threshold > 0.0 && abs(high_freq) < params.detail_threshold {
+        return;
+    }
+
+    // Masking not implemented in GPU path (TODO: edge map)
+    let delta = params.detail_strength * high_freq;
+
     let base = idx * 3u;
-    var rgb = vec3f(pixels[base], pixels[base + 1u], pixels[base + 2u]);
-
-    // White balance (temperature + tint)
-    rgb = common::tone::apply_white_balance(rgb, params.temperature, params.tint);
-
-    // Exposure
-    let factor = common::tone::exposure_factor(params.exposure);
-    rgb = vec3f(
-        common::tone::apply_exposure(rgb.x, factor),
-        common::tone::apply_exposure(rgb.y, factor),
-        common::tone::apply_exposure(rgb.z, factor),
-    );
-
-    pixels[base] = rgb.x;
-    pixels[base + 1u] = rgb.y;
-    pixels[base + 2u] = rgb.z;
+    pixels[base]      = clamp(pixels[base]      + delta, 0.0, 1.0);
+    pixels[base + 1u] = clamp(pixels[base + 1u] + delta, 0.0, 1.0);
+    pixels[base + 2u] = clamp(pixels[base + 2u] + delta, 0.0, 1.0);
 }

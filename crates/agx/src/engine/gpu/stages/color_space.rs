@@ -26,7 +26,7 @@ fn dispatch_pixel_only(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline, l
             }],
         });
 
-    let workgroup_count = (runtime.pixel_count() + 255) / 256;
+    let workgroup_count = runtime.pixel_count().div_ceil(256);
     let mut encoder = runtime
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });

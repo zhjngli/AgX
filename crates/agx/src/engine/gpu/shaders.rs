@@ -66,6 +66,22 @@ impl ShaderCache {
                 include_str!("../../shaders/gamma_adjustments.wgsl"),
             ),
             ("vignette", include_str!("../../shaders/vignette.wgsl")),
+            (
+                "detail_extract_lum",
+                include_str!("../../shaders/detail_extract_lum.wgsl"),
+            ),
+            (
+                "blur_horizontal",
+                include_str!("../../shaders/blur_horizontal.wgsl"),
+            ),
+            (
+                "blur_vertical",
+                include_str!("../../shaders/blur_vertical.wgsl"),
+            ),
+            (
+                "detail_apply",
+                include_str!("../../shaders/detail_apply.wgsl"),
+            ),
         ];
 
         for (name, source) in stage_shaders {

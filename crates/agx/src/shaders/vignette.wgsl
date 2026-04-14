@@ -50,6 +50,11 @@ struct Params {
     width: f32,
     height: f32,
     _pad5: vec2f,
+
+    detail_strength: f32,
+    detail_threshold: f32,
+    detail_masking: f32,
+    kernel_size: f32,
 }
 
 @group(0) @binding(0) var<storage, read_write> pixels: array<f32>;

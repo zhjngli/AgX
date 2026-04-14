@@ -27,6 +27,14 @@ pub struct GpuRuntime {
     pub(crate) fallback_lut_view: wgpu::TextureView,
     /// Fallback LUT sampler.
     pub(crate) fallback_lut_sampler: wgpu::Sampler,
+    /// Single-channel luminance buffer for detail/blur operations.
+    pub(crate) lum_buffer: wgpu::Buffer,
+    /// Single-channel temp buffer for separable blur intermediate.
+    pub(crate) temp_buffer: wgpu::Buffer,
+    /// Single-channel buffer for blurred luminance (detail apply reads this).
+    pub(crate) blur_buffer: wgpu::Buffer,
+    /// Storage buffer for Gaussian blur kernel weights.
+    pub(crate) kernel_buffer: wgpu::Buffer,
     /// Image width in pixels.
     pub(crate) width: u32,
     /// Image height in pixels.
@@ -80,6 +88,38 @@ impl GpuRuntime {
             label: Some("staging_buffer"),
             size: buffer_size,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let single_channel_size = pixel_count * 4; // 1 f32 per pixel
+        let lum_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("lum_buffer"),
+            size: single_channel_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("temp_buffer"),
+            size: single_channel_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let blur_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("blur_buffer"),
+            size: single_channel_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let kernel_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("kernel_buffer"),
+            size: 512 * 4, // max 512 kernel weights
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
@@ -151,6 +191,10 @@ impl GpuRuntime {
             lut_sampler: None,
             fallback_lut_view,
             fallback_lut_sampler,
+            lum_buffer,
+            temp_buffer,
+            blur_buffer,
+            kernel_buffer,
             width,
             height,
         })
@@ -161,6 +205,12 @@ impl GpuRuntime {
     pub fn upload_pixels(&self, pixels: &[[f32; 3]]) {
         let bytes: &[u8] = bytemuck::cast_slice(pixels);
         self.queue.write_buffer(&self.pixel_buffer, 0, bytes);
+    }
+
+    /// Upload Gaussian kernel weights to the kernel buffer.
+    pub fn upload_kernel(&self, kernel: &[f32]) {
+        self.queue
+            .write_buffer(&self.kernel_buffer, 0, bytemuck::cast_slice(kernel));
     }
 
     /// Upload a [`GpuParameters`](super::params::GpuParameters) struct to the uniform buffer.

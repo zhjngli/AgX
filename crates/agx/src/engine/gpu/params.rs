@@ -67,6 +67,12 @@ pub struct GpuParameters {
     pub width: f32,
     pub height: f32,
     pub _pad5: [f32; 2],
+
+    // Detail / unsharp mask (set per-dispatch)
+    pub detail_strength: f32,
+    pub detail_threshold: f32,
+    pub detail_masking: f32,
+    pub kernel_size: f32,
 }
 
 impl From<&Parameters> for GpuParameters {
@@ -147,6 +153,10 @@ impl From<&Parameters> for GpuParameters {
             width: 0.0,
             height: 0.0,
             _pad5: [0.0; 2],
+            detail_strength: 0.0,
+            detail_threshold: 0.0,
+            detail_masking: 0.0,
+            kernel_size: 0.0,
         }
     }
 }

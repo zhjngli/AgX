@@ -47,7 +47,7 @@ pub fn dispatch_gamma_adjustments(runtime: &GpuRuntime, pipeline: &wgpu::Compute
             ],
         });
 
-    let workgroup_count = (runtime.pixel_count() + 255) / 256;
+    let workgroup_count = runtime.pixel_count().div_ceil(256);
     let mut encoder = runtime
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
