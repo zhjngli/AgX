@@ -82,6 +82,14 @@ impl ShaderCache {
                 "detail_apply",
                 include_str!("../../shaders/detail_apply.wgsl"),
             ),
+            (
+                "grain_noise_gen",
+                include_str!("../../shaders/grain_noise_gen.wgsl"),
+            ),
+            (
+                "grain_apply",
+                include_str!("../../shaders/grain_apply.wgsl"),
+            ),
         ];
 
         for (name, source) in stage_shaders {

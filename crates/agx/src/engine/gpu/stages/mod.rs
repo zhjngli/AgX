@@ -3,5 +3,6 @@
 pub mod color_space;
 pub mod detail;
 pub mod gamma_adjustments;
+pub mod grain;
 pub mod linear_adjustments;
 pub mod vignette;
