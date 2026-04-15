@@ -114,6 +114,38 @@ impl ShaderCache {
                 "denoise_channel_to_rgb",
                 include_str!("../../shaders/denoise_channel_to_rgb.wgsl"),
             ),
+            (
+                "dehaze_pixel_min",
+                include_str!("../../shaders/dehaze_pixel_min.wgsl"),
+            ),
+            (
+                "dehaze_min_filter",
+                include_str!("../../shaders/dehaze_min_filter.wgsl"),
+            ),
+            (
+                "dehaze_box_filter",
+                include_str!("../../shaders/dehaze_box_filter.wgsl"),
+            ),
+            (
+                "dehaze_transmission",
+                include_str!("../../shaders/dehaze_transmission.wgsl"),
+            ),
+            (
+                "dehaze_mul",
+                include_str!("../../shaders/dehaze_mul.wgsl"),
+            ),
+            (
+                "dehaze_guided_coeffs",
+                include_str!("../../shaders/dehaze_guided_coeffs.wgsl"),
+            ),
+            (
+                "dehaze_fma",
+                include_str!("../../shaders/dehaze_fma.wgsl"),
+            ),
+            (
+                "dehaze_recover",
+                include_str!("../../shaders/dehaze_recover.wgsl"),
+            ),
         ];
 
         for (name, source) in stage_shaders {

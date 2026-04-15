@@ -37,6 +37,11 @@ pub struct GpuRuntime {
     pub(crate) kernel_buffer: wgpu::Buffer,
     /// Single-channel accumulator for denoise wavelet reconstruction.
     pub(crate) denoise_accum_buffer: wgpu::Buffer,
+    /// Scratch buffers for multi-pass stages (dehaze guided filter, etc.).
+    pub(crate) scratch_a: wgpu::Buffer,
+    pub(crate) scratch_b: wgpu::Buffer,
+    pub(crate) scratch_c: wgpu::Buffer,
+    pub(crate) scratch_d: wgpu::Buffer,
     /// Image width in pixels.
     pub(crate) width: u32,
     /// Image height in pixels.
@@ -132,6 +137,33 @@ impl GpuRuntime {
                 | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
+        let scratch_usage = wgpu::BufferUsages::STORAGE
+            | wgpu::BufferUsages::COPY_DST
+            | wgpu::BufferUsages::COPY_SRC;
+        let scratch_a = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("scratch_a"),
+            size: single_channel_size,
+            usage: scratch_usage,
+            mapped_at_creation: false,
+        });
+        let scratch_b = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("scratch_b"),
+            size: single_channel_size,
+            usage: scratch_usage,
+            mapped_at_creation: false,
+        });
+        let scratch_c = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("scratch_c"),
+            size: single_channel_size,
+            usage: scratch_usage,
+            mapped_at_creation: false,
+        });
+        let scratch_d = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("scratch_d"),
+            size: single_channel_size,
+            usage: scratch_usage,
+            mapped_at_creation: false,
+        });
 
         let tone_curve_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("tone_curve_buffer"),
@@ -206,6 +238,10 @@ impl GpuRuntime {
             blur_buffer,
             kernel_buffer,
             denoise_accum_buffer,
+            scratch_a,
+            scratch_b,
+            scratch_c,
+            scratch_d,
             width,
             height,
         })

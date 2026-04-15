@@ -84,6 +84,16 @@ pub struct GpuParameters {
     pub nr_threshold: f32,
     pub nr_is_luma: f32,
     pub _pad_nr: f32,
+
+    // Dehaze (set per-dispatch)
+    pub dehaze_airlight_r: f32,
+    pub dehaze_airlight_g: f32,
+    pub dehaze_airlight_b: f32,
+    pub dehaze_omega: f32,
+
+    pub dehaze_filter_radius: f32,
+    pub dehaze_mode: f32, // multi-purpose: pixel_min mode, filter direction, etc.
+    pub _pad_dh: [f32; 2],
 }
 
 impl From<&Parameters> for GpuParameters {
@@ -176,6 +186,13 @@ impl From<&Parameters> for GpuParameters {
             nr_threshold: 0.0,
             nr_is_luma: 0.0,
             _pad_nr: 0.0,
+            dehaze_airlight_r: 0.0,
+            dehaze_airlight_g: 0.0,
+            dehaze_airlight_b: 0.0,
+            dehaze_omega: 0.0,
+            dehaze_filter_radius: 0.0,
+            dehaze_mode: 0.0,
+            _pad_dh: [0.0; 2],
         }
     }
 }
