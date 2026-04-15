@@ -90,6 +90,30 @@ impl ShaderCache {
                 "grain_apply",
                 include_str!("../../shaders/grain_apply.wgsl"),
             ),
+            (
+                "denoise_rgb_to_channel",
+                include_str!("../../shaders/denoise_rgb_to_channel.wgsl"),
+            ),
+            (
+                "denoise_atrous_h",
+                include_str!("../../shaders/denoise_atrous_h.wgsl"),
+            ),
+            (
+                "denoise_atrous_v",
+                include_str!("../../shaders/denoise_atrous_v.wgsl"),
+            ),
+            (
+                "denoise_threshold_accum",
+                include_str!("../../shaders/denoise_threshold_accum.wgsl"),
+            ),
+            (
+                "denoise_add_residual",
+                include_str!("../../shaders/denoise_add_residual.wgsl"),
+            ),
+            (
+                "denoise_channel_to_rgb",
+                include_str!("../../shaders/denoise_channel_to_rgb.wgsl"),
+            ),
         ];
 
         for (name, source) in stage_shaders {

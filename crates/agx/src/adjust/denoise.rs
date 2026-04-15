@@ -97,7 +97,7 @@ fn ycbcr_to_rgb(y: &[f32], cb: &[f32], cr: &[f32]) -> Vec<[f32; 3]> {
 ///
 /// This is a robust estimator assuming the finest wavelet level is dominated
 /// by Gaussian noise (Donoho & Johnstone, 1994).
-fn estimate_sigma(data: &[f32]) -> f32 {
+pub(crate) fn estimate_sigma(data: &[f32]) -> f32 {
     if data.is_empty() {
         return 0.0;
     }
@@ -121,7 +121,7 @@ fn soft_threshold(data: &mut [f32], threshold: f32) {
 }
 
 /// Number of wavelet decomposition levels.
-const NUM_LEVELS: usize = 5;
+pub(crate) const NUM_LEVELS: usize = 5;
 
 /// B3-spline kernel: [1/16, 1/4, 3/8, 1/4, 1/16]
 const B3_KERNEL: [f32; 5] = [1.0 / 16.0, 4.0 / 16.0, 6.0 / 16.0, 4.0 / 16.0, 1.0 / 16.0];
@@ -205,7 +205,7 @@ fn atrous_decompose(input: &[f32], width: usize, height: usize) -> (Vec<Vec<f32>
 
 /// Per-level threshold scale factors. Coarser levels need higher thresholds
 /// to avoid over-smoothing structure.
-const LEVEL_SCALE: [f32; NUM_LEVELS] = [1.0, 1.0, 1.2, 1.5, 2.0];
+pub(crate) const LEVEL_SCALE: [f32; NUM_LEVELS] = [1.0, 1.0, 1.2, 1.5, 2.0];
 
 fn denoise_channel(
     channel: &[f32],

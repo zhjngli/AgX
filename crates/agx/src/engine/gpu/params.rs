@@ -73,6 +73,17 @@ pub struct GpuParameters {
     pub detail_threshold: f32,
     pub detail_masking: f32,
     pub kernel_size: f32,
+
+    // Noise reduction (set per-dispatch for channel/level)
+    pub nr_luminance: f32,
+    pub nr_color: f32,
+    pub nr_detail: f32,
+    pub nr_channel: f32,
+
+    pub nr_gap: f32,
+    pub nr_threshold: f32,
+    pub nr_is_luma: f32,
+    pub _pad_nr: f32,
 }
 
 impl From<&Parameters> for GpuParameters {
@@ -157,6 +168,14 @@ impl From<&Parameters> for GpuParameters {
             detail_threshold: 0.0,
             detail_masking: 0.0,
             kernel_size: 0.0,
+            nr_luminance: p.noise_reduction.luminance,
+            nr_color: p.noise_reduction.color,
+            nr_detail: p.noise_reduction.detail,
+            nr_channel: 0.0,
+            nr_gap: 1.0,
+            nr_threshold: 0.0,
+            nr_is_luma: 0.0,
+            _pad_nr: 0.0,
         }
     }
 }

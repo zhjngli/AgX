@@ -35,6 +35,8 @@ pub struct GpuRuntime {
     pub(crate) blur_buffer: wgpu::Buffer,
     /// Storage buffer for Gaussian blur kernel weights.
     pub(crate) kernel_buffer: wgpu::Buffer,
+    /// Single-channel accumulator for denoise wavelet reconstruction.
+    pub(crate) denoise_accum_buffer: wgpu::Buffer,
     /// Image width in pixels.
     pub(crate) width: u32,
     /// Image height in pixels.
@@ -122,6 +124,14 @@ impl GpuRuntime {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
+        let denoise_accum_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("denoise_accum_buffer"),
+            size: single_channel_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_DST
+                | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
 
         let tone_curve_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("tone_curve_buffer"),
@@ -195,6 +205,7 @@ impl GpuRuntime {
             temp_buffer,
             blur_buffer,
             kernel_buffer,
+            denoise_accum_buffer,
             width,
             height,
         })
@@ -318,6 +329,36 @@ impl GpuRuntime {
         self.staging_buffer.unmap();
 
         pixels
+    }
+
+    /// Download a single-channel f32 buffer from GPU to CPU.
+    pub(crate) fn download_single_channel(&self, src: &wgpu::Buffer) -> Vec<f32> {
+        let size = (self.pixel_count() as u64) * 4;
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("download_single_channel"),
+            });
+        encoder.copy_buffer_to_buffer(src, 0, &self.staging_buffer, 0, size);
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        let slice = self.staging_buffer.slice(..size);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+        self.device.poll(wgpu::Maintain::Wait);
+        rx.recv()
+            .expect("GPU channel closed")
+            .expect("GPU buffer map failed");
+
+        let data = slice.get_mapped_range();
+        let result: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
+        drop(data);
+        self.staging_buffer.unmap();
+
+        result
     }
 
     /// Total number of pixels in the image.
