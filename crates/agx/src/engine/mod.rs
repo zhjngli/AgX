@@ -1247,17 +1247,27 @@ pub struct Engine {
     original: Rgb32FImage,
     params: Parameters,
     lut: Option<Arc<crate::lut::Lut3D>>,
+    #[cfg(feature = "gpu")]
+    pipeline: gpu::GpuPipeline,
+    #[cfg(not(feature = "gpu"))]
     pipeline: pipeline::CpuPipeline,
 }
 
 impl Engine {
     /// Create a new engine with the given linear sRGB image and neutral parameters.
     pub fn new(image: Rgb32FImage) -> Self {
+        #[cfg(feature = "gpu")]
+        let pipeline = {
+            let (w, h) = image.dimensions();
+            gpu::GpuPipeline::new(w, h).expect("GPU initialization failed")
+        };
+        #[cfg(not(feature = "gpu"))]
+        let pipeline = pipeline::CpuPipeline::new();
         Self {
             original: image,
             params: Parameters::default(),
             lut: None,
-            pipeline: pipeline::CpuPipeline::new(),
+            pipeline,
         }
     }
 
