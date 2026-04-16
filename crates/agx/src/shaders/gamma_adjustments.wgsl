@@ -29,11 +29,13 @@ struct Params {
     cg_global_tint: vec4f,
     cg_balance_factor: f32,
     cg_balance_active: f32,
-    _pad2: vec2f,
+    cg_active: f32,
+    _pad2: f32,
 
     vignette_amount: f32,
     vignette_shape: f32,
-    _pad3: vec2f,
+    hsl_active: f32,
+    _pad3: f32,
 
     dehaze_amount: f32,
     _pad4: array<f32, 3>,
@@ -254,17 +256,21 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     g = tc.y;
     b = tc.z;
 
-    // HSL
-    let hsl_result = apply_hsl_pixel(r, g, b);
-    r = hsl_result.x;
-    g = hsl_result.y;
-    b = hsl_result.z;
+    // HSL (skip when neutral to avoid saturation clamping on HDR values)
+    if params.hsl_active > 0.5 {
+        let hsl_result = apply_hsl_pixel(r, g, b);
+        r = hsl_result.x;
+        g = hsl_result.y;
+        b = hsl_result.z;
+    }
 
-    // Color grading
-    let cg = apply_color_grading_pixel(r, g, b);
-    r = cg.x;
-    g = cg.y;
-    b = cg.z;
+    // Color grading (skip when neutral to avoid clamping HDR values)
+    if params.cg_active > 0.5 {
+        let cg = apply_color_grading_pixel(r, g, b);
+        r = cg.x;
+        g = cg.y;
+        b = cg.z;
+    }
 
     // LUT
     if params.lut_active > 0.5 {

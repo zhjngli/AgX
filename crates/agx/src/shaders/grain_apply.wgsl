@@ -27,11 +27,13 @@ struct Params {
     cg_global_tint: vec4f,
     cg_balance_factor: f32,
     cg_balance_active: f32,
-    _pad2: vec2f,
+    cg_active: f32,
+    _pad2: f32,
 
     vignette_amount: f32,
     vignette_shape: f32,
-    _pad3: vec2f,
+    hsl_active: f32,
+    _pad3: f32,
 
     dehaze_amount: f32,
     _pad4: array<f32, 3>,

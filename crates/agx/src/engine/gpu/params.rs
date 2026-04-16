@@ -37,12 +37,14 @@ pub struct GpuParameters {
     pub cg_global_tint: [f32; 4],
     pub cg_balance_factor: f32,
     pub cg_balance_active: f32,
-    pub _pad2: [f32; 2],
+    pub cg_active: f32,
+    pub _pad2: f32,
 
     // Vignette
     pub vignette_amount: f32,
     pub vignette_shape: f32, // 0.0 = elliptical, 1.0 = circular
-    pub _pad3: [f32; 2],
+    pub hsl_active: f32,
+    pub _pad3: f32,
 
     // Dehaze
     pub dehaze_amount: f32,
@@ -127,13 +129,15 @@ impl From<&Parameters> for GpuParameters {
             } else {
                 0.0
             },
-            _pad2: [0.0; 2],
+            cg_active: if p.color_grading.is_default() { 0.0 } else { 1.0 },
+            _pad2: 0.0,
             vignette_amount: p.vignette.amount,
             vignette_shape: match p.vignette.shape {
                 VignetteShape::Elliptical => 0.0,
                 VignetteShape::Circular => 1.0,
             },
-            _pad3: [0.0; 2],
+            hsl_active: if p.hsl.is_default() { 0.0 } else { 1.0 },
+            _pad3: 0.0,
             dehaze_amount: p.dehaze.amount,
             _pad4: [0.0; 3],
             grain_amount: p.grain.amount,
