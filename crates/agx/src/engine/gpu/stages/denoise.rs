@@ -101,10 +101,9 @@ pub fn dispatch_denoise(
         // After: lum_buffer = smoothed (next level's approx), accum has detail[0]
 
         // 5. Levels 1–4
-        for level in 1..NUM_LEVELS {
+        for (level, &scale) in LEVEL_SCALE.iter().enumerate().take(NUM_LEVELS).skip(1) {
             gpu_params.nr_gap = (1u32 << level) as f32;
-            let level_threshold = sigma * LEVEL_SCALE[level] * strength;
-            gpu_params.nr_threshold = level_threshold;
+            gpu_params.nr_threshold = sigma * scale * strength;
             runtime.upload_params(gpu_params);
 
             dispatch_atrous_h(runtime, atrous_h);
@@ -513,12 +512,8 @@ mod tests {
         };
 
         // CPU path
-        let cpu_result = crate::adjust::denoise::apply_noise_reduction(
-            &pixels,
-            width,
-            height,
-            &nr_params,
-        );
+        let cpu_result =
+            crate::adjust::denoise::apply_noise_reduction(&pixels, width, height, &nr_params);
 
         // GPU path
         let runtime = GpuRuntime::new(width as u32, height as u32).unwrap();

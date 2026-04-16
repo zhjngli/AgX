@@ -75,6 +75,13 @@ impl GpuRuntime {
         // 3 floats per pixel, 4 bytes per float
         let buffer_size = pixel_count * 3 * 4;
 
+        let max_buf = device.limits().max_buffer_size;
+        if buffer_size > max_buf {
+            return Err(AgxError::Gpu(format!(
+                "image too large for GPU: pixel buffer {buffer_size} bytes exceeds device limit {max_buf}"
+            )));
+        }
+
         let pixel_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("pixel_buffer"),
             size: buffer_size,

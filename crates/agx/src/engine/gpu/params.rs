@@ -129,7 +129,11 @@ impl From<&Parameters> for GpuParameters {
             } else {
                 0.0
             },
-            cg_active: if p.color_grading.is_default() { 0.0 } else { 1.0 },
+            cg_active: if p.color_grading.is_default() {
+                0.0
+            } else {
+                1.0
+            },
             _pad2: 0.0,
             vignette_amount: p.vignette.amount,
             vignette_shape: match p.vignette.shape {
@@ -203,7 +207,7 @@ impl From<&Parameters> for GpuParameters {
 
 /// Build the 5x256 tone curve data for GPU upload.
 /// Layout: [rgb_256, luma_256, red_256, green_256, blue_256] contiguous.
-/// Inactive curves are identity (value[i] = i / 255.0).
+/// Inactive curves are identity (value\[i\] = i / 255.0).
 pub fn build_tone_curve_data(params: &crate::engine::Parameters) -> [f32; 1280] {
     let mut data = [0.0f32; 1280];
     let identity: [f32; 256] = std::array::from_fn(|i| i as f32 / 255.0);

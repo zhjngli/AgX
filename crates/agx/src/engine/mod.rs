@@ -1247,22 +1247,31 @@ pub struct Engine {
     original: Rgb32FImage,
     params: Parameters,
     lut: Option<Arc<crate::lut::Lut3D>>,
+    pipeline: Pipeline,
+}
+
+enum Pipeline {
+    Cpu(pipeline::CpuPipeline),
     #[cfg(feature = "gpu")]
-    pipeline: gpu::GpuPipeline,
-    #[cfg(not(feature = "gpu"))]
-    pipeline: pipeline::CpuPipeline,
+    Gpu(Box<gpu::GpuPipeline>),
 }
 
 impl Engine {
     /// Create a new engine with the given linear sRGB image and neutral parameters.
+    ///
+    /// When compiled with the `gpu` feature, tries GPU acceleration first and
+    /// falls back to CPU if initialization fails (e.g. buffer too large, no adapter).
     pub fn new(image: Rgb32FImage) -> Self {
         #[cfg(feature = "gpu")]
         let pipeline = {
             let (w, h) = image.dimensions();
-            gpu::GpuPipeline::new(w, h).expect("GPU initialization failed")
+            match gpu::GpuPipeline::new(w, h) {
+                Ok(gpu) => Pipeline::Gpu(Box::new(gpu)),
+                Err(_) => Pipeline::Cpu(pipeline::CpuPipeline::new()),
+            }
         };
         #[cfg(not(feature = "gpu"))]
-        let pipeline = pipeline::CpuPipeline::new();
+        let pipeline = Pipeline::Cpu(pipeline::CpuPipeline::new());
         Self {
             original: image,
             params: Parameters::default(),
@@ -1327,8 +1336,11 @@ impl Engine {
     /// Delegates to the stage-based pipeline. Each render starts from the
     /// original image — no state accumulates between renders.
     pub fn render(&mut self) -> RenderResult {
-        self.pipeline
-            .execute(&self.original, &self.params, self.lut.as_deref())
+        match &mut self.pipeline {
+            Pipeline::Cpu(cpu) => cpu.execute(&self.original, &self.params, self.lut.as_deref()),
+            #[cfg(feature = "gpu")]
+            Pipeline::Gpu(gpu) => gpu.execute(&self.original, &self.params, self.lut.as_deref()),
+        }
     }
 }
 

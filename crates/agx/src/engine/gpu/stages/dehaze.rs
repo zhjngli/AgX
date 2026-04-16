@@ -40,16 +40,40 @@ pub fn dispatch_dehaze(
     // pixel_min → lum_buffer, min_h → temp_buffer, min_v → blur_buffer
     gpu_params.dehaze_mode = 0.0; // raw
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, pixel_min_pipeline, &runtime.pixel_buffer, &runtime.lum_buffer, &runtime.params_buffer, "dehaze_pixel_min", wg_count);
+    dispatch_3buf(
+        runtime,
+        pixel_min_pipeline,
+        &runtime.pixel_buffer,
+        &runtime.lum_buffer,
+        &runtime.params_buffer,
+        "dehaze_pixel_min",
+        wg_count,
+    );
 
     gpu_params.dehaze_filter_radius = PATCH_HALF;
     gpu_params.dehaze_mode = 0.0; // horizontal
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, min_filter_pipeline, &runtime.lum_buffer, &runtime.temp_buffer, &runtime.params_buffer, "dehaze_min_h", wg_count);
+    dispatch_3buf(
+        runtime,
+        min_filter_pipeline,
+        &runtime.lum_buffer,
+        &runtime.temp_buffer,
+        &runtime.params_buffer,
+        "dehaze_min_h",
+        wg_count,
+    );
 
     gpu_params.dehaze_mode = 1.0; // vertical
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, min_filter_pipeline, &runtime.temp_buffer, &runtime.blur_buffer, &runtime.params_buffer, "dehaze_min_v", wg_count);
+    dispatch_3buf(
+        runtime,
+        min_filter_pipeline,
+        &runtime.temp_buffer,
+        &runtime.blur_buffer,
+        &runtime.params_buffer,
+        "dehaze_min_v",
+        wg_count,
+    );
 
     // Step 2: Airlight estimation (CPU readback)
     let dark_channel = runtime.download_single_channel(&runtime.blur_buffer);
@@ -68,9 +92,15 @@ pub fn dispatch_dehaze(
         runtime.upload_params(gpu_params);
 
         // Use blur_buffer as dummy transmission (unused in fog mode)
-        dispatch_3buf(runtime, shaders.get("dehaze_recover").expect("dehaze_recover"),
-            &runtime.pixel_buffer, &runtime.blur_buffer, &runtime.params_buffer,
-            "dehaze_fog", wg_count);
+        dispatch_3buf(
+            runtime,
+            shaders.get("dehaze_recover").expect("dehaze_recover"),
+            &runtime.pixel_buffer,
+            &runtime.blur_buffer,
+            &runtime.params_buffer,
+            "dehaze_fog",
+            wg_count,
+        );
         return;
     }
 
@@ -81,80 +111,204 @@ pub fn dispatch_dehaze(
     // Step 3: Normalized dark channel
     gpu_params.dehaze_mode = 1.0; // normalized
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, pixel_min_pipeline, &runtime.pixel_buffer, &runtime.lum_buffer, &runtime.params_buffer, "dehaze_norm_pmin", wg_count);
+    dispatch_3buf(
+        runtime,
+        pixel_min_pipeline,
+        &runtime.pixel_buffer,
+        &runtime.lum_buffer,
+        &runtime.params_buffer,
+        "dehaze_norm_pmin",
+        wg_count,
+    );
 
     gpu_params.dehaze_filter_radius = PATCH_HALF;
     gpu_params.dehaze_mode = 0.0; // horizontal
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, min_filter_pipeline, &runtime.lum_buffer, &runtime.temp_buffer, &runtime.params_buffer, "dehaze_norm_min_h", wg_count);
+    dispatch_3buf(
+        runtime,
+        min_filter_pipeline,
+        &runtime.lum_buffer,
+        &runtime.temp_buffer,
+        &runtime.params_buffer,
+        "dehaze_norm_min_h",
+        wg_count,
+    );
 
     gpu_params.dehaze_mode = 1.0; // vertical
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, min_filter_pipeline, &runtime.temp_buffer, &runtime.denoise_accum_buffer, &runtime.params_buffer, "dehaze_norm_min_v", wg_count);
+    dispatch_3buf(
+        runtime,
+        min_filter_pipeline,
+        &runtime.temp_buffer,
+        &runtime.denoise_accum_buffer,
+        &runtime.params_buffer,
+        "dehaze_norm_min_v",
+        wg_count,
+    );
     // dc_norm is now in denoise_accum_buffer
 
     // Step 4: Raw transmission map → lum_buffer
-    let transmission_pipeline = shaders.get("dehaze_transmission").expect("dehaze_transmission");
+    let transmission_pipeline = shaders
+        .get("dehaze_transmission")
+        .expect("dehaze_transmission");
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, transmission_pipeline, &runtime.denoise_accum_buffer, &runtime.lum_buffer, &runtime.params_buffer, "dehaze_transmission", wg_count);
+    dispatch_3buf(
+        runtime,
+        transmission_pipeline,
+        &runtime.denoise_accum_buffer,
+        &runtime.lum_buffer,
+        &runtime.params_buffer,
+        "dehaze_transmission",
+        wg_count,
+    );
     // t_raw is now in lum_buffer
 
     // Step 5: Luminance guide → temp_buffer
-    let extract_lum_pipeline = shaders.get("detail_extract_lum").expect("detail_extract_lum");
-    dispatch_2buf(runtime, extract_lum_pipeline, &runtime.pixel_buffer, &runtime.temp_buffer, "dehaze_lum_guide", wg_count);
+    let extract_lum_pipeline = shaders
+        .get("detail_extract_lum")
+        .expect("detail_extract_lum");
+    dispatch_2buf(
+        runtime,
+        extract_lum_pipeline,
+        &runtime.pixel_buffer,
+        &runtime.temp_buffer,
+        "dehaze_lum_guide",
+        wg_count,
+    );
     // guide is now in temp_buffer
 
     // Step 6: Guided filter
     // guide = temp_buffer, input = lum_buffer (t_raw)
     let box_filter_pipeline = shaders.get("dehaze_box_filter").expect("dehaze_box_filter");
     let mul_pipeline = shaders.get("dehaze_mul").expect("dehaze_mul");
-    let coeffs_pipeline = shaders.get("dehaze_guided_coeffs").expect("dehaze_guided_coeffs");
+    let coeffs_pipeline = shaders
+        .get("dehaze_guided_coeffs")
+        .expect("dehaze_guided_coeffs");
     let fma_pipeline = shaders.get("dehaze_fma").expect("dehaze_fma");
 
     // 6a: mean_g = box_filter(guide) → scratch_a
-    box_filter_2d(runtime, box_filter_pipeline, gpu_params, &runtime.temp_buffer, &runtime.scratch_a, wg_count);
+    box_filter_2d(
+        runtime,
+        box_filter_pipeline,
+        gpu_params,
+        &runtime.temp_buffer,
+        &runtime.scratch_a,
+        wg_count,
+    );
 
     // 6b: mean_p = box_filter(t_raw) → scratch_b
-    box_filter_2d(runtime, box_filter_pipeline, gpu_params, &runtime.lum_buffer, &runtime.scratch_b, wg_count);
+    box_filter_2d(
+        runtime,
+        box_filter_pipeline,
+        gpu_params,
+        &runtime.lum_buffer,
+        &runtime.scratch_b,
+        wg_count,
+    );
 
     // 6c: gp = guide * t_raw → blur_buffer
-    dispatch_3buf(runtime, mul_pipeline, &runtime.temp_buffer, &runtime.lum_buffer, &runtime.blur_buffer, "dehaze_mul_gp", wg_count);
+    dispatch_3buf(
+        runtime,
+        mul_pipeline,
+        &runtime.temp_buffer,
+        &runtime.lum_buffer,
+        &runtime.blur_buffer,
+        "dehaze_mul_gp",
+        wg_count,
+    );
 
     // 6d: mean_gp = box_filter(gp) → scratch_c
-    box_filter_2d(runtime, box_filter_pipeline, gpu_params, &runtime.blur_buffer, &runtime.scratch_c, wg_count);
+    box_filter_2d(
+        runtime,
+        box_filter_pipeline,
+        gpu_params,
+        &runtime.blur_buffer,
+        &runtime.scratch_c,
+        wg_count,
+    );
 
     // 6e: gg = guide * guide → blur_buffer (reuse)
-    dispatch_3buf(runtime, mul_pipeline, &runtime.temp_buffer, &runtime.temp_buffer, &runtime.blur_buffer, "dehaze_mul_gg", wg_count);
+    dispatch_3buf(
+        runtime,
+        mul_pipeline,
+        &runtime.temp_buffer,
+        &runtime.temp_buffer,
+        &runtime.blur_buffer,
+        "dehaze_mul_gg",
+        wg_count,
+    );
 
     // 6f: mean_gg = box_filter(gg) → denoise_accum_buffer
     // (can't use scratch_d as output since box_filter_2d uses it as H-intermediate)
-    box_filter_2d(runtime, box_filter_pipeline, gpu_params, &runtime.blur_buffer, &runtime.denoise_accum_buffer, wg_count);
+    box_filter_2d(
+        runtime,
+        box_filter_pipeline,
+        gpu_params,
+        &runtime.blur_buffer,
+        &runtime.denoise_accum_buffer,
+        wg_count,
+    );
 
     // 6g: Compute coefficients a, b
     // mean_g=scratch_a, mean_p=scratch_b, mean_gp=scratch_c, mean_gg=denoise_accum_buffer
     // a→lum_buffer (t_raw no longer needed), b→blur_buffer
-    dispatch_guided_coeffs(runtime, coeffs_pipeline,
-        &runtime.scratch_a, &runtime.scratch_b, &runtime.scratch_c, &runtime.denoise_accum_buffer,
-        &runtime.lum_buffer, &runtime.blur_buffer,
-        wg_count);
+    dispatch_guided_coeffs(
+        runtime,
+        coeffs_pipeline,
+        &runtime.scratch_a,
+        &runtime.scratch_b,
+        &runtime.scratch_c,
+        &runtime.denoise_accum_buffer,
+        &runtime.lum_buffer,
+        &runtime.blur_buffer,
+        wg_count,
+    );
 
     // 6h: mean_a = box_filter(a) → scratch_a
-    box_filter_2d(runtime, box_filter_pipeline, gpu_params, &runtime.lum_buffer, &runtime.scratch_a, wg_count);
+    box_filter_2d(
+        runtime,
+        box_filter_pipeline,
+        gpu_params,
+        &runtime.lum_buffer,
+        &runtime.scratch_a,
+        wg_count,
+    );
 
     // 6i: mean_b = box_filter(b) → scratch_b
-    box_filter_2d(runtime, box_filter_pipeline, gpu_params, &runtime.blur_buffer, &runtime.scratch_b, wg_count);
+    box_filter_2d(
+        runtime,
+        box_filter_pipeline,
+        gpu_params,
+        &runtime.blur_buffer,
+        &runtime.scratch_b,
+        wg_count,
+    );
 
     // 6j: t_refined = mean_a * guide + mean_b → lum_buffer
-    dispatch_fma(runtime, fma_pipeline,
-        &runtime.scratch_a, &runtime.temp_buffer, &runtime.scratch_b, &runtime.lum_buffer,
-        wg_count);
+    dispatch_fma(
+        runtime,
+        fma_pipeline,
+        &runtime.scratch_a,
+        &runtime.temp_buffer,
+        &runtime.scratch_b,
+        &runtime.lum_buffer,
+        wg_count,
+    );
     // t_refined is now in lum_buffer
 
     // Step 7: Scene recovery
     gpu_params.dehaze_mode = 0.0; // positive mode
     runtime.upload_params(gpu_params);
     let recover_pipeline = shaders.get("dehaze_recover").expect("dehaze_recover");
-    dispatch_3buf(runtime, recover_pipeline, &runtime.pixel_buffer, &runtime.lum_buffer, &runtime.params_buffer, "dehaze_recover", wg_count);
+    dispatch_3buf(
+        runtime,
+        recover_pipeline,
+        &runtime.pixel_buffer,
+        &runtime.lum_buffer,
+        &runtime.params_buffer,
+        "dehaze_recover",
+        wg_count,
+    );
 }
 
 /// Airlight estimation on CPU: pick brightest pixel among top 0.1% of dark channel.
@@ -244,12 +398,28 @@ fn box_filter_2d(
     gpu_params.dehaze_filter_radius = GUIDED_RADIUS;
     gpu_params.dehaze_mode = 0.0; // horizontal
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, pipeline, input, &runtime.scratch_d, &runtime.params_buffer, "box_h", wg_count);
+    dispatch_3buf(
+        runtime,
+        pipeline,
+        input,
+        &runtime.scratch_d,
+        &runtime.params_buffer,
+        "box_h",
+        wg_count,
+    );
 
     // V-pass: scratch_d → output
     gpu_params.dehaze_mode = 1.0; // vertical
     runtime.upload_params(gpu_params);
-    dispatch_3buf(runtime, pipeline, &runtime.scratch_d, output, &runtime.params_buffer, "box_v", wg_count);
+    dispatch_3buf(
+        runtime,
+        pipeline,
+        &runtime.scratch_d,
+        output,
+        &runtime.params_buffer,
+        "box_v",
+        wg_count,
+    );
 }
 
 /// Generic dispatch for 3-binding shaders (input, output, params or similar).
@@ -262,18 +432,34 @@ fn dispatch_3buf(
     label: &str,
     wg_count: u32,
 ) {
-    let bind_group = runtime.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some(label),
-        layout: &pipeline.get_bind_group_layout(0),
-        entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: buf0.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: buf1.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: buf2.as_entire_binding() },
-        ],
-    });
-    let mut encoder = runtime.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
+    let bind_group = runtime
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label),
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buf0.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: buf1.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: buf2.as_entire_binding(),
+                },
+            ],
+        });
+    let mut encoder = runtime
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
     {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some(label), timestamp_writes: None });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some(label),
+            timestamp_writes: None,
+        });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
         pass.dispatch_workgroups(wg_count, 1, 1);
@@ -290,17 +476,30 @@ fn dispatch_2buf(
     label: &str,
     wg_count: u32,
 ) {
-    let bind_group = runtime.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some(label),
-        layout: &pipeline.get_bind_group_layout(0),
-        entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: buf0.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: buf1.as_entire_binding() },
-        ],
-    });
-    let mut encoder = runtime.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
+    let bind_group = runtime
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label),
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: buf0.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: buf1.as_entire_binding(),
+                },
+            ],
+        });
+    let mut encoder = runtime
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
     {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some(label), timestamp_writes: None });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some(label),
+            timestamp_writes: None,
+        });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
         pass.dispatch_workgroups(wg_count, 1, 1);
@@ -309,6 +508,7 @@ fn dispatch_2buf(
 }
 
 /// Dispatch guided filter coefficient computation (6-binding shader).
+#[allow(clippy::too_many_arguments)]
 fn dispatch_guided_coeffs(
     runtime: &GpuRuntime,
     pipeline: &wgpu::ComputePipeline,
@@ -320,21 +520,48 @@ fn dispatch_guided_coeffs(
     b_out: &wgpu::Buffer,
     wg_count: u32,
 ) {
-    let bind_group = runtime.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("dehaze_guided_coeffs"),
-        layout: &pipeline.get_bind_group_layout(0),
-        entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: mean_g.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: mean_p.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: mean_gp.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 3, resource: mean_gg.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 4, resource: a_out.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 5, resource: b_out.as_entire_binding() },
-        ],
-    });
-    let mut encoder = runtime.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("dehaze_guided_coeffs") });
+    let bind_group = runtime
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("dehaze_guided_coeffs"),
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: mean_g.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: mean_p.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: mean_gp.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: mean_gg.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: a_out.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: b_out.as_entire_binding(),
+                },
+            ],
+        });
+    let mut encoder = runtime
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("dehaze_guided_coeffs"),
+        });
     {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("dehaze_guided_coeffs"), timestamp_writes: None });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("dehaze_guided_coeffs"),
+            timestamp_writes: None,
+        });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
         pass.dispatch_workgroups(wg_count, 1, 1);
@@ -352,19 +579,40 @@ fn dispatch_fma(
     output: &wgpu::Buffer,
     wg_count: u32,
 ) {
-    let bind_group = runtime.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("dehaze_fma"),
-        layout: &pipeline.get_bind_group_layout(0),
-        entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: a.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: b.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: c.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 3, resource: output.as_entire_binding() },
-        ],
-    });
-    let mut encoder = runtime.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("dehaze_fma") });
+    let bind_group = runtime
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("dehaze_fma"),
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: a.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: b.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: c.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: output.as_entire_binding(),
+                },
+            ],
+        });
+    let mut encoder = runtime
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("dehaze_fma"),
+        });
     {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("dehaze_fma"), timestamp_writes: None });
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("dehaze_fma"),
+            timestamp_writes: None,
+        });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
         pass.dispatch_workgroups(wg_count, 1, 1);
@@ -421,7 +669,9 @@ mod tests {
                 assert!(
                     (orig[c] - out[c]).abs() < 1e-6,
                     "pixel[{i}][{c}]: expected {}, got {} (diff={})",
-                    orig[c], out[c], (orig[c] - out[c]).abs()
+                    orig[c],
+                    out[c],
+                    (orig[c] - out[c]).abs()
                 );
             }
         }
@@ -458,7 +708,9 @@ mod tests {
         dispatch_dehaze(&runtime, &shaders, &mut gpu_params, &dehaze_params);
 
         let result = runtime.download_pixels();
-        let differs = result.iter().zip(pixels.iter())
+        let differs = result
+            .iter()
+            .zip(pixels.iter())
             .any(|(r, p)| (r[0] - p[0]).abs() > 1e-4);
         assert!(differs, "positive dehaze should modify image");
     }
@@ -493,7 +745,9 @@ mod tests {
         dispatch_dehaze(&runtime, &shaders, &mut gpu_params, &dehaze_params);
 
         let result = runtime.download_pixels();
-        let differs = result.iter().zip(pixels.iter())
+        let differs = result
+            .iter()
+            .zip(pixels.iter())
             .any(|(r, p)| (r[0] - p[0]).abs() > 1e-4);
         assert!(differs, "negative dehaze should add fog");
     }

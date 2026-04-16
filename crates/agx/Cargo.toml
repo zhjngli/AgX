@@ -33,7 +33,7 @@ tempfile = "3"
 cc = "1"
 
 [features]
-default = []
+default = ["gpu"]
 raw = []
 profiling = ["serde_json"]
 docgen = ["schemars", "serde_json"]
