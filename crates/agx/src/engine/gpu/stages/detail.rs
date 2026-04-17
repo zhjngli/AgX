@@ -194,8 +194,7 @@ mod tests {
         dispatch_detail(&runtime, &shaders, &mut gpu_params, &detail_params);
         let gpu_result = runtime.download_pixels();
 
-        // Generous tolerance: GPU float precision and workgroup ordering
-        let tolerance = 0.02;
+        let tolerance = 0.00001;
         let mut max_diff = 0.0f32;
         for (i, (cpu, gpu)) in cpu_result.iter().zip(gpu_result.iter()).enumerate() {
             for c in 0..3 {
@@ -295,7 +294,7 @@ mod tests {
         dispatch_detail(&runtime, &shaders, &mut gpu_params, &detail_params);
         let gpu_result = runtime.download_pixels();
 
-        let tolerance = 0.02;
+        let tolerance = 0.00001;
         let mut max_diff = 0.0f32;
         for (i, (cpu, gpu)) in cpu_result.iter().zip(gpu_result.iter()).enumerate() {
             for c in 0..3 {

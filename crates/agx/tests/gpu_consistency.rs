@@ -71,7 +71,7 @@ fn neutral_params() {
     let img = make_gradient(16, 16);
     let params = Parameters::default();
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.005);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn exposure_and_contrast() {
     params.highlights = -30.0;
     params.shadows = 20.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.01);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn white_balance() {
     params.temperature = 30.0;
     params.tint = -15.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.01);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn vignette() {
     let mut params = Parameters::default();
     params.vignette.amount = -50.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.01);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn detail_sharpening() {
     let mut params = Parameters::default();
     params.detail.sharpening.amount = 60.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.02);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn detail_clarity() {
     let mut params = Parameters::default();
     params.detail.clarity = 40.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.02);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -147,8 +147,7 @@ fn denoise_luminance() {
     let mut params = Parameters::default();
     params.noise_reduction.luminance = 50.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    // Denoise has inherent differences from hybrid sigma estimation
-    assert_near_identical(&cpu, &gpu, 0.05);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -160,7 +159,7 @@ fn denoise_color() {
     let mut params = Parameters::default();
     params.noise_reduction.color = 50.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.05);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -172,8 +171,7 @@ fn dehaze_positive() {
     let mut params = Parameters::default();
     params.dehaze.amount = 30.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    // Dehaze guided filter can differ slightly due to floating-point order
-    assert_near_identical(&cpu, &gpu, 0.05);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -185,7 +183,7 @@ fn dehaze_negative() {
     let mut params = Parameters::default();
     params.dehaze.amount = -30.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.05);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }
 
 #[test]
@@ -204,5 +202,5 @@ fn combined_adjustments() {
     params.vignette.amount = -30.0;
     params.detail.sharpening.amount = 40.0;
     let (cpu, gpu) = render_both(&img, &params, None);
-    assert_near_identical(&cpu, &gpu, 0.02);
+    assert_near_identical(&cpu, &gpu, 0.00001);
 }

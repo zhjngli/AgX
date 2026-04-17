@@ -358,7 +358,7 @@ mod tests {
         dispatch_denoise(&runtime, &shaders, &mut gpu_params, &nr_params);
         let gpu_result = runtime.download_pixels();
 
-        let tolerance = 0.05;
+        let tolerance = 0.00001;
         let mut max_diff = 0.0f32;
         for (i, (cpu, gpu)) in cpu_result.iter().zip(gpu_result.iter()).enumerate() {
             for c in 0..3 {
