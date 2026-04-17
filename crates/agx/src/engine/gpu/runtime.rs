@@ -59,11 +59,7 @@ impl GpuRuntime {
         Self::new_inner(width, height, true)
     }
 
-    fn new_inner(
-        width: u32,
-        height: u32,
-        force_fallback: bool,
-    ) -> Result<Self, AgxError> {
+    fn new_inner(width: u32, height: u32, force_fallback: bool) -> Result<Self, AgxError> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
 
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -80,8 +76,7 @@ impl GpuRuntime {
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits {
                     max_buffer_size: adapter_limits.max_buffer_size,
-                    max_storage_buffer_binding_size: adapter_limits
-                        .max_storage_buffer_binding_size,
+                    max_storage_buffer_binding_size: adapter_limits.max_storage_buffer_binding_size,
                     ..wgpu::Limits::default()
                 },
                 memory_hints: wgpu::MemoryHints::Performance,

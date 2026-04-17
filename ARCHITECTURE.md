@@ -37,6 +37,9 @@ AgX is an open-source photo editing library and CLI in Rust. The architecture fo
                 ▼                                    │
           ┌──────────────┐                           │
           │    engine    │◄──────────────────────────┘
+          │  ┌────┬────┐ │
+          │  │CPU │GPU │ │   (runtime pipeline selection)
+          │  └────┴────┘ │
           └──────┬───────┘
                  │
           ┌──────────────┐
@@ -72,7 +75,7 @@ What does NOT exist in each module -- violations of these constraints indicate a
 - **metadata**: No pixel manipulation. No encoding. Does not decide what to do with metadata -- it only extracts and represents it.
 - **encode**: No decoding. No adjustments. No preset logic. Receives final pixels and metadata, writes output.
 - **preset**: No I/O beyond TOML file reading. No pixel math. Does not execute adjustments -- it only declares parameter values.
-- **engine**: No direct file I/O for decoding/encoding (delegates to decode/encode modules). Does not define adjustment algorithms (delegates to adjust module). Pipeline stages are orchestrated by the Pipeline executor in a fixed order; stages are not reorderable by consumers.
+- **engine**: No direct file I/O for decoding/encoding (delegates to decode/encode modules). Does not define adjustment algorithms (delegates to adjust module for CPU, WGSL shaders for GPU). Pipeline stages are orchestrated in a fixed order; stages are not reorderable by consumers. The engine selects GPU or CPU pipeline at runtime — this is transparent to consumers.
 - **agx-cli**: No image processing logic. Thin wrapper that parses CLI arguments and calls library API.
 - **agx-docgen**: No image processing logic. Dev-only build tool that generates CLI and preset reference markdown for the documentation site.
 
@@ -88,6 +91,8 @@ These invariants must hold across the entire codebase:
 
 4. **Fixed render order**: The engine applies adjustments in a fixed, hardcoded order regardless of the order parameters appear in presets or API calls. The render order is an engine implementation detail, not a user-facing concept.
 
+5. **Dual pipeline, same output**: The engine has CPU (Rust + rayon) and GPU (wgpu + WGSL compute shaders) pipelines that execute the same stages in the same order. GPU is selected at runtime when a hardware adapter is available; CPU is the fallback. Both paths must produce near-identical output — verified by `gpu_consistency.rs` cross-path tests.
+
 ## Per-Module Details
 
 Each module has (or will have) a README.md documenting its public API, internal structure, and specific constraints.
@@ -101,7 +106,8 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | encode     | [`crates/agx/src/encode/README.md`](crates/agx/src/encode/README.md)     |
 | preset     | [`crates/agx/src/preset/README.md`](crates/agx/src/preset/README.md)     |
 | engine     | [`crates/agx/src/engine/README.md`](crates/agx/src/engine/README.md)     |
-| engine/stages | Stage implementations (see engine README)                             |
+| engine/gpu | GPU pipeline via wgpu + WGSL compute shaders (see engine README)      |
+| engine/stages | CPU stage implementations (see engine README)                        |
 | agx-cli    | [`crates/agx-cli/README.md`](crates/agx-cli/README.md)                   |
 
 ## Design Docs

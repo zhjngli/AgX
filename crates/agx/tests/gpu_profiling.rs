@@ -147,7 +147,10 @@ fn probe_adapter_info() {
             eprintln!("  Primary adapter: {} ({:?})", info.name, info.backend);
             eprintln!("  Driver: {}", info.driver);
             eprintln!("  Type: {:?}", info.device_type);
-            eprintln!("  Max buffer size: {} MB", limits.max_buffer_size / 1_048_576);
+            eprintln!(
+                "  Max buffer size: {} MB",
+                limits.max_buffer_size / 1_048_576
+            );
             eprintln!(
                 "  Max storage buffer binding: {} MB",
                 limits.max_storage_buffer_binding_size / 1_048_576
@@ -168,7 +171,10 @@ fn probe_adapter_info() {
             eprintln!("  Fallback adapter: {} ({:?})", info.name, info.backend);
             eprintln!("  Driver: {}", info.driver);
             eprintln!("  Type: {:?}", info.device_type);
-            eprintln!("  Max buffer size: {} MB", limits.max_buffer_size / 1_048_576);
+            eprintln!(
+                "  Max buffer size: {} MB",
+                limits.max_buffer_size / 1_048_576
+            );
             eprintln!(
                 "  Max storage buffer binding: {} MB",
                 limits.max_storage_buffer_binding_size / 1_048_576

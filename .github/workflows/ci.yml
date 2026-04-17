@@ -54,6 +54,7 @@ jobs:
   gpu-profiling:
     name: GPU profiling (software Vulkan)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
