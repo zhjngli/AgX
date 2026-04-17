@@ -1,7 +1,9 @@
 use image::{Rgb, Rgb32FImage};
 
 use super::stages;
-use super::{ColorSpace, Parameters, RenderContext, RenderResult, Stage};
+use super::{Parameters, RenderContext, RenderResult, Stage};
+#[cfg(debug_assertions)]
+use super::ColorSpace;
 
 #[cfg(feature = "profiling")]
 use super::RenderProfile;
