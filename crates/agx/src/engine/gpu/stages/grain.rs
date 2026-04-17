@@ -36,7 +36,7 @@ pub fn dispatch_grain(
     let sigma = grain_sigma(grain_params.size, runtime.width, runtime.height);
     let use_blur = sigma >= MIN_BLUR_SIGMA;
 
-    let wg_count = runtime.pixel_count().div_ceil(256);
+    let wg = runtime.workgroup_counts();
     let noise_gen_pipeline = shaders.get("grain_noise_gen").expect("grain_noise_gen");
 
     // 1. Generate noise → lum_buffer
@@ -46,7 +46,7 @@ pub fn dispatch_grain(
         &runtime.lum_buffer,
         &runtime.params_buffer,
         "grain_noise_gen",
-        wg_count,
+        wg,
     );
 
     if use_blur {
@@ -82,7 +82,7 @@ pub fn dispatch_grain(
         noise_buffer,
         &runtime.params_buffer,
         "grain_apply",
-        wg_count,
+        wg,
     );
 }
 

@@ -93,8 +93,8 @@ fn mirror_idx(i: i32, max_val: u32) -> u32 {
 @group(0) @binding(2) var<storage, read> params: Params;
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let w = u32(params.width);
     let h = u32(params.height);
     let pixel_count = w * h;

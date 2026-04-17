@@ -15,8 +15,8 @@ const GUIDED_EPS: f32 = 0.001;
 @group(0) @binding(5) var<storage, read_write> b_out: array<f32>;
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let n = arrayLength(&a_out);
     if idx >= n { return; }
 

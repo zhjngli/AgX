@@ -26,7 +26,7 @@ fn dispatch_pixel_only(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline, l
             }],
         });
 
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
+    let wg = runtime.workgroup_counts();
     let mut encoder = runtime
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
@@ -37,7 +37,7 @@ fn dispatch_pixel_only(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline, l
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
+        pass.dispatch_workgroups(wg.0, wg.1, 1);
     }
     runtime.queue.submit(std::iter::once(encoder.finish()));
 }

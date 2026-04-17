@@ -7,8 +7,8 @@
 @group(0) @binding(3) var<storage, read_write> output: array<f32>;
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let n = arrayLength(&output);
     if idx >= n { return; }
     output[idx] = a[idx] * b[idx] + c[idx];

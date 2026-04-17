@@ -65,8 +65,8 @@ struct Params {
 @group(0) @binding(1) var<storage, read> params: Params;
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let pixel_count = arrayLength(&pixels) / 3u;
     if idx >= pixel_count { return; }
     let base = idx * 3u;

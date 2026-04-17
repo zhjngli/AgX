@@ -60,7 +60,7 @@ pub fn dispatch_denoise(
 
         let is_luma = channel == 0;
 
-        let wg_count = runtime.pixel_count().div_ceil(256);
+        let wg = runtime.workgroup_counts();
 
         // 1. Extract channel from pixels → lum_buffer
         gpu_params.nr_channel = channel as f32;
@@ -73,7 +73,7 @@ pub fn dispatch_denoise(
             &runtime.lum_buffer,
             &runtime.params_buffer,
             "denoise_rgb_to_channel",
-            wg_count,
+            wg,
         );
 
         // 2. Zero out denoise_accum_buffer (GPU-side, no CPU allocation)
@@ -98,7 +98,7 @@ pub fn dispatch_denoise(
             &runtime.temp_buffer,
             &runtime.params_buffer,
             "denoise_atrous_h",
-            wg_count,
+            wg,
         );
         dispatch_3buf(
             runtime,
@@ -107,7 +107,7 @@ pub fn dispatch_denoise(
             &runtime.blur_buffer,
             &runtime.params_buffer,
             "denoise_atrous_v",
-            wg_count,
+            wg,
         );
 
         // Read back lum_buffer (approx) and blur_buffer (smoothed) for sigma estimation
@@ -136,7 +136,7 @@ pub fn dispatch_denoise(
             &runtime.denoise_accum_buffer,
             &runtime.params_buffer,
             "denoise_threshold_accum",
-            wg_count,
+            wg,
         );
 
         // 5. Levels 1–4
@@ -152,7 +152,7 @@ pub fn dispatch_denoise(
                 &runtime.temp_buffer,
                 &runtime.params_buffer,
                 "denoise_atrous_h",
-                wg_count,
+                wg,
             );
             dispatch_3buf(
                 runtime,
@@ -161,7 +161,7 @@ pub fn dispatch_denoise(
                 &runtime.blur_buffer,
                 &runtime.params_buffer,
                 "denoise_atrous_v",
-                wg_count,
+                wg,
             );
             dispatch_4buf(
                 runtime,
@@ -171,7 +171,7 @@ pub fn dispatch_denoise(
                 &runtime.denoise_accum_buffer,
                 &runtime.params_buffer,
                 "denoise_threshold_accum",
-                wg_count,
+                wg,
             );
         }
 
@@ -182,7 +182,7 @@ pub fn dispatch_denoise(
             &runtime.lum_buffer,
             &runtime.denoise_accum_buffer,
             "denoise_add_residual",
-            wg_count,
+            wg,
         );
 
         // 7. Write denoised channel back to pixels
@@ -195,7 +195,7 @@ pub fn dispatch_denoise(
             &runtime.denoise_accum_buffer,
             &runtime.params_buffer,
             "denoise_channel_to_rgb",
-            wg_count,
+            wg,
         );
     }
 }

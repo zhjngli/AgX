@@ -9,7 +9,7 @@ pub(crate) fn dispatch_2buf(
     buf0: &wgpu::Buffer,
     buf1: &wgpu::Buffer,
     label: &str,
-    wg_count: u32,
+    wg: (u32, u32),
 ) {
     let bind_group = runtime
         .device
@@ -37,7 +37,7 @@ pub(crate) fn dispatch_2buf(
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
+        pass.dispatch_workgroups(wg.0, wg.1, 1);
     }
     runtime.queue.submit(std::iter::once(encoder.finish()));
 }
@@ -50,7 +50,7 @@ pub(crate) fn dispatch_3buf(
     buf1: &wgpu::Buffer,
     buf2: &wgpu::Buffer,
     label: &str,
-    wg_count: u32,
+    wg: (u32, u32),
 ) {
     let bind_group = runtime
         .device
@@ -82,7 +82,7 @@ pub(crate) fn dispatch_3buf(
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
+        pass.dispatch_workgroups(wg.0, wg.1, 1);
     }
     runtime.queue.submit(std::iter::once(encoder.finish()));
 }
@@ -97,7 +97,7 @@ pub(crate) fn dispatch_4buf(
     buf2: &wgpu::Buffer,
     buf3: &wgpu::Buffer,
     label: &str,
-    wg_count: u32,
+    wg: (u32, u32),
 ) {
     let bind_group = runtime
         .device
@@ -133,14 +133,14 @@ pub(crate) fn dispatch_4buf(
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
+        pass.dispatch_workgroups(wg.0, wg.1, 1);
     }
     runtime.queue.submit(std::iter::once(encoder.finish()));
 }
 
 /// Separable Gaussian blur: horizontal pass (lum_buffer → temp_buffer).
 pub(crate) fn dispatch_blur_h(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let wg_count = runtime.pixel_count().div_ceil(256);
+    let wg = runtime.workgroup_counts();
     dispatch_4buf(
         runtime,
         pipeline,
@@ -149,13 +149,13 @@ pub(crate) fn dispatch_blur_h(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipe
         &runtime.kernel_buffer,
         &runtime.params_buffer,
         "blur_horizontal",
-        wg_count,
+        wg,
     );
 }
 
 /// Separable Gaussian blur: vertical pass (temp_buffer → blur_buffer).
 pub(crate) fn dispatch_blur_v(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let wg_count = runtime.pixel_count().div_ceil(256);
+    let wg = runtime.workgroup_counts();
     dispatch_4buf(
         runtime,
         pipeline,
@@ -164,6 +164,6 @@ pub(crate) fn dispatch_blur_v(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipe
         &runtime.kernel_buffer,
         &runtime.params_buffer,
         "blur_vertical",
-        wg_count,
+        wg,
     );
 }

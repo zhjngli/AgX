@@ -425,6 +425,18 @@ impl GpuRuntime {
     pub fn pixel_count(&self) -> u32 {
         self.width * self.height
     }
+
+    /// Compute 2D workgroup counts that stay within the 65535-per-dimension limit.
+    pub(crate) fn workgroup_counts(&self) -> (u32, u32) {
+        let total = self.pixel_count().div_ceil(256);
+        if total <= 65535 {
+            (total, 1)
+        } else {
+            let wg_x = 65535u32;
+            let wg_y = total.div_ceil(wg_x);
+            (wg_x, wg_y)
+        }
+    }
 }
 
 /// Returns true if a GPU adapter is available for testing.

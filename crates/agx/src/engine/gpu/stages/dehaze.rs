@@ -32,7 +32,7 @@ pub fn dispatch_dehaze(
     }
 
     let amount = dehaze_params.amount;
-    let wg_count = runtime.pixel_count().div_ceil(256);
+    let wg = runtime.workgroup_counts();
 
     let pixel_min_pipeline = shaders.get("dehaze_pixel_min").expect("dehaze_pixel_min");
     let min_filter_pipeline = shaders.get("dehaze_min_filter").expect("dehaze_min_filter");
@@ -48,7 +48,7 @@ pub fn dispatch_dehaze(
         &runtime.lum_buffer,
         &runtime.params_buffer,
         "dehaze_pixel_min",
-        wg_count,
+        wg,
     );
 
     gpu_params.dehaze_filter_radius = PATCH_HALF;
@@ -61,7 +61,7 @@ pub fn dispatch_dehaze(
         &runtime.temp_buffer,
         &runtime.params_buffer,
         "dehaze_min_h",
-        wg_count,
+        wg,
     );
 
     gpu_params.dehaze_mode = 1.0; // vertical
@@ -73,7 +73,7 @@ pub fn dispatch_dehaze(
         &runtime.blur_buffer,
         &runtime.params_buffer,
         "dehaze_min_v",
-        wg_count,
+        wg,
     );
 
     // Step 2: Airlight estimation (CPU readback)
@@ -100,7 +100,7 @@ pub fn dispatch_dehaze(
             &runtime.blur_buffer,
             &runtime.params_buffer,
             "dehaze_fog",
-            wg_count,
+            wg,
         );
         return;
     }
@@ -119,7 +119,7 @@ pub fn dispatch_dehaze(
         &runtime.lum_buffer,
         &runtime.params_buffer,
         "dehaze_norm_pmin",
-        wg_count,
+        wg,
     );
 
     gpu_params.dehaze_filter_radius = PATCH_HALF;
@@ -132,7 +132,7 @@ pub fn dispatch_dehaze(
         &runtime.temp_buffer,
         &runtime.params_buffer,
         "dehaze_norm_min_h",
-        wg_count,
+        wg,
     );
 
     gpu_params.dehaze_mode = 1.0; // vertical
@@ -144,7 +144,7 @@ pub fn dispatch_dehaze(
         &runtime.denoise_accum_buffer,
         &runtime.params_buffer,
         "dehaze_norm_min_v",
-        wg_count,
+        wg,
     );
     // dc_norm is now in denoise_accum_buffer
 
@@ -160,7 +160,7 @@ pub fn dispatch_dehaze(
         &runtime.lum_buffer,
         &runtime.params_buffer,
         "dehaze_transmission",
-        wg_count,
+        wg,
     );
     // t_raw is now in lum_buffer
 
@@ -174,7 +174,7 @@ pub fn dispatch_dehaze(
         &runtime.pixel_buffer,
         &runtime.temp_buffer,
         "dehaze_lum_guide",
-        wg_count,
+        wg,
     );
     // guide is now in temp_buffer
 
@@ -194,7 +194,7 @@ pub fn dispatch_dehaze(
         gpu_params,
         &runtime.temp_buffer,
         &runtime.scratch_a,
-        wg_count,
+        wg,
     );
 
     // 6b: mean_p = box_filter(t_raw) → scratch_b
@@ -204,7 +204,7 @@ pub fn dispatch_dehaze(
         gpu_params,
         &runtime.lum_buffer,
         &runtime.scratch_b,
-        wg_count,
+        wg,
     );
 
     // 6c: gp = guide * t_raw → blur_buffer
@@ -215,7 +215,7 @@ pub fn dispatch_dehaze(
         &runtime.lum_buffer,
         &runtime.blur_buffer,
         "dehaze_mul_gp",
-        wg_count,
+        wg,
     );
 
     // 6d: mean_gp = box_filter(gp) → scratch_c
@@ -225,7 +225,7 @@ pub fn dispatch_dehaze(
         gpu_params,
         &runtime.blur_buffer,
         &runtime.scratch_c,
-        wg_count,
+        wg,
     );
 
     // 6e: gg = guide * guide → blur_buffer (reuse)
@@ -236,7 +236,7 @@ pub fn dispatch_dehaze(
         &runtime.temp_buffer,
         &runtime.blur_buffer,
         "dehaze_mul_gg",
-        wg_count,
+        wg,
     );
 
     // 6f: mean_gg = box_filter(gg) → denoise_accum_buffer
@@ -247,7 +247,7 @@ pub fn dispatch_dehaze(
         gpu_params,
         &runtime.blur_buffer,
         &runtime.denoise_accum_buffer,
-        wg_count,
+        wg,
     );
 
     // 6g: Compute coefficients a, b
@@ -262,7 +262,7 @@ pub fn dispatch_dehaze(
         &runtime.denoise_accum_buffer,
         &runtime.lum_buffer,
         &runtime.blur_buffer,
-        wg_count,
+        wg,
     );
 
     // 6h: mean_a = box_filter(a) → scratch_a
@@ -272,7 +272,7 @@ pub fn dispatch_dehaze(
         gpu_params,
         &runtime.lum_buffer,
         &runtime.scratch_a,
-        wg_count,
+        wg,
     );
 
     // 6i: mean_b = box_filter(b) → scratch_b
@@ -282,7 +282,7 @@ pub fn dispatch_dehaze(
         gpu_params,
         &runtime.blur_buffer,
         &runtime.scratch_b,
-        wg_count,
+        wg,
     );
 
     // 6j: t_refined = mean_a * guide + mean_b → lum_buffer
@@ -293,7 +293,7 @@ pub fn dispatch_dehaze(
         &runtime.temp_buffer,
         &runtime.scratch_b,
         &runtime.lum_buffer,
-        wg_count,
+        wg,
     );
     // t_refined is now in lum_buffer
 
@@ -308,7 +308,7 @@ pub fn dispatch_dehaze(
         &runtime.lum_buffer,
         &runtime.params_buffer,
         "dehaze_recover",
-        wg_count,
+        wg,
     );
 }
 
@@ -345,7 +345,7 @@ fn box_filter_2d(
     gpu_params: &mut GpuParameters,
     input: &wgpu::Buffer,
     output: &wgpu::Buffer,
-    wg_count: u32,
+    wg: (u32, u32),
 ) {
     // H-pass: input → scratch_d (horizontal intermediate)
     gpu_params.dehaze_filter_radius = GUIDED_RADIUS;
@@ -358,7 +358,7 @@ fn box_filter_2d(
         &runtime.scratch_d,
         &runtime.params_buffer,
         "box_h",
-        wg_count,
+        wg,
     );
 
     // V-pass: scratch_d → output
@@ -371,7 +371,7 @@ fn box_filter_2d(
         output,
         &runtime.params_buffer,
         "box_v",
-        wg_count,
+        wg,
     );
 }
 
@@ -386,7 +386,7 @@ fn dispatch_guided_coeffs(
     mean_gg: &wgpu::Buffer,
     a_out: &wgpu::Buffer,
     b_out: &wgpu::Buffer,
-    wg_count: u32,
+    wg: (u32, u32),
 ) {
     let bind_group = runtime
         .device
@@ -432,7 +432,7 @@ fn dispatch_guided_coeffs(
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
+        pass.dispatch_workgroups(wg.0, wg.1, 1);
     }
     runtime.queue.submit(std::iter::once(encoder.finish()));
 }
@@ -445,7 +445,7 @@ fn dispatch_fma(
     b: &wgpu::Buffer,
     c: &wgpu::Buffer,
     output: &wgpu::Buffer,
-    wg_count: u32,
+    wg: (u32, u32),
 ) {
     let bind_group = runtime
         .device
@@ -483,7 +483,7 @@ fn dispatch_fma(
         });
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
+        pass.dispatch_workgroups(wg.0, wg.1, 1);
     }
     runtime.queue.submit(std::iter::once(encoder.finish()));
 }

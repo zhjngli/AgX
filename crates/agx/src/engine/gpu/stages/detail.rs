@@ -63,7 +63,7 @@ pub fn dispatch_detail(
         gpu_params.kernel_size = kernel.len() as f32;
         runtime.upload_params(gpu_params);
 
-        let wg_count = runtime.pixel_count().div_ceil(256);
+        let wg = runtime.workgroup_counts();
 
         // 1. Extract luminance → lum_buffer
         dispatch_2buf(
@@ -72,7 +72,7 @@ pub fn dispatch_detail(
             &runtime.pixel_buffer,
             &runtime.lum_buffer,
             "detail_extract_lum",
-            wg_count,
+            wg,
         );
 
         // 2. Horizontal blur: lum_buffer → temp_buffer
@@ -91,7 +91,7 @@ pub fn dispatch_detail(
             &runtime.blur_buffer,
             &runtime.params_buffer,
             "detail_apply",
-            wg_count,
+            wg,
         );
     }
 }

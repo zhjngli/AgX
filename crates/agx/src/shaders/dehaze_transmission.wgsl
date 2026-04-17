@@ -25,8 +25,8 @@ struct Params {
 @group(0) @binding(2) var<storage, read> params: Params;
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let n = arrayLength(&dc_norm);
     if idx >= n { return; }
     t_raw[idx] = 1.0 - params.dehaze_omega * dc_norm[idx];

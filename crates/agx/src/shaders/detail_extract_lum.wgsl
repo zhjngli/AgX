@@ -4,8 +4,8 @@
 @group(0) @binding(1) var<storage, read_write> lum: array<f32>;
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let pixel_count = arrayLength(&lum);
     if idx >= pixel_count { return; }
 

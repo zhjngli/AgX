@@ -216,8 +216,8 @@ fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
 }
 
 @compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3u) {
-    let idx = id.x;
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: vec3u) {
+    let idx = id.x + id.y * nwg.x * 256u;
     let pixel_count = arrayLength(&pixels) / 3u;
     if idx >= pixel_count { return; }
     let base = idx * 3u;
