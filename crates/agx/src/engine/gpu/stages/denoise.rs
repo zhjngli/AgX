@@ -11,6 +11,7 @@ use crate::adjust::denoise::{estimate_sigma, NoiseReductionParams, LEVEL_SCALE, 
 use crate::engine::gpu::params::GpuParameters;
 use crate::engine::gpu::runtime::GpuRuntime;
 use crate::engine::gpu::shaders::ShaderCache;
+use crate::engine::gpu::stages::dispatch::{dispatch_2buf, dispatch_3buf, dispatch_4buf};
 
 /// Dispatch the full denoise stage (à trous wavelet, 3 channels).
 ///
@@ -59,25 +60,55 @@ pub fn dispatch_denoise(
 
         let is_luma = channel == 0;
 
+        let wg_count = runtime.pixel_count().div_ceil(256);
+
         // 1. Extract channel from pixels → lum_buffer
         gpu_params.nr_channel = channel as f32;
         gpu_params.nr_is_luma = if is_luma { 1.0 } else { 0.0 };
         runtime.upload_params(gpu_params);
-        dispatch_rgb_to_channel(runtime, rgb_to_channel);
-
-        // 2. Zero out denoise_accum_buffer
-        let zero_data = vec![0.0f32; runtime.pixel_count() as usize];
-        runtime.queue.write_buffer(
-            &runtime.denoise_accum_buffer,
-            0,
-            bytemuck::cast_slice(&zero_data),
+        dispatch_3buf(
+            runtime,
+            rgb_to_channel,
+            &runtime.pixel_buffer,
+            &runtime.lum_buffer,
+            &runtime.params_buffer,
+            "denoise_rgb_to_channel",
+            wg_count,
         );
+
+        // 2. Zero out denoise_accum_buffer (GPU-side, no CPU allocation)
+        let mut clear_encoder =
+            runtime
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("denoise_clear_accum"),
+                });
+        clear_encoder.clear_buffer(&runtime.denoise_accum_buffer, 0, None);
+        runtime
+            .queue
+            .submit(std::iter::once(clear_encoder.finish()));
 
         // 3. Level 0: compute smoothed, estimate sigma from detail
         gpu_params.nr_gap = 1.0;
         runtime.upload_params(gpu_params);
-        dispatch_atrous_h(runtime, atrous_h); // lum_buffer → temp_buffer
-        dispatch_atrous_v(runtime, atrous_v); // temp_buffer → blur_buffer
+        dispatch_3buf(
+            runtime,
+            atrous_h,
+            &runtime.lum_buffer,
+            &runtime.temp_buffer,
+            &runtime.params_buffer,
+            "denoise_atrous_h",
+            wg_count,
+        );
+        dispatch_3buf(
+            runtime,
+            atrous_v,
+            &runtime.temp_buffer,
+            &runtime.blur_buffer,
+            &runtime.params_buffer,
+            "denoise_atrous_v",
+            wg_count,
+        );
 
         // Read back lum_buffer (approx) and blur_buffer (smoothed) for sigma estimation
         let approx_data = runtime.download_single_channel(&runtime.lum_buffer);
@@ -97,8 +128,16 @@ pub fn dispatch_denoise(
         }
         gpu_params.nr_threshold = threshold;
         runtime.upload_params(gpu_params);
-        dispatch_threshold_accum(runtime, threshold_accum);
-        // After: lum_buffer = smoothed (next level's approx), accum has detail[0]
+        dispatch_4buf(
+            runtime,
+            threshold_accum,
+            &runtime.lum_buffer,
+            &runtime.blur_buffer,
+            &runtime.denoise_accum_buffer,
+            &runtime.params_buffer,
+            "denoise_threshold_accum",
+            wg_count,
+        );
 
         // 5. Levels 1–4
         for (level, &scale) in LEVEL_SCALE.iter().enumerate().take(NUM_LEVELS).skip(1) {
@@ -106,281 +145,68 @@ pub fn dispatch_denoise(
             gpu_params.nr_threshold = sigma * scale * strength;
             runtime.upload_params(gpu_params);
 
-            dispatch_atrous_h(runtime, atrous_h);
-            dispatch_atrous_v(runtime, atrous_v);
-            dispatch_threshold_accum(runtime, threshold_accum);
+            dispatch_3buf(
+                runtime,
+                atrous_h,
+                &runtime.lum_buffer,
+                &runtime.temp_buffer,
+                &runtime.params_buffer,
+                "denoise_atrous_h",
+                wg_count,
+            );
+            dispatch_3buf(
+                runtime,
+                atrous_v,
+                &runtime.temp_buffer,
+                &runtime.blur_buffer,
+                &runtime.params_buffer,
+                "denoise_atrous_v",
+                wg_count,
+            );
+            dispatch_4buf(
+                runtime,
+                threshold_accum,
+                &runtime.lum_buffer,
+                &runtime.blur_buffer,
+                &runtime.denoise_accum_buffer,
+                &runtime.params_buffer,
+                "denoise_threshold_accum",
+                wg_count,
+            );
         }
 
         // 6. Add residual (final approximation in lum_buffer)
-        dispatch_add_residual(runtime, add_residual);
+        dispatch_2buf(
+            runtime,
+            add_residual,
+            &runtime.lum_buffer,
+            &runtime.denoise_accum_buffer,
+            "denoise_add_residual",
+            wg_count,
+        );
 
         // 7. Write denoised channel back to pixels
         gpu_params.nr_channel = channel as f32;
         runtime.upload_params(gpu_params);
-        dispatch_channel_to_rgb(runtime, channel_to_rgb);
+        dispatch_3buf(
+            runtime,
+            channel_to_rgb,
+            &runtime.pixel_buffer,
+            &runtime.denoise_accum_buffer,
+            &runtime.params_buffer,
+            "denoise_channel_to_rgb",
+            wg_count,
+        );
     }
-}
-
-/// Extract a YCbCr channel from pixels → lum_buffer.
-fn dispatch_rgb_to_channel(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("denoise_rgb_to_channel"),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.pixel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("denoise_rgb_to_channel"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("denoise_rgb_to_channel"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Horizontal à trous B3-spline: lum_buffer → temp_buffer.
-fn dispatch_atrous_h(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("denoise_atrous_h"),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.temp_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("denoise_atrous_h"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("denoise_atrous_h"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Vertical à trous B3-spline: temp_buffer → blur_buffer.
-fn dispatch_atrous_v(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("denoise_atrous_v"),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.temp_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.blur_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("denoise_atrous_v"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("denoise_atrous_v"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Compute detail, threshold, accumulate; update approx for next level.
-/// approx=lum_buffer, smoothed=blur_buffer, accum=denoise_accum_buffer.
-fn dispatch_threshold_accum(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("denoise_threshold_accum"),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.blur_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.denoise_accum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("denoise_threshold_accum"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("denoise_threshold_accum"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Add final residual (lum_buffer) to accumulator (denoise_accum_buffer).
-fn dispatch_add_residual(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("denoise_add_residual"),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.denoise_accum_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("denoise_add_residual"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("denoise_add_residual"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Write denoised channel from denoise_accum_buffer back to pixels.
-fn dispatch_channel_to_rgb(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("denoise_channel_to_rgb"),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.pixel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.denoise_accum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("denoise_channel_to_rgb"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("denoise_channel_to_rgb"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::engine::gpu::params::GpuParameters;
-    use crate::engine::gpu::runtime::GpuRuntime;
+    use crate::engine::gpu::runtime::{gpu_available, GpuRuntime};
     use crate::engine::gpu::shaders::ShaderCache;
     use crate::engine::Parameters;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     #[test]
     fn gpu_denoise_zero_is_identity() {

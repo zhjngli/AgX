@@ -10,6 +10,9 @@ use crate::adjust::detail::{build_gaussian_kernel, DetailParams};
 use crate::engine::gpu::params::GpuParameters;
 use crate::engine::gpu::runtime::GpuRuntime;
 use crate::engine::gpu::shaders::ShaderCache;
+use crate::engine::gpu::stages::dispatch::{
+    dispatch_2buf, dispatch_4buf, dispatch_blur_h, dispatch_blur_v,
+};
 
 /// Dispatch the full detail stage (texture, clarity, sharpening).
 ///
@@ -60,8 +63,17 @@ pub fn dispatch_detail(
         gpu_params.kernel_size = kernel.len() as f32;
         runtime.upload_params(gpu_params);
 
+        let wg_count = runtime.pixel_count().div_ceil(256);
+
         // 1. Extract luminance → lum_buffer
-        dispatch_extract_lum(runtime, extract_lum_pipeline);
+        dispatch_2buf(
+            runtime,
+            extract_lum_pipeline,
+            &runtime.pixel_buffer,
+            &runtime.lum_buffer,
+            "detail_extract_lum",
+            wg_count,
+        );
 
         // 2. Horizontal blur: lum_buffer → temp_buffer
         dispatch_blur_h(runtime, blur_h_pipeline);
@@ -71,199 +83,26 @@ pub fn dispatch_detail(
 
         // 4. Apply unsharp mask: read lum_buffer (original) and blur_buffer (blurred),
         //    write delta to pixel_buffer
-        dispatch_apply(runtime, apply_pipeline);
+        dispatch_4buf(
+            runtime,
+            apply_pipeline,
+            &runtime.pixel_buffer,
+            &runtime.lum_buffer,
+            &runtime.blur_buffer,
+            &runtime.params_buffer,
+            "detail_apply",
+            wg_count,
+        );
     }
-}
-
-/// Extract luminance from pixel buffer into lum_buffer.
-fn dispatch_extract_lum(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("detail_extract_lum"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.pixel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("detail_extract_lum"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("detail_extract_lum"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Horizontal blur: lum_buffer (input) → temp_buffer (output).
-fn dispatch_blur_h(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("blur_horizontal"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.temp_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.kernel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("blur_horizontal"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("blur_horizontal"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Vertical blur: temp_buffer (input) → blur_buffer (output).
-fn dispatch_blur_v(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("blur_vertical"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.temp_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.blur_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.kernel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("blur_vertical"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("blur_vertical"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Apply unsharp mask: read lum_buffer (original) + blur_buffer (blurred), modify pixel_buffer.
-fn dispatch_apply(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("detail_apply"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.pixel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.blur_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("detail_apply"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("detail_apply"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::adjust::detail::{DetailParams, SharpeningParams};
-    use crate::engine::gpu::runtime::GpuRuntime;
+    use crate::engine::gpu::runtime::{gpu_available, GpuRuntime};
     use crate::engine::gpu::shaders::ShaderCache;
     use crate::engine::Parameters;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     #[test]
     fn gpu_detail_neutral_is_identity() {

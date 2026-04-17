@@ -11,6 +11,7 @@ use crate::adjust::dehaze::DehazeParams;
 use crate::engine::gpu::params::GpuParameters;
 use crate::engine::gpu::runtime::GpuRuntime;
 use crate::engine::gpu::shaders::ShaderCache;
+use crate::engine::gpu::stages::dispatch::{dispatch_2buf, dispatch_3buf};
 
 const PATCH_HALF: f32 = 7.0; // PATCH_SIZE=15, half=7
 const GUIDED_RADIUS: f32 = 40.0;
@@ -336,8 +337,8 @@ fn estimate_airlight_cpu(pixels: &[[f32; 3]], dark_channel: &[f32]) -> [f32; 3] 
     pixels[best_idx]
 }
 
-/// 2D box filter (separable H+V) using a temporary buffer.
-/// Uses denoise_accum_buffer as intermediate for H-pass, then writes to output.
+/// 2D box filter (separable H+V). Always uses `scratch_d` as the H-pass
+/// intermediate — callers must not pass `scratch_d` as input or output.
 fn box_filter_2d(
     runtime: &GpuRuntime,
     pipeline: &wgpu::ComputePipeline,
@@ -346,54 +347,6 @@ fn box_filter_2d(
     output: &wgpu::Buffer,
     wg_count: u32,
 ) {
-    // We need a temp buffer for the H-pass result. Use denoise_accum_buffer if it's
-    // not the input or output, otherwise use scratch_c or scratch_d.
-    // Since callers may be using various buffers, we use a dedicated intermediate.
-    // H-pass: input → lum_buffer (temporary)... but lum_buffer may be in use.
-    //
-    // To avoid conflicts, the H-pass writes to a known-safe intermediate.
-    // We'll use the output buffer itself for H-pass, then V-pass reads from output
-    // and writes back to output. Wait, that's wrong — we'd need separate read/write.
-    //
-    // Safest approach: two dispatches using two distinct buffers.
-    // H-pass: input → scratch_c (if not in use) → but scratch_c may be used by caller.
-    //
-    // Actually, let's just use the approach: H writes to output, V reads from output
-    // and writes to a temp, then copy temp→output. But that's 3 dispatches.
-    //
-    // Simpler: use a scratch that we know is safe. The caller tells us input/output,
-    // we need a third buffer for H-intermediate. Let's always use scratch_d as the
-    // H-pass temp for box_filter_2d. The caller must not pass scratch_d as input/output.
-    //
-    // Actually, scratch_d IS used as mean_gg and then as input to guided_coeffs.
-    // Let me think about this more carefully...
-    //
-    // The key insight: box_filter_2d is called 6 times. For each call, we need a
-    // temp buffer that's neither the input nor the output. Since we have 8 buffers
-    // (lum, temp, blur, denoise_accum, scratch_a/b/c/d), there's always a free one.
-    //
-    // For simplicity, let's pass the H-intermediate through the same output buffer:
-    // H-pass: input → output, then V-pass needs to read from output and write somewhere.
-    // But V-pass can't read and write the same buffer.
-    //
-    // Use a two-step approach with a known scratch:
-    // H-pass: input → output (horizontal filtered rows stored in output)
-    // V-pass: output → scratch_c (vertical filtered)
-    // Copy: scratch_c → output
-    //
-    // But we can't copy if scratch_c is being used for something else.
-    //
-    // Let me just make the V-pass write directly to output by reading from a temp.
-    // H-pass: input → (temp area), V-pass: (temp area) → output.
-    //
-    // We know lum_buffer and temp_buffer might be in use (guide and t_raw).
-    // Let me use blur_buffer as the H-pass intermediate for box_filter_2d.
-    // ... but blur_buffer is also used by the caller.
-    //
-    // OK, pragmatic solution: always use scratch_d as the H-pass intermediate.
-    // The caller must arrange buffer assignments so scratch_d is not the input or output
-    // of any active box_filter_2d call.
-
     // H-pass: input → scratch_d (horizontal intermediate)
     gpu_params.dehaze_filter_radius = GUIDED_RADIUS;
     gpu_params.dehaze_mode = 0.0; // horizontal
@@ -420,91 +373,6 @@ fn box_filter_2d(
         "box_v",
         wg_count,
     );
-}
-
-/// Generic dispatch for 3-binding shaders (input, output, params or similar).
-fn dispatch_3buf(
-    runtime: &GpuRuntime,
-    pipeline: &wgpu::ComputePipeline,
-    buf0: &wgpu::Buffer,
-    buf1: &wgpu::Buffer,
-    buf2: &wgpu::Buffer,
-    label: &str,
-    wg_count: u32,
-) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(label),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buf0.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: buf1.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: buf2.as_entire_binding(),
-                },
-            ],
-        });
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some(label),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Generic dispatch for 2-binding shaders (input, output).
-fn dispatch_2buf(
-    runtime: &GpuRuntime,
-    pipeline: &wgpu::ComputePipeline,
-    buf0: &wgpu::Buffer,
-    buf1: &wgpu::Buffer,
-    label: &str,
-    wg_count: u32,
-) {
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(label),
-            layout: &pipeline.get_bind_group_layout(0),
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: buf0.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: buf1.as_entire_binding(),
-                },
-            ],
-        });
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some(label),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(wg_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
 }
 
 /// Dispatch guided filter coefficient computation (6-binding shader).
@@ -624,15 +492,9 @@ fn dispatch_fma(
 mod tests {
     use super::*;
     use crate::engine::gpu::params::GpuParameters;
-    use crate::engine::gpu::runtime::GpuRuntime;
+    use crate::engine::gpu::runtime::{gpu_available, GpuRuntime};
     use crate::engine::gpu::shaders::ShaderCache;
     use crate::engine::Parameters;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     #[test]
     fn gpu_dehaze_zero_is_identity() {

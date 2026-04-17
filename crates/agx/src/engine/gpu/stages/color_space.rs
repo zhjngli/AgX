@@ -45,14 +45,8 @@ fn dispatch_pixel_only(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline, l
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::gpu::runtime::GpuRuntime;
+    use crate::engine::gpu::runtime::{gpu_available, GpuRuntime};
     use crate::engine::gpu::shaders::ShaderCache;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     #[test]
     fn gpu_linear_srgb_roundtrip() {

@@ -69,15 +69,10 @@ pub fn dispatch_gamma_adjustments(runtime: &GpuRuntime, pipeline: &wgpu::Compute
 mod tests {
     use super::*;
     use crate::engine::gpu::params::{build_tone_curve_data, GpuParameters};
+    use crate::engine::gpu::runtime::gpu_available;
     use crate::engine::gpu::shaders::ShaderCache;
     use crate::engine::gpu::stages::color_space::dispatch_linear_to_srgb;
     use crate::engine::Parameters;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     /// Upload identity tone curves for tests that don't test tone curves.
     fn upload_identity_tone_curves(runtime: &GpuRuntime, params: &Parameters) {

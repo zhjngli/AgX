@@ -10,6 +10,9 @@ use crate::adjust::grain::GrainParams;
 use crate::engine::gpu::params::GpuParameters;
 use crate::engine::gpu::runtime::GpuRuntime;
 use crate::engine::gpu::shaders::ShaderCache;
+use crate::engine::gpu::stages::dispatch::{
+    dispatch_2buf, dispatch_3buf, dispatch_blur_h, dispatch_blur_v,
+};
 
 /// Minimum sigma for blur to be applied (below this, noise is used unblurred).
 const MIN_BLUR_SIGMA: f32 = 0.3;
@@ -33,10 +36,18 @@ pub fn dispatch_grain(
     let sigma = grain_sigma(grain_params.size, runtime.width, runtime.height);
     let use_blur = sigma >= MIN_BLUR_SIGMA;
 
+    let wg_count = runtime.pixel_count().div_ceil(256);
     let noise_gen_pipeline = shaders.get("grain_noise_gen").expect("grain_noise_gen");
 
     // 1. Generate noise → lum_buffer
-    dispatch_noise_gen(runtime, noise_gen_pipeline);
+    dispatch_2buf(
+        runtime,
+        noise_gen_pipeline,
+        &runtime.lum_buffer,
+        &runtime.params_buffer,
+        "grain_noise_gen",
+        wg_count,
+    );
 
     if use_blur {
         // Build and upload kernel for grain blur
@@ -57,13 +68,22 @@ pub fn dispatch_grain(
     }
 
     let apply_pipeline = shaders.get("grain_apply").expect("grain_apply");
+    let noise_buffer = if use_blur {
+        &runtime.blur_buffer
+    } else {
+        &runtime.lum_buffer
+    };
 
     // 3. Apply grain from blur_buffer (blurred) or lum_buffer (unblurred) to pixel_buffer
-    if use_blur {
-        dispatch_apply(runtime, apply_pipeline, &runtime.blur_buffer);
-    } else {
-        dispatch_apply(runtime, apply_pipeline, &runtime.lum_buffer);
-    }
+    dispatch_3buf(
+        runtime,
+        apply_pipeline,
+        &runtime.pixel_buffer,
+        noise_buffer,
+        &runtime.params_buffer,
+        "grain_apply",
+        wg_count,
+    );
 }
 
 /// Compute grain blur sigma from size parameter and image dimensions.
@@ -74,198 +94,14 @@ fn grain_sigma(size: f32, width: u32, height: u32) -> f32 {
     base_sigma * (long_edge / 2000.0) // GRAIN_REF_RESOLUTION = 2000
 }
 
-/// Generate noise into lum_buffer.
-fn dispatch_noise_gen(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("grain_noise_gen"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("grain_noise_gen"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("grain_noise_gen"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Horizontal blur: lum_buffer (input) -> temp_buffer (output).
-fn dispatch_blur_h(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("grain_blur_h"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.lum_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.temp_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.kernel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("grain_blur_h"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("grain_blur_h"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Vertical blur: temp_buffer (input) -> blur_buffer (output).
-fn dispatch_blur_v(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("grain_blur_v"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.temp_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: runtime.blur_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.kernel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("grain_blur_v"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("grain_blur_v"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Apply grain noise to pixel buffer.
-///
-/// `noise_buffer` is either `lum_buffer` (no blur) or `blur_buffer` (after blur).
-fn dispatch_apply(
-    runtime: &GpuRuntime,
-    pipeline: &wgpu::ComputePipeline,
-    noise_buffer: &wgpu::Buffer,
-) {
-    let bind_group_layout = pipeline.get_bind_group_layout(0);
-    let bind_group = runtime
-        .device
-        .create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("grain_apply"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: runtime.pixel_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: noise_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: runtime.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-    let workgroup_count = runtime.pixel_count().div_ceil(256);
-    let mut encoder = runtime
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("grain_apply"),
-        });
-    {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("grain_apply"),
-            timestamp_writes: None,
-        });
-        pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(workgroup_count, 1, 1);
-    }
-    runtime.queue.submit(std::iter::once(encoder.finish()));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::adjust::grain::{GrainParams, GrainType};
     use crate::engine::gpu::params::GpuParameters;
-    use crate::engine::gpu::runtime::GpuRuntime;
+    use crate::engine::gpu::runtime::{gpu_available, GpuRuntime};
     use crate::engine::gpu::shaders::ShaderCache;
     use crate::engine::Parameters;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     fn setup_runtime(
         width: u32,

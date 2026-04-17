@@ -427,15 +427,16 @@ impl GpuRuntime {
     }
 }
 
+/// Returns true if a GPU adapter is available for testing.
+#[cfg(test)]
+pub(crate) fn gpu_available() -> bool {
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+    pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     #[test]
     fn upload_download_roundtrip() {

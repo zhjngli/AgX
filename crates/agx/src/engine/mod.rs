@@ -1258,6 +1258,15 @@ enum Pipeline {
 }
 
 impl Engine {
+    fn from_pipeline(image: Rgb32FImage, pipeline: Pipeline) -> Self {
+        Self {
+            original: image,
+            params: Parameters::default(),
+            lut: None,
+            pipeline,
+        }
+    }
+
     /// Create a new engine with the given linear sRGB image and neutral parameters.
     ///
     /// When compiled with the `gpu` feature, tries GPU acceleration first and
@@ -1273,23 +1282,13 @@ impl Engine {
         };
         #[cfg(not(feature = "gpu"))]
         let pipeline = Pipeline::Cpu(pipeline::CpuPipeline::new());
-        Self {
-            original: image,
-            params: Parameters::default(),
-            lut: None,
-            pipeline,
-        }
+        Self::from_pipeline(image, pipeline)
     }
 
     /// Create an engine that always uses the CPU pipeline, even when
     /// the `gpu` feature is enabled. Useful for profiling comparison.
     pub fn new_cpu(image: Rgb32FImage) -> Self {
-        Self {
-            original: image,
-            params: Parameters::default(),
-            lut: None,
-            pipeline: Pipeline::Cpu(pipeline::CpuPipeline::new()),
-        }
+        Self::from_pipeline(image, Pipeline::Cpu(pipeline::CpuPipeline::new()))
     }
 
     /// Create an engine that uses the GPU pipeline.
@@ -1298,12 +1297,7 @@ impl Engine {
     pub fn new_gpu(image: Rgb32FImage) -> Result<Self, crate::error::AgxError> {
         let (w, h) = image.dimensions();
         let gpu = gpu::GpuPipeline::new(w, h)?;
-        Ok(Self {
-            original: image,
-            params: Parameters::default(),
-            lut: None,
-            pipeline: Pipeline::Gpu(Box::new(gpu)),
-        })
+        Ok(Self::from_pipeline(image, Pipeline::Gpu(Box::new(gpu))))
     }
 
     /// Create an engine using wgpu's software fallback adapter.
@@ -1312,12 +1306,7 @@ impl Engine {
     pub fn new_gpu_fallback(image: Rgb32FImage) -> Result<Self, crate::error::AgxError> {
         let (w, h) = image.dimensions();
         let gpu = gpu::GpuPipeline::new_fallback(w, h)?;
-        Ok(Self {
-            original: image,
-            params: Parameters::default(),
-            lut: None,
-            pipeline: Pipeline::Gpu(Box::new(gpu)),
-        })
+        Ok(Self::from_pipeline(image, Pipeline::Gpu(Box::new(gpu))))
     }
 
     /// Get a reference to the original (unmodified) image.

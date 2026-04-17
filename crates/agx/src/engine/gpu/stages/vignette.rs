@@ -13,14 +13,9 @@ mod tests {
     use super::*;
     use crate::adjust::{self, VignetteShape};
     use crate::engine::gpu::params::GpuParameters;
+    use crate::engine::gpu::runtime::gpu_available;
     use crate::engine::gpu::shaders::ShaderCache;
     use crate::engine::Parameters;
-
-    fn gpu_available() -> bool {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
-            .is_some()
-    }
 
     #[test]
     fn gpu_vignette_matches_cpu() {
