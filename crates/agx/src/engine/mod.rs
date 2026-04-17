@@ -32,6 +32,7 @@ pub struct RenderProfile {
 pub struct RenderResult {
     /// Rendered image in linear sRGB float.
     pub image: Rgb32FImage,
+    /// Per-stage profiling data, present when compiled with `profiling` feature.
     #[cfg(feature = "profiling")]
     pub profile: Option<RenderProfile>,
 }
@@ -1280,6 +1281,45 @@ impl Engine {
         }
     }
 
+    /// Create an engine that always uses the CPU pipeline, even when
+    /// the `gpu` feature is enabled. Useful for profiling comparison.
+    pub fn new_cpu(image: Rgb32FImage) -> Self {
+        Self {
+            original: image,
+            params: Parameters::default(),
+            lut: None,
+            pipeline: Pipeline::Cpu(pipeline::CpuPipeline::new()),
+        }
+    }
+
+    /// Create an engine that uses the GPU pipeline.
+    /// Returns `Err` if GPU initialization fails.
+    #[cfg(feature = "gpu")]
+    pub fn new_gpu(image: Rgb32FImage) -> Result<Self, crate::error::AgxError> {
+        let (w, h) = image.dimensions();
+        let gpu = gpu::GpuPipeline::new(w, h)?;
+        Ok(Self {
+            original: image,
+            params: Parameters::default(),
+            lut: None,
+            pipeline: Pipeline::Gpu(Box::new(gpu)),
+        })
+    }
+
+    /// Create an engine using wgpu's software fallback adapter.
+    /// Returns `Err` if no fallback adapter is available.
+    #[cfg(feature = "gpu")]
+    pub fn new_gpu_fallback(image: Rgb32FImage) -> Result<Self, crate::error::AgxError> {
+        let (w, h) = image.dimensions();
+        let gpu = gpu::GpuPipeline::new_fallback(w, h)?;
+        Ok(Self {
+            original: image,
+            params: Parameters::default(),
+            lut: None,
+            pipeline: Pipeline::Gpu(Box::new(gpu)),
+        })
+    }
+
     /// Get a reference to the original (unmodified) image.
     pub fn original(&self) -> &Rgb32FImage {
         &self.original
@@ -1328,6 +1368,15 @@ impl Engine {
         self.params = merged.materialize();
         if preset.lut.is_some() {
             self.lut = preset.lut.clone();
+        }
+    }
+
+    /// Returns `"gpu"` or `"cpu"` depending on which pipeline is active.
+    pub fn pipeline_name(&self) -> &'static str {
+        match &self.pipeline {
+            Pipeline::Cpu(_) => "cpu",
+            #[cfg(feature = "gpu")]
+            Pipeline::Gpu(_) => "gpu",
         }
     }
 

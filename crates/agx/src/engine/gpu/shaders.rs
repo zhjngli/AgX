@@ -130,18 +130,12 @@ impl ShaderCache {
                 "dehaze_transmission",
                 include_str!("../../shaders/dehaze_transmission.wgsl"),
             ),
-            (
-                "dehaze_mul",
-                include_str!("../../shaders/dehaze_mul.wgsl"),
-            ),
+            ("dehaze_mul", include_str!("../../shaders/dehaze_mul.wgsl")),
             (
                 "dehaze_guided_coeffs",
                 include_str!("../../shaders/dehaze_guided_coeffs.wgsl"),
             ),
-            (
-                "dehaze_fma",
-                include_str!("../../shaders/dehaze_fma.wgsl"),
-            ),
+            ("dehaze_fma", include_str!("../../shaders/dehaze_fma.wgsl")),
             (
                 "dehaze_recover",
                 include_str!("../../shaders/dehaze_recover.wgsl"),

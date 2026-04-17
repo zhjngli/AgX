@@ -51,20 +51,39 @@ pub struct GpuRuntime {
 impl GpuRuntime {
     /// Create a new GPU runtime for images of the given dimensions.
     pub fn new(width: u32, height: u32) -> Result<Self, AgxError> {
+        Self::new_inner(width, height, false)
+    }
+
+    /// Create a GPU runtime using wgpu's software fallback adapter.
+    pub fn new_fallback(width: u32, height: u32) -> Result<Self, AgxError> {
+        Self::new_inner(width, height, true)
+    }
+
+    fn new_inner(
+        width: u32,
+        height: u32,
+        force_fallback: bool,
+    ) -> Result<Self, AgxError> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
 
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: None,
-            force_fallback_adapter: false,
+            force_fallback_adapter: force_fallback,
         }))
         .ok_or_else(|| AgxError::Gpu("no GPU adapter found".into()))?;
 
+        let adapter_limits = adapter.limits();
         let (device, queue) = pollster::block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("agx-gpu"),
                 required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
+                required_limits: wgpu::Limits {
+                    max_buffer_size: adapter_limits.max_buffer_size,
+                    max_storage_buffer_binding_size: adapter_limits
+                        .max_storage_buffer_binding_size,
+                    ..wgpu::Limits::default()
+                },
                 memory_hints: wgpu::MemoryHints::Performance,
             },
             None,
@@ -75,10 +94,13 @@ impl GpuRuntime {
         // 3 floats per pixel, 4 bytes per float
         let buffer_size = pixel_count * 3 * 4;
 
-        let max_buf = device.limits().max_buffer_size;
-        if buffer_size > max_buf {
+        let limits = device.limits();
+        let max_buf = limits.max_buffer_size;
+        let max_binding = limits.max_storage_buffer_binding_size as u64;
+        let effective_limit = max_buf.min(max_binding);
+        if buffer_size > effective_limit {
             return Err(AgxError::Gpu(format!(
-                "image too large for GPU: pixel buffer {buffer_size} bytes exceeds device limit {max_buf}"
+                "image too large for GPU: pixel buffer {buffer_size} bytes exceeds device limit {effective_limit}"
             )));
         }
 
