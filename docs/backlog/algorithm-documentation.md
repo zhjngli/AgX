@@ -20,6 +20,17 @@ Human-readable reference docs explaining each image processing algorithm's math,
 - Document the algorithm implementation-agnostically. Each explanation page includes a "Source" section listing both CPU (Rust) and GPU (WGSL) source locations.
 - Keep separate from code comments — this is explanatory prose for contributors and curious users, not API docs.
 
+## Research: WGSL documentation tooling
+
+WGSL has no `include_str!` equivalent, so the documentation-in-code philosophy doesn't naturally extend to shaders. Before implementing sub-project #4, research these tools/approaches to see if they can close the gap:
+
+- **`wgsl_to_wgpu`** — generates Rust types from WGSL struct definitions. Could make WGSL the source of truth for `GpuParameters` layout, and carry doc comments from WGSL into generated Rust types that appear in rustdoc. Evaluate whether it's mature enough and whether its generated code is clean enough to use.
+- **`wgsl-analyzer`** — LSP for WGSL. May have doc comment support or structured metadata extraction that could feed into a doc pipeline.
+- **`naga`** — the shader compiler underlying wgpu. Parses WGSL into an IR. Could potentially extract struct definitions, entry points, and comments programmatically for doc generation.
+- **Custom `agx-docgen` extension** — extend the existing docgen crate to parse WGSL files and generate shader reference pages (entry points, buffer bindings, struct layouts) for mdbook. Would give WGSL a documentation surface without requiring WGSL-native doc tooling.
+- **Structured WGSL header comments** — convention where each `.wgsl` file starts with a structured comment block (algorithm name, canonical doc path, buffer bindings summary) that a simple parser can extract. Low-tech but keeps documentation discoverable from the shader side.
+- **mdbook `{{#include}}` with WGSL snippets** — mdbook's built-in `{{#include}}` supports line ranges and anchor comments. Algorithm explanation pages could pull relevant WGSL math directly from shader source into the prose (e.g., showing the grain blending formula from `grain_apply.wgsl` alongside the Rust equivalent). Research whether mdbook preprocessors like `mdbook-embed` offer better ergonomics for this. Scope overlaps with sub-projects #1 and #4.
+
 ## Related
 
 - [Processing Parity](processing-parity.md) — algorithm docs help compare our implementations against reference editors
