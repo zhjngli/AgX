@@ -342,13 +342,13 @@ Profile both paths on real images across representative hardware (M1 Pro, discre
 
 Based on F1 profiling data, decide whether to keep both paths or drop the CPU path. If keeping both: evaluate automatic runtime fallback (GPU init fails -> fall back to CPU). If dropping CPU: remove the `adjust/` math duplication and make WGSL the sole source of truth for adjustment algorithms.
 
-### F3: Documentation strategy
+### F3: Documentation strategy — DONE
 
-Depends on F2. If both paths are kept: document both, with shared concepts in `common/` WGSL files. If GPU-only: evaluate `wgsl_to_wgpu` as the documentation source of truth, update documentation initiative sub-projects 4+ to account for WGSL source files, and determine whether WGSL files need the same sibling `.md` pattern that `adjust/*.rs` uses today.
+Both paths kept (per F2). Documentation initiative design doc and algorithm documentation backlog updated to account for GPU/WGSL. Key decisions: document each algorithm once in implementation-agnostic prose (sibling `.md` files next to `adjust/*.rs`), with a "Source" section linking both CPU and GPU implementations. WGSL shaders don't get their own sibling `.md` files — the canonical algorithm explanation lives on the Rust/adjust side and covers both. A contributor-facing `engine/gpu/README.md` will document the dual-path architecture and how to extend both paths. Open question deferred to sub-project #4: WGSL has no `include_str!` equivalent, so the "documentation in code" philosophy applies to Rust but not WGSL — WGSL comments remain implementation-focused, while algorithm-level prose lives in the shared `.md` files.
 
-### F4: Golden file regeneration
+### F4: Golden file regeneration — DONE
 
-Regenerate e2e golden files from the GPU path (or designate one path as canonical). Define tolerance policy: are GPU goldens the new baseline, or maintain CPU goldens and validate GPU output within tolerance?
+Golden files regenerated from the GPU path (default pipeline). Both CPU and GPU paths produce identical output (cross-path max diff ~0.000001). Tolerance policy: `gpu_consistency.rs` enforces 0.00001 per-channel tolerance. Goldens are path-agnostic since the paths match.
 
 ### F5: Architecture and backlog updates
 
