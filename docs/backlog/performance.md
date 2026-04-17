@@ -36,6 +36,10 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 - [ ] Decode buffer reduction — convert sRGB-to-linear in-place instead of allocating an intermediate buffer (~1 buffer saved)
 - [ ] Encode buffer reduction — go directly from linear f32 to u8 sRGB in a single pass (~1-2 buffers saved)
 
+### CI and testing
+
+- [ ] **GPU CI runner** — `gpu_consistency.rs` (11 cross-path tests) and all per-stage GPU unit tests only run on machines with a hardware GPU adapter. CI uses `ubuntu-latest` (no GPU), so the GPU path is never exercised in CI. The existing `gpu-profiling` job uses mesa/llvmpipe but that has a 128MB buffer limit (can't fit images above ~12MP) and is ~5x slower than native Rust. Options: GitHub GPU runners (Team/Enterprise only), self-hosted runner with GPU, or lavapipe for small-image consistency tests. The 2D dispatch limit bug (images >16.7MP crashed) was only caught by local e2e testing — CI would not have caught it.
+
 ### Code quality
 
 - [ ] Consolidate dual `BatchOpts` — CLI has `BatchOpts` (clap args) and `batch::BatchOpts` (internal). Could unify.
