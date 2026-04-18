@@ -315,9 +315,13 @@ A dedicated test module runs the same `Parameters` + input image through both `C
 
 No changes to e2e test code or golden files. E2e runs whichever pipeline the feature gate selects. Golden file regeneration is deferred to follow-up work.
 
+## Dispatch limits
+
+GPUs enforce a 65535-per-dimension workgroup limit. Images larger than ~16.7MP exceed this with 1D dispatch (`dispatch_workgroups(total_wg, 1, 1)`). All shaders use 2D dispatch: `GpuRuntime::workgroup_counts()` splits workgroups into `(wg_x, wg_y)` and each shader flattens back to a linear index via `id.x + id.y * nwg.x * 256u` using `@builtin(num_workgroups)`. This is a hard constraint — any new shader must follow this pattern.
+
 ## Error handling
 
-`GpuPipeline::new()` can fail if no GPU adapter or device is available. This propagates as `AgxError::GpuInitFailed(String)` with a description of what failed (adapter request, device creation, etc.). There is no automatic fallback to the CPU path — the user selects the path at compile time via the feature gate. Automatic fallback is a potential follow-up after profiling.
+`GpuPipeline::new()` can fail if no GPU adapter or device is available. This propagates as `AgxError::GpuInitFailed(String)` with a description of what failed (adapter request, device creation, etc.). With `Engine::new_gpu_auto()`, failure silently falls back to CPU. With `Engine::new_gpu()`, the error propagates to the caller.
 
 ## New dependencies
 

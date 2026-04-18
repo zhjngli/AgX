@@ -28,6 +28,7 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 - [ ] **P6: SIMD for per-pixel adjustments** — vectorize the inner per-pixel loop with explicit SIMD. Additional 2-4x on top of parallelization. High complexity (sRGB gamma `pow` needs fast approximation).
 - [x] **P7: GPU acceleration (compute shaders)** — wgpu + WGSL compute shaders for all 9 pipeline stages. 1.5-3x faster than CPU on hardware GPU. Opt-in via `--gpu` CLI flag; CPU remains the canonical path for deterministic output across platforms. GPU path is available for future interactive preview or users who want single-image latency.
+- [ ] **P8: GPU as default pipeline** — revisit making GPU the default when: (a) interactive preview / UI is added (GPU latency wins matter), or (b) GPU CI runner is available for output correctness testing, or (c) cross-vendor floating-point determinism is validated. See [GPU design doc F2](../plans/2026-04-13-gpu-acceleration-design.md) for rationale behind current CPU-canonical decision.
 
 ### Memory and buffer optimizations
 
