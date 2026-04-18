@@ -13,7 +13,8 @@ rayon = "1"
 serde_json = { version = "1", optional = true }
 
 [features]
-default = []
+default = ["gpu"]
+gpu = ["agx/gpu"]
 profiling = ["agx/profiling", "serde_json"]
 
 [dev-dependencies]

@@ -10,7 +10,7 @@ The engine has two render pipelines that execute the same stages in the same ord
 - **CPU pipeline** (`pipeline.rs`) — Rust + rayon. Each stage implements the `Stage` trait and processes a shared pixel buffer in-place.
 - **GPU pipeline** (`gpu/`) — wgpu + WGSL compute shaders. Each stage dispatches compute passes on GPU-side buffers. Enabled by the `gpu` feature (on by default).
 
-`Engine::new()` tries GPU first and falls back to CPU if initialization fails (no adapter, buffer too large). This is transparent to consumers — `Engine::render()` returns the same `RenderResult` either way. `Engine::new_cpu()` and `Engine::new_gpu()` force a specific path for profiling or testing.
+`Engine::new()` always uses the CPU pipeline — this is the canonical path for deterministic output across all platforms. `Engine::new_gpu_auto()` tries GPU first and falls back to CPU (opt-in via `--gpu` CLI flag). `Engine::new_gpu()` forces GPU-only and returns `Err` if unavailable (useful for profiling and testing).
 
 ### Pipeline Order (fixed, not configurable)
 
@@ -54,8 +54,8 @@ Key GPU submodules:
 - `VignetteParams` -- vignette parameters: `amount` (f32) and `shape` (`VignetteShape`)
 - `PartialParameters` -- partial parameter set for preset composability
 - `ColorSpace` -- enum: `LinearSrgb`, `SrgbGamma`
-- `Engine::new(image)` -- create engine (tries GPU, falls back to CPU)
-- `Engine::new_cpu(image)` -- force CPU pipeline
+- `Engine::new(image)` -- create engine (always CPU, canonical path)
+- `Engine::new_gpu_auto(image)` -- try GPU, fall back to CPU (opt-in)
 - `Engine::new_gpu(image)` -- force GPU pipeline (returns `Err` if unavailable)
 - `Engine::pipeline_name()` -- returns `"gpu"` or `"cpu"`
 - `Engine::original()` -- reference to the unmodified source image
@@ -94,5 +94,5 @@ To add a new per-pixel adjustment (within the existing PerPixelAdjustments stage
 - **Output is linear sRGB.** The rendered image is returned in linear space.
 - **CPU stages delegate to adjust.** CPU stages own orchestration; `adjust` owns the math.
 - **GPU stages are self-contained WGSL.** GPU shaders reimplement the same algorithms in WGSL. The `adjust` module is not used by the GPU path.
-- **Runtime pipeline selection.** GPU is preferred; CPU is the automatic fallback. Transparent to consumers.
+- **CPU is canonical.** CPU pipeline is the default for deterministic output. GPU is opt-in via `new_gpu_auto()` or `--gpu` CLI flag.
 - **Profiling is built into both executors.** Each stage is automatically timed when the `profiling` feature is enabled.

@@ -1269,26 +1269,26 @@ impl Engine {
 
     /// Create a new engine with the given linear sRGB image and neutral parameters.
     ///
-    /// When compiled with the `gpu` feature, tries GPU acceleration first and
-    /// falls back to CPU if initialization fails (e.g. buffer too large, no adapter).
+    /// Always uses the CPU pipeline. This is the canonical path for deterministic
+    /// output across all platforms. Use [`Engine::new_gpu`] or
+    /// [`Engine::new_gpu_auto`] for GPU acceleration.
     pub fn new(image: Rgb32FImage) -> Self {
-        #[cfg(feature = "gpu")]
-        let pipeline = {
-            let (w, h) = image.dimensions();
-            match gpu::GpuPipeline::new(w, h) {
-                Ok(gpu) => Pipeline::Gpu(Box::new(gpu)),
-                Err(_) => Pipeline::Cpu(pipeline::CpuPipeline::new()),
-            }
-        };
-        #[cfg(not(feature = "gpu"))]
-        let pipeline = Pipeline::Cpu(pipeline::CpuPipeline::new());
-        Self::from_pipeline(image, pipeline)
+        Self::from_pipeline(image, Pipeline::Cpu(pipeline::CpuPipeline::new()))
     }
 
-    /// Create an engine that always uses the CPU pipeline, even when
-    /// the `gpu` feature is enabled. Useful for profiling comparison.
-    pub fn new_cpu(image: Rgb32FImage) -> Self {
-        Self::from_pipeline(image, Pipeline::Cpu(pipeline::CpuPipeline::new()))
+    /// Create an engine that tries GPU first, falling back to CPU.
+    ///
+    /// Use this when the caller explicitly opts into GPU acceleration
+    /// (e.g. via a `--gpu` CLI flag). Output may differ slightly from
+    /// the CPU path due to floating-point precision differences.
+    #[cfg(feature = "gpu")]
+    pub fn new_gpu_auto(image: Rgb32FImage) -> Self {
+        let (w, h) = image.dimensions();
+        let pipeline = match gpu::GpuPipeline::new(w, h) {
+            Ok(gpu) => Pipeline::Gpu(Box::new(gpu)),
+            Err(_) => Pipeline::Cpu(pipeline::CpuPipeline::new()),
+        };
+        Self::from_pipeline(image, pipeline)
     }
 
     /// Create an engine that uses the GPU pipeline.

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
+use agx_cli::create_engine;
 use rayon::prelude::*;
 
 /// Standard (non-raw) image file extensions recognized by the CLI.
@@ -172,12 +173,13 @@ fn process_single(
     output: &Path,
     quality: u8,
     format: Option<agx::encode::OutputFormat>,
+    use_gpu: bool,
     configure: impl FnOnce(&mut agx::Engine),
 ) -> Result<Duration, String> {
     let start = Instant::now();
     let metadata = agx::metadata::extract_metadata(input);
     let linear = agx::decode::decode(input).map_err(|e| e.to_string())?;
-    let mut engine = agx::Engine::new(linear);
+    let mut engine = create_engine(linear, use_gpu);
     configure(&mut engine);
     let result = engine.render();
     let rendered = result.image;
@@ -289,6 +291,7 @@ pub fn run_batch_apply(
     suffix: Option<&str>,
     jobs: usize,
     skip_errors: bool,
+    use_gpu: bool,
 ) -> BatchSummary {
     let preset = match agx::Preset::load_from_file(preset_path) {
         Ok(p) => p,
@@ -317,7 +320,7 @@ pub fn run_batch_apply(
         skip_errors,
     };
     run_batch(&opts, |input, output| {
-        process_single(input, output, quality, format, |engine| {
+        process_single(input, output, quality, format, use_gpu, |engine| {
             engine.apply_preset(&preset);
         })
     })
@@ -336,6 +339,7 @@ pub fn run_batch_edit(
     suffix: Option<&str>,
     jobs: usize,
     skip_errors: bool,
+    use_gpu: bool,
 ) -> BatchSummary {
     let opts = BatchOpts {
         input_dir,
@@ -347,7 +351,7 @@ pub fn run_batch_edit(
         skip_errors,
     };
     run_batch(&opts, |input, output| {
-        process_single(input, output, quality, format, |engine| {
+        process_single(input, output, quality, format, use_gpu, |engine| {
             engine.set_params(params.clone());
             if let Some(l) = &lut {
                 engine.set_lut(Some(Arc::clone(l)));
@@ -533,6 +537,7 @@ mod tests {
             None,
             1,
             false,
+            false,
         );
 
         assert_eq!(summary.total, 2);
@@ -563,6 +568,7 @@ mod tests {
             None,
             None,
             1,
+            false,
             false,
         );
 

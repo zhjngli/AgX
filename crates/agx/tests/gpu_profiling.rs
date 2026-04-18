@@ -35,7 +35,7 @@ fn profile_both(label: &str, w: u32, h: u32, params: &Parameters) {
     let img = make_test_image(w, h);
 
     // CPU path
-    let mut cpu_engine = Engine::new_cpu(img.clone());
+    let mut cpu_engine = Engine::new(img.clone());
     *cpu_engine.params_mut() = params.clone();
     let cpu_result = cpu_engine.render();
     let cpu_profile = cpu_result.profile.expect("CPU should have profile");
@@ -64,7 +64,7 @@ fn profile_three(label: &str, w: u32, h: u32, params: &Parameters) {
     let img = make_test_image(w, h);
 
     // CPU path
-    let mut cpu_engine = Engine::new_cpu(img.clone());
+    let mut cpu_engine = Engine::new(img.clone());
     *cpu_engine.params_mut() = params.clone();
     let cpu_result = cpu_engine.render();
     let cpu_profile = cpu_result.profile.expect("CPU should have profile");

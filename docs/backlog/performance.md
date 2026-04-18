@@ -27,7 +27,7 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 ### Advanced optimizations (consider after P1-P4)
 
 - [ ] **P6: SIMD for per-pixel adjustments** — vectorize the inner per-pixel loop with explicit SIMD. Additional 2-4x on top of parallelization. High complexity (sRGB gamma `pow` needs fast approximation).
-- [x] **P7: GPU acceleration (compute shaders)** — wgpu + WGSL compute shaders for all 9 pipeline stages. 1.5-3x faster than CPU on hardware GPU. Runtime fallback to CPU when no adapter available. May revisit dropping the CPU path if wgpu software fallback improves (currently ~5x slower than native Rust).
+- [x] **P7: GPU acceleration (compute shaders)** — wgpu + WGSL compute shaders for all 9 pipeline stages. 1.5-3x faster than CPU on hardware GPU. Opt-in via `--gpu` CLI flag; CPU remains the canonical path for deterministic output across platforms. GPU path is available for future interactive preview or users who want single-image latency.
 
 ### Memory and buffer optimizations
 

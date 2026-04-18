@@ -14,8 +14,8 @@ Port all adjustment math from Rust (CPU) to WGSL compute shaders (GPU) via the w
 
 ## Non-goals
 
-- Dropping the CPU path (deferred to follow-up profiling work)
-- Automatic GPU→CPU fallback at runtime (deferred — compile-time feature gate for now)
+- Dropping the CPU path (CPU is canonical; GPU is opt-in)
+- Making GPU the default pipeline (deferred until interactive preview exists)
 - Golden file regeneration (deferred to follow-up)
 - Documentation strategy for WGSL code (deferred to follow-up)
 - Browser/WebGPU target (wgpu supports it, but not a goal of this design)
@@ -32,7 +32,7 @@ This approach was chosen over:
 
 ### Two pipeline executors
 
-The engine selects between two pipeline executors at compile time via a Cargo feature gate.
+The engine selects between two pipeline executors at runtime. CPU is the default; GPU is opt-in via `Engine::new_gpu_auto()` or `--gpu` CLI flag (requires the `gpu` Cargo feature).
 
 ```
                         Engine
@@ -338,9 +338,9 @@ Each item below becomes its own brainstorm/design/implement cycle after this wor
 
 Profile both paths on real images across representative hardware (M1 Pro, discrete GPU, integrated GPU). Measure per-stage timings, total render time, and upload/download overhead. Compare against the rayon CPU baseline. This data drives all subsequent decisions.
 
-### F2: CPU path decision
+### F2: CPU path decision — DONE
 
-Based on F1 profiling data, decide whether to keep both paths or drop the CPU path. If keeping both: evaluate automatic runtime fallback (GPU init fails -> fall back to CPU). If dropping CPU: remove the `adjust/` math duplication and make WGSL the sole source of truth for adjustment algorithms.
+Both paths kept. CPU is the canonical/default pipeline for deterministic output across all platforms. GPU is opt-in via `--gpu` CLI flag or `Engine::new_gpu_auto()`. Rationale: AgX is primarily a batch CLI tool with no interactive preview — GPU's latency advantage doesn't help batch throughput (cross-image parallelism already saturates cores). CPU-canonical avoids GPU floating-point variance across hardware vendors and driver versions, eliminates CI testing gaps (no GPU CI runner needed for output correctness), and matches the industry pattern (Lightroom/Capture One use CPU for export). GPU becomes the default path if/when interactive preview is added.
 
 ### F3: Documentation strategy — DONE
 
@@ -348,7 +348,7 @@ Both paths kept (per F2). Documentation initiative design doc and algorithm docu
 
 ### F4: Golden file regeneration — DONE
 
-Golden files regenerated from the GPU path (default pipeline). Both CPU and GPU paths produce identical output (cross-path max diff ~0.000001). Tolerance policy: `gpu_consistency.rs` enforces 0.00001 per-channel tolerance. Goldens are path-agnostic since the paths match.
+Golden files unchanged — CPU remains the canonical path, so existing goldens are correct. Both CPU and GPU paths produce near-identical output (cross-path max diff ~0.000001). Tolerance policy: `gpu_consistency.rs` enforces 0.00001 per-channel tolerance.
 
 ### F5: Architecture and backlog updates
 
