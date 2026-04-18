@@ -518,7 +518,7 @@ mod tests {
             .collect();
         let edge_map = compute_edge_map(&luma, width, height);
         // Pixels at the boundary (column 3 and 4) should have high edge response.
-        let boundary_edge = edge_map[1 * width + 3]; // row 1, col 3
+        let boundary_edge = edge_map[width + 3]; // row 1, col 3
         assert!(
             boundary_edge > 0.5,
             "expected large edge at boundary, got {boundary_edge}"

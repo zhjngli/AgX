@@ -1645,12 +1645,11 @@ mod tests {
     fn tone_curve_lut_identity_is_diagonal() {
         let curve = ToneCurve::default();
         let lut = build_tone_curve_lut(&curve);
-        for i in 0..256 {
+        for (i, &v) in lut.iter().enumerate() {
             let expected = i as f32 / 255.0;
             assert!(
-                (lut[i] - expected).abs() < 1e-5,
-                "LUT[{i}] = {}, expected {expected}",
-                lut[i]
+                (v - expected).abs() < 1e-5,
+                "LUT[{i}] = {v}, expected {expected}"
             );
         }
     }
@@ -1695,13 +1694,12 @@ mod tests {
             points: vec![(0.0, 0.3), (1.0, 0.7)],
         };
         let lut = build_tone_curve_lut(&curve);
-        for i in 0..256 {
+        for (i, &v) in lut.iter().enumerate() {
             let t = i as f32 / 255.0;
             let expected = 0.3 + 0.4 * t;
             assert!(
-                (lut[i] - expected).abs() < 1e-4,
-                "LUT[{i}] = {}, expected {expected}",
-                lut[i]
+                (v - expected).abs() < 1e-4,
+                "LUT[{i}] = {v}, expected {expected}"
             );
         }
     }
@@ -1787,13 +1785,8 @@ mod tests {
     fn white_balance_exposure_buffer_applies_exposure() {
         let mut buf = vec![[0.25, 0.25, 0.25]];
         apply_white_balance_exposure_buffer(&mut buf, 0.0, 0.0, 1.0);
-        for c in 0..3 {
-            assert!(
-                (buf[0][c] - 0.5).abs() < 1e-5,
-                "channel {}: expected 0.5, got {}",
-                c,
-                buf[0][c]
-            );
+        for (c, &v) in buf[0].iter().enumerate() {
+            assert!((v - 0.5).abs() < 1e-5, "channel {c}: expected 0.5, got {v}");
         }
     }
 
@@ -1867,7 +1860,7 @@ mod tests {
         let pre = VignettePrecomputed::new(-50.0, VignetteShape::Elliptical, w, h);
         apply_vignette_buffer(&mut buf, w, h, &pre);
         // Center pixel should be unchanged (or close)
-        let center = buf[(1 * w + 1) as usize];
+        let center = buf[(w + 1) as usize];
         // Corner pixel should be darker
         let corner = buf[0];
         assert!(

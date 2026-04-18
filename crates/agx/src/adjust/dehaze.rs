@@ -567,12 +567,8 @@ mod tests {
         let params = DehazeParams { amount: 100.0 };
         let result = apply_dehaze(&buf, 10, 10, &params);
         for px in &result {
-            for c in 0..3 {
-                assert!(
-                    px[c] >= 0.0 && px[c] <= 1.0,
-                    "Output {:.4} out of [0,1]",
-                    px[c]
-                );
+            for &v in px {
+                assert!((0.0..=1.0).contains(&v), "Output {v:.4} out of [0,1]");
             }
         }
     }
@@ -583,11 +579,10 @@ mod tests {
         let params = DehazeParams { amount: 100.0 };
         let result = apply_dehaze(&buf, 10, 10, &params);
         for px in &result {
-            for c in 0..3 {
+            for &v in px {
                 assert!(
-                    px[c] >= 0.0 && px[c] <= 1.0,
-                    "T_MIN should prevent extreme values, got {:.4}",
-                    px[c]
+                    (0.0..=1.0).contains(&v),
+                    "T_MIN should prevent extreme values, got {v:.4}"
                 );
             }
         }

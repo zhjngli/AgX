@@ -80,11 +80,13 @@ fn exposure_and_contrast() {
         return;
     }
     let img = make_gradient(16, 16);
-    let mut params = Parameters::default();
-    params.exposure = 1.5;
-    params.contrast = 40.0;
-    params.highlights = -30.0;
-    params.shadows = 20.0;
+    let params = Parameters {
+        exposure: 1.5,
+        contrast: 40.0,
+        highlights: -30.0,
+        shadows: 20.0,
+        ..Default::default()
+    };
     let (cpu, gpu) = render_both(&img, &params, None);
     assert_near_identical(&cpu, &gpu, 0.00001);
 }
@@ -95,9 +97,11 @@ fn white_balance() {
         return;
     }
     let img = make_gradient(16, 16);
-    let mut params = Parameters::default();
-    params.temperature = 30.0;
-    params.tint = -15.0;
+    let params = Parameters {
+        temperature: 30.0,
+        tint: -15.0,
+        ..Default::default()
+    };
     let (cpu, gpu) = render_both(&img, &params, None);
     assert_near_identical(&cpu, &gpu, 0.00001);
 }
@@ -192,13 +196,15 @@ fn combined_adjustments() {
         return;
     }
     let img = make_gradient(32, 32);
-    let mut params = Parameters::default();
-    params.exposure = 0.8;
-    params.contrast = 20.0;
-    params.highlights = -20.0;
-    params.shadows = 15.0;
-    params.whites = 10.0;
-    params.blacks = -5.0;
+    let mut params = Parameters {
+        exposure: 0.8,
+        contrast: 20.0,
+        highlights: -20.0,
+        shadows: 15.0,
+        whites: 10.0,
+        blacks: -5.0,
+        ..Default::default()
+    };
     params.vignette.amount = -30.0;
     params.detail.sharpening.amount = 40.0;
     let (cpu, gpu) = render_both(&img, &params, None);

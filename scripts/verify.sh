@@ -90,7 +90,7 @@ check_fmt() {
 }
 
 check_clippy() {
-    cargo clippy -p agx -p agx-cli -- -D warnings
+    cargo clippy --workspace --all-targets -- -D warnings
 }
 
 check_test_lib() {

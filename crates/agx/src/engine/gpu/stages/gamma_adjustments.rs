@@ -99,8 +99,10 @@ mod tests {
         let srgb_before = runtime.download_pixels();
 
         // Apply contrast
-        let mut params = Parameters::default();
-        params.contrast = 50.0;
+        let params = Parameters {
+            contrast: 50.0,
+            ..Default::default()
+        };
         let mut gpu_params: GpuParameters = (&params).into();
         gpu_params.width = 2.0;
         gpu_params.height = 1.0;

@@ -67,8 +67,10 @@ mod tests {
         let pixels = vec![[0.2, 0.4, 0.6]; 4];
         runtime.upload_pixels(&pixels);
 
-        let mut params = Parameters::default();
-        params.exposure = 1.0; // +1 stop = 2x brightness
+        let params = Parameters {
+            exposure: 1.0, // +1 stop = 2x brightness
+            ..Default::default()
+        };
         let mut gpu_params: GpuParameters = (&params).into();
         gpu_params.width = 2.0;
         gpu_params.height = 2.0;
