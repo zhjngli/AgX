@@ -324,5 +324,5 @@ The initiative is "done" when:
 - [mdbook](https://rust-lang.github.io/mdBook/)
 - [clap-markdown](https://docs.rs/clap-markdown/)
 - [schemars](https://docs.rs/schemars/)
-- [`docs/backlog/algorithm-documentation.md`](../backlog/algorithm-documentation.md) — superseded by this initiative
+- [`docs/backlog/documentation-initiative.md`](../backlog/documentation-initiative.md) — umbrella epic tracking sub-project status (supersedes the narrower `algorithm-documentation.md` backlog file)
 - [`docs/contributing/developer-workflow.md`](../contributing/developer-workflow.md) — will be updated to reference the doc conventions established in sub-project #1

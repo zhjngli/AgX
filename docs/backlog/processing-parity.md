@@ -47,5 +47,5 @@ Verify each editing algorithm against open-source references (darktable, RawTher
 ## Related
 
 - [Color Management](color-management.md) — per-camera profiles improve starting-point accuracy
-- [Algorithm Documentation](algorithm-documentation.md) — understanding our algorithms helps compare against references
+- [Documentation Initiative](documentation-initiative.md) — sub-project #4 covers algorithm explanations that aid comparison against references
 - [Ecosystem Interop](ecosystem-interop.md) — users importing presets from other tools expect similar results
