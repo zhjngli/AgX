@@ -93,11 +93,10 @@ mod tests {
         let mut stage = PerPixelAdjustmentsStage::new();
         stage.prepare(&params);
         stage.process(&mut ctx).unwrap();
-        for c in 0..3 {
+        for (c, &v) in ctx.buf[0].iter().enumerate() {
             assert!(
-                (ctx.buf[0][c] - pixels[0][c]).abs() < 1e-6,
-                "channel {} changed with neutral params",
-                c
+                (v - pixels[0][c]).abs() < 1e-6,
+                "channel {c} changed with neutral params"
             );
         }
     }

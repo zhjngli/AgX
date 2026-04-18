@@ -225,7 +225,7 @@ mod tests {
             .map(|i| {
                 let x = i % width as usize;
                 let y = i / width as usize;
-                let v = if (x + y) % 2 == 0 { 0.8 } else { 0.2 };
+                let v = if (x + y).is_multiple_of(2) { 0.8 } else { 0.2 };
                 [v, v, v]
             })
             .collect();

@@ -120,15 +120,12 @@ mod tests {
         to_linear.prepare(&params);
         to_linear.process(&mut ctx).unwrap();
 
-        for i in 0..2 {
-            for c in 0..3 {
+        for (i, pixel) in ctx.buf.iter().enumerate() {
+            for (c, &v) in pixel.iter().enumerate() {
                 assert!(
-                    (ctx.buf[i][c] - pixels[i][c]).abs() < 1e-5,
-                    "pixel[{}][{}]: expected {}, got {}",
-                    i,
-                    c,
-                    pixels[i][c],
-                    ctx.buf[i][c]
+                    (v - pixels[i][c]).abs() < 1e-5,
+                    "pixel[{i}][{c}]: expected {}, got {v}",
+                    pixels[i][c]
                 );
             }
         }

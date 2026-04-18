@@ -5,21 +5,45 @@ on:
     branches: [main]
 
 jobs:
-  fast-checks:
-    name: Fast checks
+  fast-checks-matrix:
+    name: Fast (${{ matrix.check }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - fmt
+          - clippy
+          - test-lib
+          - test-cli
+          - test-features
+          - rustdoc
+          - doc-links
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: fast-checks
       - name: Install libraw
+        if: matrix.check != 'fmt' && matrix.check != 'doc-links'
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
-      - name: Verify
-        run: ./scripts/verify.sh
-      - name: Feature-gated tests
-        run: cargo test -p agx --features docgen && cargo test -p agx-docgen && cargo test -p agx --features raw
+      - name: Run check
+        run: ./scripts/verify.sh ${{ matrix.check }}
+
+  fast-checks:
+    name: Fast checks
+    runs-on: ubuntu-latest
+    if: always()
+    needs: fast-checks-matrix
+    steps:
+      - run: |
+          if [ "${{ needs.fast-checks-matrix.result }}" != "success" ]; then
+            echo "Fast checks matrix failed: ${{ needs.fast-checks-matrix.result }}"
+            exit 1
+          fi
 
   e2e-tests:
     name: E2E (${{ matrix.suite }})
