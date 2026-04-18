@@ -11,13 +11,14 @@ use std::process;
 
 use clap::Parser;
 
-use agx::{Engine, Preset};
-use agx_cli::{BatchOpts, Cli, Commands, EditArgs, OutputOpts};
+use agx::Preset;
+use agx_cli::{create_engine, BatchOpts, Cli, Commands, EditArgs, OutputOpts};
 
 mod batch;
 
 fn main() {
     let cli = Cli::parse();
+    let use_gpu = cli.gpu;
 
     let result = match cli.command {
         Commands::Apply {
@@ -26,22 +27,29 @@ fn main() {
             presets,
             output,
             output_opts,
-        } => run_apply(&input, preset.as_deref(), &presets, &output, &output_opts),
+        } => run_apply(
+            &input,
+            preset.as_deref(),
+            &presets,
+            &output,
+            &output_opts,
+            use_gpu,
+        ),
         Commands::Edit {
             input,
             output,
             edit,
             output_opts,
-        } => run_edit(&input, &output, &edit, &output_opts),
-        Commands::BatchApply { preset, batch } => run_batch_apply(&preset, &batch),
-        Commands::BatchEdit { edit, batch } => run_batch_edit(&edit, &batch),
+        } => run_edit(&input, &output, &edit, &output_opts, use_gpu),
+        Commands::BatchApply { preset, batch } => run_batch_apply(&preset, &batch, use_gpu),
+        Commands::BatchEdit { edit, batch } => run_batch_edit(&edit, &batch, use_gpu),
         Commands::MultiApply {
             input,
             preset,
             output,
             noop,
             jobs,
-        } => run_multi_apply(&input, &preset, &output, noop, jobs),
+        } => run_multi_apply(&input, &preset, &output, noop, jobs, use_gpu),
     };
 
     if let Err(e) = result {
@@ -98,6 +106,7 @@ fn run_apply(
     presets: &[PathBuf],
     output: &std::path::Path,
     output_opts: &OutputOpts,
+    use_gpu: bool,
 ) -> agx::Result<()> {
     #[cfg(feature = "profiling")]
     let decode_start = std::time::Instant::now();
@@ -108,7 +117,7 @@ fn run_apply(
     #[cfg(feature = "profiling")]
     let decode_ms = decode_start.elapsed().as_secs_f64() * 1000.0;
 
-    let mut engine = Engine::new(linear);
+    let mut engine = create_engine(linear, use_gpu);
 
     #[cfg(feature = "profiling")]
     let preset_name = if !presets.is_empty() {
@@ -181,6 +190,7 @@ fn run_edit(
     output: &std::path::Path,
     edit: &EditArgs,
     output_opts: &OutputOpts,
+    use_gpu: bool,
 ) -> agx::Result<()> {
     #[cfg(feature = "profiling")]
     let decode_start = std::time::Instant::now();
@@ -191,7 +201,7 @@ fn run_edit(
     #[cfg(feature = "profiling")]
     let decode_ms = decode_start.elapsed().as_secs_f64() * 1000.0;
 
-    let mut engine = Engine::new(linear);
+    let mut engine = create_engine(linear, use_gpu);
     engine.set_params(edit.to_params()?);
     if let Some(lut) = edit.load_lut()? {
         engine.set_lut(Some(lut));
@@ -231,7 +241,11 @@ fn run_edit(
     Ok(())
 }
 
-fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> agx::Result<()> {
+fn run_batch_apply(
+    preset_path: &std::path::Path,
+    batch: &BatchOpts,
+    use_gpu: bool,
+) -> agx::Result<()> {
     let fmt = batch.output.parse_format()?;
     let summary = batch::run_batch_apply(
         &batch.input_dir,
@@ -243,6 +257,7 @@ fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> agx::Res
         batch.suffix.as_deref(),
         batch.jobs,
         batch.skip_errors,
+        use_gpu,
     );
     if !summary.failed.is_empty() {
         process::exit(1);
@@ -250,7 +265,7 @@ fn run_batch_apply(preset_path: &std::path::Path, batch: &BatchOpts) -> agx::Res
     Ok(())
 }
 
-fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
+fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts, use_gpu: bool) -> agx::Result<()> {
     let params = edit.to_params()?;
     let lut_data = edit.load_lut()?;
     let fmt = batch.output.parse_format()?;
@@ -265,6 +280,7 @@ fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts) -> agx::Result<()> {
         batch.suffix.as_deref(),
         batch.jobs,
         batch.skip_errors,
+        use_gpu,
     );
     if !summary.failed.is_empty() {
         process::exit(1);
@@ -279,8 +295,9 @@ fn render_and_encode(
     preset: Option<&agx::Preset>,
     output_path: &std::path::Path,
     metadata: Option<&agx::metadata::ImageMetadata>,
+    use_gpu: bool,
 ) -> agx::Result<()> {
-    let mut engine = Engine::new(image);
+    let mut engine = create_engine(image, use_gpu);
     if let Some(p) = preset {
         engine.apply_preset(p);
     }
@@ -301,6 +318,7 @@ fn run_multi_apply(
     output_dir: &std::path::Path,
     noop: bool,
     jobs: usize,
+    use_gpu: bool,
 ) -> agx::Result<()> {
     let image_stem = input
         .file_stem()
@@ -327,13 +345,25 @@ fn run_multi_apply(
 
     if noop {
         let noop_path = output_dir.join(format!("{image_stem}_noop.png"));
-        render_and_encode(decoded.clone(), None, &noop_path, metadata.as_ref())?;
+        render_and_encode(
+            decoded.clone(),
+            None,
+            &noop_path,
+            metadata.as_ref(),
+            use_gpu,
+        )?;
     }
 
     if jobs <= 1 {
         for (name, preset) in &loaded {
             let out_path = output_dir.join(format!("{image_stem}_{name}.png"));
-            render_and_encode(decoded.clone(), Some(preset), &out_path, metadata.as_ref())?;
+            render_and_encode(
+                decoded.clone(),
+                Some(preset),
+                &out_path,
+                metadata.as_ref(),
+                use_gpu,
+            )?;
         }
     } else {
         // OS threads for concurrency control; each render's internal rayon
@@ -353,6 +383,7 @@ fn run_multi_apply(
                             Some(preset),
                             &out_path,
                             metadata.as_ref(),
+                            use_gpu,
                         ) {
                             Ok(()) => {}
                             Err(e) => errors.lock().unwrap().push(e),

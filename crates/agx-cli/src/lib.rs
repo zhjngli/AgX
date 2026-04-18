@@ -11,10 +11,24 @@ use std::sync::Arc;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 
+/// Create an engine with the appropriate pipeline based on the `--gpu` flag.
+pub fn create_engine(image: image::Rgb32FImage, use_gpu: bool) -> agx::Engine {
+    if use_gpu {
+        #[cfg(feature = "gpu")]
+        return agx::Engine::new_gpu_auto(image);
+        #[cfg(not(feature = "gpu"))]
+        eprintln!("Warning: --gpu requires the 'gpu' feature; using CPU");
+    }
+    agx::Engine::new(image)
+}
+
 /// Top-level CLI arguments.
 #[derive(Parser)]
 #[command(name = "agx", about = "Photo editing CLI with portable TOML presets")]
 pub struct Cli {
+    /// Use GPU acceleration (opt-in). Falls back to CPU if no GPU is available.
+    #[arg(long, global = true)]
+    pub gpu: bool,
     /// Selected subcommand and its arguments.
     #[command(subcommand)]
     pub command: Commands,

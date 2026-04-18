@@ -2,8 +2,15 @@
 
 use std::sync::Arc;
 
-use image::{Rgb, Rgb32FImage};
+use image::Rgb32FImage;
 use serde::{Deserialize, Serialize};
+
+/// CPU render pipeline (and future GPU pipeline behind the `gpu` feature).
+pub mod pipeline;
+
+/// GPU render pipeline using wgpu + WGSL compute shaders.
+#[cfg(feature = "gpu")]
+pub mod gpu;
 
 /// Pluggable pipeline stages (white balance, dehaze, denoise, per-pixel, detail, grain, vignette, color-space conversions).
 pub mod stages;
@@ -25,6 +32,7 @@ pub struct RenderProfile {
 pub struct RenderResult {
     /// Rendered image in linear sRGB float.
     pub image: Rgb32FImage,
+    /// Per-stage profiling data, present when compiled with `profiling` feature.
     #[cfg(feature = "profiling")]
     pub profile: Option<RenderProfile>,
 }
@@ -83,127 +91,6 @@ pub trait Stage: Send + Sync {
 
     /// Process the pixel buffer in-place.
     fn process(&self, ctx: &mut RenderContext) -> Result<(), crate::error::AgxError>;
-}
-
-/// The fixed render pipeline. Holds stages in execution order.
-///
-/// The pipeline order is hardcoded and not configurable by consumers.
-/// This preserves the invariant that identical parameters always produce
-/// identical output, regardless of the order they were set.
-pub struct Pipeline {
-    stages: Vec<Box<dyn Stage>>,
-}
-
-impl Default for Pipeline {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Pipeline {
-    /// Construct the fixed pipeline with all stages in render order.
-    pub fn new() -> Self {
-        Pipeline {
-            stages: vec![
-                Box::new(stages::WhiteBalanceExposureStage::new()),
-                Box::new(stages::DehazeStage::new()),
-                Box::new(stages::DenoiseStage::new()),
-                Box::new(stages::LinearToSrgbStage::new()),
-                Box::new(stages::PerPixelAdjustmentsStage::new()),
-                Box::new(stages::DetailStage::new()),
-                Box::new(stages::GrainStage::new()),
-                Box::new(stages::VignetteStage::new()),
-                Box::new(stages::SrgbToLinearStage::new()),
-            ],
-        }
-    }
-
-    /// Execute the pipeline, returning the rendered image and optional profiling data.
-    pub fn execute(
-        &mut self,
-        original: &Rgb32FImage,
-        params: &Parameters,
-        lut: Option<&crate::lut::Lut3D>,
-    ) -> RenderResult {
-        let (w, h) = original.dimensions();
-
-        #[cfg(feature = "profiling")]
-        let render_start = std::time::Instant::now();
-        #[cfg(feature = "profiling")]
-        let mut profile_stages: Vec<(String, f64)> = Vec::new();
-
-        let buf: Vec<[f32; 3]> = original
-            .pixels()
-            .map(|p| [p.0[0], p.0[1], p.0[2]])
-            .collect();
-
-        let mut ctx = RenderContext {
-            buf,
-            width: w,
-            height: h,
-            params,
-            lut,
-        };
-
-        // Prepare all active stages
-        for stage in &mut self.stages {
-            if stage.is_active(params) {
-                stage.prepare(params);
-            }
-        }
-
-        // Execute stages in order, tracking color space in debug builds
-        #[cfg(debug_assertions)]
-        let mut current_color_space = ColorSpace::LinearSrgb;
-
-        for stage in &self.stages {
-            if !stage.is_active(params) {
-                continue;
-            }
-
-            #[cfg(debug_assertions)]
-            debug_assert_eq!(
-                stage.input_color_space(),
-                current_color_space,
-                "stage '{}' expects {:?} but current space is {:?}",
-                stage.name(),
-                stage.input_color_space(),
-                current_color_space,
-            );
-
-            #[cfg(feature = "profiling")]
-            let stage_start = std::time::Instant::now();
-
-            stage
-                .process(&mut ctx)
-                .expect("stage processing should not fail");
-
-            #[cfg(debug_assertions)]
-            {
-                current_color_space = stage.output_color_space();
-            }
-
-            #[cfg(feature = "profiling")]
-            profile_stages.push((
-                stage.name().to_string(),
-                stage_start.elapsed().as_secs_f64() * 1000.0,
-            ));
-        }
-
-        let image = Rgb32FImage::from_fn(w, h, |x, y| {
-            let idx = (y * w + x) as usize;
-            Rgb(ctx.buf[idx])
-        });
-
-        RenderResult {
-            image,
-            #[cfg(feature = "profiling")]
-            profile: Some(RenderProfile {
-                stages: profile_stages,
-                total_ms: render_start.elapsed().as_secs_f64() * 1000.0,
-            }),
-        }
-    }
 }
 
 /// Per-channel HSL adjustment (hue shift, saturation, luminance).
@@ -1364,15 +1251,62 @@ pub struct Engine {
     pipeline: Pipeline,
 }
 
+enum Pipeline {
+    Cpu(pipeline::CpuPipeline),
+    #[cfg(feature = "gpu")]
+    Gpu(Box<gpu::GpuPipeline>),
+}
+
 impl Engine {
-    /// Create a new engine with the given linear sRGB image and neutral parameters.
-    pub fn new(image: Rgb32FImage) -> Self {
+    fn from_pipeline(image: Rgb32FImage, pipeline: Pipeline) -> Self {
         Self {
             original: image,
             params: Parameters::default(),
             lut: None,
-            pipeline: Pipeline::new(),
+            pipeline,
         }
+    }
+
+    /// Create a new engine with the given linear sRGB image and neutral parameters.
+    ///
+    /// Always uses the CPU pipeline. This is the canonical path for deterministic
+    /// output across all platforms. Use [`Engine::new_gpu`] or
+    /// [`Engine::new_gpu_auto`] for GPU acceleration.
+    pub fn new(image: Rgb32FImage) -> Self {
+        Self::from_pipeline(image, Pipeline::Cpu(pipeline::CpuPipeline::new()))
+    }
+
+    /// Create an engine that tries GPU first, falling back to CPU.
+    ///
+    /// Use this when the caller explicitly opts into GPU acceleration
+    /// (e.g. via a `--gpu` CLI flag). Output may differ slightly from
+    /// the CPU path due to floating-point precision differences.
+    #[cfg(feature = "gpu")]
+    pub fn new_gpu_auto(image: Rgb32FImage) -> Self {
+        let (w, h) = image.dimensions();
+        let pipeline = match gpu::GpuPipeline::new(w, h) {
+            Ok(gpu) => Pipeline::Gpu(Box::new(gpu)),
+            Err(_) => Pipeline::Cpu(pipeline::CpuPipeline::new()),
+        };
+        Self::from_pipeline(image, pipeline)
+    }
+
+    /// Create an engine that uses the GPU pipeline.
+    /// Returns `Err` if GPU initialization fails.
+    #[cfg(feature = "gpu")]
+    pub fn new_gpu(image: Rgb32FImage) -> Result<Self, crate::error::AgxError> {
+        let (w, h) = image.dimensions();
+        let gpu = gpu::GpuPipeline::new(w, h)?;
+        Ok(Self::from_pipeline(image, Pipeline::Gpu(Box::new(gpu))))
+    }
+
+    /// Create an engine using wgpu's software fallback adapter.
+    /// Returns `Err` if no fallback adapter is available.
+    #[cfg(feature = "gpu")]
+    pub fn new_gpu_fallback(image: Rgb32FImage) -> Result<Self, crate::error::AgxError> {
+        let (w, h) = image.dimensions();
+        let gpu = gpu::GpuPipeline::new_fallback(w, h)?;
+        Ok(Self::from_pipeline(image, Pipeline::Gpu(Box::new(gpu))))
     }
 
     /// Get a reference to the original (unmodified) image.
@@ -1426,20 +1360,32 @@ impl Engine {
         }
     }
 
+    /// Returns `"gpu"` or `"cpu"` depending on which pipeline is active.
+    pub fn pipeline_name(&self) -> &'static str {
+        match &self.pipeline {
+            Pipeline::Cpu(_) => "cpu",
+            #[cfg(feature = "gpu")]
+            Pipeline::Gpu(_) => "gpu",
+        }
+    }
+
     /// Render the image by applying all adjustments from scratch.
     ///
     /// Delegates to the stage-based pipeline. Each render starts from the
     /// original image — no state accumulates between renders.
     pub fn render(&mut self) -> RenderResult {
-        self.pipeline
-            .execute(&self.original, &self.params, self.lut.as_deref())
+        match &mut self.pipeline {
+            Pipeline::Cpu(cpu) => cpu.execute(&self.original, &self.params, self.lut.as_deref()),
+            #[cfg(feature = "gpu")]
+            Pipeline::Gpu(gpu) => gpu.execute(&self.original, &self.params, self.lut.as_deref()),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::ImageBuffer;
+    use image::{ImageBuffer, Rgb};
 
     fn make_test_image(r: f32, g: f32, b: f32) -> Rgb32FImage {
         ImageBuffer::from_pixel(2, 2, Rgb([r, g, b]))

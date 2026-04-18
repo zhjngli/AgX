@@ -19,6 +19,12 @@ exif = { package = "kamadak-exif", version = "0.5" }
 rand = "0.8"
 serde_json = { version = "1", optional = true }
 schemars = { version = "0.8", optional = true }
+wgpu = { version = "24", optional = true }
+naga_oil = { version = "0.16", optional = true }
+naga = { version = "23", features = ["wgsl-in", "wgsl-out"], optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+pollster = { version = "0.4", optional = true }
+half = { version = "2", features = ["bytemuck"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -27,7 +33,8 @@ tempfile = "3"
 cc = "1"
 
 [features]
-default = []
+default = ["gpu"]
 raw = []
 profiling = ["serde_json"]
 docgen = ["schemars", "serde_json"]
+gpu = ["dep:wgpu", "dep:naga_oil", "dep:naga", "dep:bytemuck", "dep:pollster", "dep:half"]
