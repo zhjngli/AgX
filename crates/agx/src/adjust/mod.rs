@@ -19,6 +19,10 @@ pub use denoise::NoiseReductionParams;
 pub mod grain;
 pub use grain::{GrainParams, GrainType};
 
+/// Exposure adjustment (linear space).
+pub mod exposure;
+pub use exposure::{apply_exposure, exposure_factor};
+
 // --- Luminance coefficients (Rec. 709) ---
 
 pub(crate) const LUMA_R: f32 = 0.2126;
@@ -52,19 +56,6 @@ pub fn linear_to_srgb(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
 pub fn srgb_to_linear(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let lin: LinSrgb<f32> = Srgb::new(r, g, b).into_linear();
     (lin.red, lin.green, lin.blue)
-}
-
-// --- Exposure (linear space) ---
-
-/// Compute the exposure multiplier for the given number of stops.
-/// 0 stops = 1.0 (no change), +1 stop = 2.0, -1 stop = 0.5.
-pub fn exposure_factor(stops: f32) -> f32 {
-    2.0f32.powf(stops)
-}
-
-/// Apply exposure to a single channel value in linear space.
-pub fn apply_exposure(value: f32, factor: f32) -> f32 {
-    (value * factor).max(0.0)
 }
 
 // --- White balance (linear space) ---
@@ -932,28 +923,6 @@ pub fn apply_tone_curves_pre(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // --- Exposure tests ---
-
-    #[test]
-    fn exposure_factor_zero_is_one() {
-        assert_eq!(exposure_factor(0.0), 1.0);
-    }
-
-    #[test]
-    fn exposure_factor_one_stop_doubles() {
-        assert!((exposure_factor(1.0) - 2.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn exposure_factor_neg_one_halves() {
-        assert!((exposure_factor(-1.0) - 0.5).abs() < 1e-6);
-    }
-
-    #[test]
-    fn apply_exposure_multiplies() {
-        assert!((apply_exposure(0.25, exposure_factor(1.0)) - 0.5).abs() < 1e-6);
-    }
 
     // --- Color space roundtrip ---
 
