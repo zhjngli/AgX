@@ -1,4 +1,4 @@
-//! Pure-function adjustment math: per-pixel, dehaze, denoise, detail, grain, color grading, tone curves, vignette.
+//! Pure-function adjustment math: per-pixel and per-image algorithms (exposure, white balance, basic tone, HSL, color grading, tone curves, vignette, detail, dehaze, denoise, grain).
 
 use palette::{LinSrgb, Srgb};
 use rayon::prelude::*;
