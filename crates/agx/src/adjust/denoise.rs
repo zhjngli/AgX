@@ -1,3 +1,5 @@
+#![doc = include_str!("denoise.md")]
+//!
 //! Noise reduction adjustment using an à trous wavelet decomposition with per-band thresholding.
 
 use rayon::prelude::*;

@@ -1,8 +1,9 @@
-AgX simulates film grain by convolving white noise with a Gaussian kernel
-whose sigma is proportional to the configured grain size, then modulating
-the result by per-pixel luminance to mimic the way film grain is more
-pronounced in midtones than in deep shadows or bright highlights.
+<!-- Canonical source: crates/agx/src/adjust/grain.rs -->
+<!-- If you materially change this prose, verify claims against the CPU
+     and GPU implementations. -->
+<!-- If you materially change the algorithm in code, update this file
+     so the explanation and implementation stay in sync. -->
 
-The current algorithm replaced an older frequency-based approach. See the
-project's design history for the trade-offs and the reference photographs
-that informed the parameter choices.
+Film grain is simulated by convolving white noise with a Gaussian kernel
+sized by the grain-size parameter, then modulating by per-pixel
+luminance to mimic film's mid-tone-dominant grain response. This overview is intentionally brief.

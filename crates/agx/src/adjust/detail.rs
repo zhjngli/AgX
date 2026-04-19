@@ -1,3 +1,5 @@
+#![doc = include_str!("detail.md")]
+//!
 //! Detail pass: sharpening, clarity, and texture controls built on a multi-scale unsharp mask.
 
 use rayon::prelude::*;
