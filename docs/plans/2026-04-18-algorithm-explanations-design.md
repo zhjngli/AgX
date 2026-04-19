@@ -297,7 +297,7 @@ Every `.wgsl` file in `crates/agx/src/shaders/` (excluding `common/`) gets a hea
 
 **CI enforcement:** `scripts/verify.sh` gets a simple regex check that every non-common `.wgsl` file starts with the four-line header. Common-utility shaders in `shaders/common/` are exempt.
 
-**Rollout:** one commit in PR 2 touches all 22 non-common shader files.
+**Rollout:** one commit in PR 2 touches all 25 non-common shader files.
 
 ### GPU contributor guide
 
@@ -455,11 +455,11 @@ Goal: replace placeholder prose with real algorithm explanations; add WGSL heade
 
 **Infrastructure commits:**
 
-10. `docs(agx): add structured headers to all WGSL shaders` — 22 shader files, one commit.
+10. `docs(agx): add structured headers to all WGSL shaders` — 25 shader files, one commit.
 11. `docs(agx): GPU contributor guide (engine/gpu/README.md)`
 12. `ci(docs): add book-linkcheck matrix entry and docs rollup` — restructures `.github/workflows/ci.yml` per the CI reorganization section.
 13. `ci(docs): external linkcheck workflow and lychee config` — new workflow file, `.lychee.toml`, optional `verify.sh external-links` target.
-14. `docs(contributing): sibling-md rule and algorithm checklist` — updates `docs/contributing/doc-conventions.md` with the bidirectional editing rule; updates `docs/contributing/developer-workflow.md` adding "When adding a new `adjust` submodule or other algorithm-bearing module, create a sibling `.md` with the doc-conventions template, wire it with `#![doc = include_str!]` + `{{#include}}`, and add a `docs/book/src/explanation/` entry with `SUMMARY.md` listing." Cross-references the WGSL header convention.
+14. `docs(contributing): sibling-md rule and algorithm checklist` — updates `docs/contributing/documentation-conventions.md` with the bidirectional editing rule; updates `docs/contributing/developer-workflow.md` adding "When adding a new `adjust` submodule or other algorithm-bearing module, create a sibling `.md` with the documentation-conventions template, wire it with `#![doc = include_str!]` + `{{#include}}`, and add a `docs/book/src/explanation/` entry with `SUMMARY.md` listing." Cross-references the WGSL header convention.
 15. `docs(backlog): check off documentation-initiative sub-project 4` — updates `docs/backlog/documentation-initiative.md` and the "Open questions" section of the umbrella initiative design doc.
 
 **Verification before submitting PR 2:**
@@ -545,7 +545,7 @@ Sub-project #4 is done when:
 5. `crates/agx/src/engine/gpu/README.md` exists with the contributor guide.
 6. `.github/workflows/external-linkcheck.yml` and `.lychee.toml` exist; weekly cron is running; on-PR path-filtered runs are configured.
 7. `.github/workflows/ci.yml` has the reorganized `docs-matrix` + `docs-checks` rollup; `book-linkcheck` is blocking on PRs touching `docs/book/**`.
-8. `docs/contributing/doc-conventions.md` documents the shared-`.md` convention, bidirectional editing rule, footnote reference style, and forward-ref-omission rule.
+8. `docs/contributing/documentation-conventions.md` documents the shared-`.md` convention, bidirectional editing rule, footnote reference style, and forward-ref-omission rule.
 9. `docs/contributing/developer-workflow.md` documents the "new algorithm needs sibling `.md`" checklist item.
 10. `docs/backlog/documentation-initiative.md` sub-project #4 is checked off; the "Open questions" section of the umbrella initiative design doc is updated.
 11. `scripts/verify.sh all` and `scripts/e2e.sh` pass. Manual walkthrough of all 9 explanation pages confirms they render cleanly in mdbook and rustdoc.
