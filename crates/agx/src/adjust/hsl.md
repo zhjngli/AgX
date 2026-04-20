@@ -6,4 +6,4 @@
 
 HSL adjustments shift hue, saturation, and luminance for up to eight
 named color bands (red, orange, yellow, green, aqua, blue, purple,
-magenta) using cosine-weighted blending. This overview is intentionally brief.
+magenta) using cosine-weighted blending.

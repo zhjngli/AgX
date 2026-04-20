@@ -6,4 +6,4 @@
 
 Noise reduction uses the à trous wavelet decomposition to separate
 high-frequency noise from structural image content, then thresholds
-the noise subband before reconstruction. This overview is intentionally brief.
+the noise subband before reconstruction.

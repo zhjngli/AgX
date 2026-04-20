@@ -6,4 +6,4 @@
 
 Film grain is simulated by convolving white noise with a Gaussian kernel
 sized by the grain-size parameter, then modulating by per-pixel
-luminance to mimic film's mid-tone-dominant grain response. This overview is intentionally brief.
+luminance to mimic film's mid-tone-dominant grain response.

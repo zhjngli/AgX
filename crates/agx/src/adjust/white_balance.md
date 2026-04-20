@@ -6,4 +6,4 @@
 
 White balance shifts the image's color cast along temperature (warm↔cool)
 and tint (magenta↔green) axes in linear space. Channel multipliers are
-normalized to preserve overall brightness. This overview is intentionally brief.
+normalized to preserve overall brightness.
