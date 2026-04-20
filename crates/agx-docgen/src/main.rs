@@ -365,9 +365,18 @@ fn render_nested_section(
 
     if let Some(paths) = preferred_nested_field_paths(field_name) {
         for &display_path in paths {
-            let path = split_field_path(field_name, display_path);
-            let display_name = format!("{field_name}.{display_path}");
-            section.push_str(&format_field_row(schema, &path, &display_name));
+            let (schema_path, display_name) = if field_name == "grain" && display_path == "type" {
+                (
+                    split_field_path(field_name, "grain_type"),
+                    format!("grain.{display_path}"),
+                )
+            } else {
+                (
+                    split_field_path(field_name, display_path),
+                    format!("{field_name}.{display_path}"),
+                )
+            };
+            section.push_str(&format_field_row(schema, &schema_path, &display_name));
         }
     } else {
         let mut rows = Vec::new();
@@ -717,7 +726,7 @@ fn preferred_nested_field_paths(field_name: &str) -> Option<&'static [&'static s
         ]),
         "dehaze" => Some(&["amount"]),
         "noise_reduction" => Some(&["luminance", "color", "detail"]),
-        "grain" => Some(&["grain_type", "amount", "size", "seed"]),
+        "grain" => Some(&["type", "amount", "size", "seed"]),
         _ => None,
     }
 }
@@ -1075,7 +1084,7 @@ mod tests {
         );
 
         values.insert(
-            vec!["grain".to_owned(), "grain_type".to_owned()],
+            vec!["grain".to_owned(), "type".to_owned()],
             format!("`{}`", defaults.grain.grain_type),
         );
         values.insert(
@@ -1231,7 +1240,7 @@ mod tests {
         assert!(markdown.contains("| `hsl.red.hue` | -180 to 180 | 0 |"));
         assert!(markdown.contains("| `vignette.shape` | `elliptical`, `circular` | `elliptical` |"));
         assert!(markdown.contains("| `detail.sharpening.radius` | 0.5 to 3 | 1 |"));
-        assert!(markdown.contains("| `grain.grain_type` | `fine`, `silver`, `harsh` | `silver` |"));
+        assert!(markdown.contains("| `grain.type` | `fine`, `silver`, `harsh` | `silver` |"));
         assert!(markdown.contains("| `grain.size` | 0 to 100 | 50 |"));
         assert!(markdown.contains("| `tone_curve.rgb.points` | array of &#91;x, y&#93; points, each 0 to 1 | &#91;(0, 0), (1, 1)&#93; |"));
         assert!(markdown.contains(
