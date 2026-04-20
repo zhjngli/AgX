@@ -46,7 +46,7 @@ Larger efforts that expand AgX's capabilities or improve code quality.
 
 | Priority | Idea | Why next |
 |----------|------|----------|
-| 6 | [Algorithm Documentation](algorithm-documentation.md) | Helps contributors understand and improve algorithms |
+| 6 | [Documentation Initiative](documentation-initiative.md) | Coherent docs system (mdbook site, rustdoc, auto-gen CLI/preset ref, algorithm explanations) |
 | 7 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
 | 8 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
 | 9 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
@@ -88,7 +88,12 @@ Major features that require significant design work or change the project's scop
 | File | Summary |
 |------|---------|
 | [processing-parity.md](processing-parity.md) | Per-feature algorithm verification, grain size bug fix, raw processing improvements |
-| [algorithm-documentation.md](algorithm-documentation.md) | Human-readable docs for each algorithm's math and paper references |
+
+### Documentation
+
+| File | Summary |
+|------|---------|
+| [documentation-initiative.md](documentation-initiative.md) | Umbrella epic: mdbook site, rustdoc retrofit, auto-gen CLI/preset ref, algorithm explanations, tutorials, how-tos |
 
 ### Color and Formats
 

@@ -1,3 +1,5 @@
+#![doc = include_str!("dehaze.md")]
+//!
 //! Dehaze adjustment: removes or adds atmospheric haze using a dark-channel prior estimator.
 
 use std::collections::VecDeque;
