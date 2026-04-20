@@ -85,10 +85,10 @@ unsharp mask.
 
 ## Why we chose it
 
-The 2026-03-21 design chose a multi-scale unsharp-mask model because it
-fits photo-editing expectations well: texture, clarity, and sharpening
-map cleanly to increasing spatial frequency bands, and the behavior is
-easy to reason about from preset values alone.
+AgX uses a multi-scale unsharp-mask model because it fits
+photo-editing expectations well: texture, clarity, and sharpening map
+cleanly to increasing spatial frequency bands, and the behavior is easy
+to reason about from preset values alone.
 
 AgX also keeps the implementation conservative on purpose. Texture and
 clarity use fixed blur scales, while sharpening keeps only one user

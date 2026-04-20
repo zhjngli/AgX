@@ -32,9 +32,17 @@ Internally, the implementation generates one shared noise field plus three chann
 
 ## Why we chose it
 
-The 2026-03-27 grain-size rework replaced the earlier frequency-based sizing model with blur-based sizing. That change removed the failure mode where extreme size values collapsed into blotchy low-frequency artifacts. The blur approach keeps the visual result effectively the same for normal settings, but it is much easier to reason about and tune.
+AgX uses blur-based sizing instead of a frequency-based size control.
+That removes the failure mode where extreme size values collapse into
+blotchy low-frequency artifacts. The blur approach keeps the visual
+result effectively the same for normal settings, but it is much easier
+to reason about and tune.
 
-The 2026-03-29 chromatic-grain work then moved chromatic variation away from a purely digital RGB-noise model and into the grain type itself. Real film layers are correlated, not independent, so a small amount of per-channel decorrelation is enough. That is why the implementation now uses a mostly shared noise field with only a modest type-specific channel split.
+Chromatic variation also lives in the grain type itself rather than in a
+purely digital RGB-noise model. Real film layers are correlated, not
+independent, so a small amount of per-channel decorrelation is enough.
+That is why the implementation uses a mostly shared noise field with
+only a modest type-specific channel split.
 
 ## Parameters and constants
 

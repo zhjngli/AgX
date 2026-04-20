@@ -86,14 +86,13 @@ overlay.
 
 ## Why we chose it
 
-The 2026-03-21 design chose Dark Channel Prior because it is a good fit
-for AgX's constraints: one slider, no per-image tuning, strong results
-on the outdoor scenes where users expect dehaze to help, and a
-physically interpretable negative mode that can add haze as well as
-remove it. AgX intentionally keeps the user model simple. There is only
-one public strength control; patch size, transmission floor, guided
-filter radius, and the airlight percentile stay fixed so presets remain
-portable and predictable.
+Dark Channel Prior is a good fit for AgX's constraints: one slider, no
+per-image tuning, strong results on the outdoor scenes where users
+expect dehaze to help, and a physically interpretable negative mode
+that can add haze as well as remove it. AgX intentionally keeps the
+user model simple. There is only one public strength control; patch
+size, transmission floor, guided filter radius, and the airlight
+percentile stay fixed so presets remain portable and predictable.
 
 The same design also chose guided filtering over the original
 soft-matting refinement. Soft matting is higher ceremony and more
@@ -101,12 +100,12 @@ expensive for this use case; guided filtering gives the edge-aware
 transmission cleanup the algorithm needs while staying O(N) and much
 easier to implement consistently on CPU and GPU.
 
-The 2026-04-05 parallelization work kept the algorithm unchanged and
-focused on throughput. Dehaze had become the main CPU bottleneck at
-large resolutions, so AgX parallelized the row and column passes of the
-separable min and box filters and the embarrassingly parallel pixel
-loops. The important point for this explanation is that parallelization
-did not change the math: it only changed how the same dark-channel,
+AgX also keeps the later performance work separate from the image model.
+Dehaze had become the main CPU bottleneck at large resolutions, so the
+implementation parallelizes the row and column passes of the separable
+min and box filters and the embarrassingly parallel pixel loops. The
+important point for this explanation is that those throughput changes do
+not change the math: they only change how the same dark-channel,
 guided-filter, and recovery steps are scheduled.
 
 ## Parameters and constants
