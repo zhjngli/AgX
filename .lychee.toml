@@ -11,7 +11,15 @@ cache = true
 max_cache_age = "1d"
 
 exclude = [
-  # Domains with consistent false positives go here with a comment.
+  # DOI/ACM/Wiley block CI clients despite the citation URLs being valid.
+  "https://doi.org/10.1137/0717021",
+  "https://dl.acm.org/doi/10.1145/3592127",
+  "https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.13159",
+  # Adobe Help intermittently fails with HTTP/2 protocol errors in lychee.
+  "https://helpx.adobe.com/camera-raw/using/vignette-grain-effects-camera-raw.html",
+  # Unsplash returns 401 to unauthenticated CI link checks for these stable pages.
+  "https://unsplash.com/",
+  "https://unsplash.com/license",
 ]
 
 exclude_path = [
