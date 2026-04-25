@@ -20,6 +20,8 @@ set -euo pipefail
 #   external-links external URL validation (opt-in, requires lychee)
 #   wgsl-headers   non-common WGSL header validation
 #   markdown-lint  markdownlint-cli2 (style, structure, formatting)
+#   back-links     verify every explanation wrapper has a "## See also" block
+#   sibling-md-clean verify sibling .md files are link-free
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -168,6 +170,56 @@ check_markdown_lint() {
     markdownlint-cli2
 }
 
+check_back_links() {
+    local errors=0
+    for f in docs/book/src/explanation/*.md; do
+        [ -f "$f" ] || continue
+        case "$f" in
+            */index.md) continue ;;
+        esac
+        if ! grep -q "^## See also" "$f"; then
+            echo "ERROR: $f missing '## See also' block"
+            errors=$((errors + 1))
+        fi
+    done
+
+    if [ "$errors" -gt 0 ]; then
+        echo "$errors explanation wrapper page(s) missing See also block"
+        return 1
+    fi
+
+    echo "All explanation wrapper pages have See also blocks"
+    return 0
+}
+
+check_sibling_md_clean() {
+    local errors=0
+    for f in crates/agx/src/adjust/*.md; do
+        [ -f "$f" ] || continue
+        # Match markdown links of the form [text](target). External
+        # https:// links are allowed (per the umbrella initiative
+        # convention); relative cross-references and plain http:// links
+        # are forbidden because they don't render uniformly across
+        # rustdoc and mdbook.
+        local hits
+        hits="$(grep -nE '\[[^]]+\]\([^)]+\)' "$f" | grep -vE '\]\(https://' || true)"
+        if [ -n "$hits" ]; then
+            echo "$hits" | while IFS= read -r line; do
+                echo "ERROR: $f: $line"
+            done
+            errors=$((errors + 1))
+        fi
+    done
+
+    if [ "$errors" -gt 0 ]; then
+        echo "$errors sibling .md file(s) contain forbidden non-HTTPS links"
+        return 1
+    fi
+
+    echo "All sibling .md files are link-free (or contain only HTTPS links)"
+    return 0
+}
+
 check_wgsl_headers() {
     local errors=0
     local files=()
@@ -235,10 +287,12 @@ if [ "$#" -gt 0 ]; then
         external-links) check_external_links ;;
         wgsl-headers)  check_wgsl_headers ;;
         markdown-lint) check_markdown_lint ;;
+        back-links)    check_back_links ;;
+        sibling-md-clean) check_sibling_md_clean ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, back-links, sibling-md-clean, all"
             exit 1
             ;;
     esac
@@ -295,6 +349,12 @@ run_check "WGSL headers" check_wgsl_headers
 
 # 9. Markdown linting
 run_check "Markdown lint" check_markdown_lint
+
+# 10. Back-links (explanation -> concepts)
+run_check "Back-links" check_back_links
+
+# 11. Sibling .md cleanliness
+run_check "Sibling .md cleanliness" check_sibling_md_clean
 
 # Summary
 echo ""
