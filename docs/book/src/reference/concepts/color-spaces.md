@@ -28,6 +28,14 @@ A value of 0.5 means different things in each space:
 
 If you do math in the wrong space, you get wrong results. Multiplying linear values by 2 doubles the light (correct exposure adjustment). Multiplying sRGB values by 2 produces a non-physical result that doesn't look right.
 
+## Working space
+
+A render pipeline does math on pixel values somewhere in the linear-vs-gamma spectrum. The space the pipeline does its math in is the **working space**. AgX's working space is sRGB — both the linear-light variant (for physical operations like exposure and white balance) and the gamma-encoded variant (for perceptual operations like contrast and tone curves).
+
+Working in sRGB constrains the gamut to what an sRGB display can show. The trade-off is simplicity and a clean match to the input format that consumer cameras and editing software already use. Wider working spaces (Adobe RGB, ProPhoto RGB, Display P3) can hold colors that would clip in sRGB, at the cost of more careful color management.
+
+See [Color models](color-models.md) for the channel structure inside each space, and the [render pipeline overview](render-pipeline.md) for where the conversions happen.
+
 ## The AgX Pipeline
 
 Each operation in the rendering pipeline runs in the color space where it's mathematically correct:
@@ -95,4 +103,4 @@ Future versions may add:
 - **ICC profile handling**: Read embedded profiles from input images, embed profiles in output
 - **Log input LUTs**: Support for LUTs designed for video log curves (S-Log3, LogC)
 
-See `docs/backlog/color-management.md` for the full roadmap.
+See the [color management backlog](https://github.com/zhjngli/AgX/blob/main/docs/backlog/color-management.md) for the full roadmap.
