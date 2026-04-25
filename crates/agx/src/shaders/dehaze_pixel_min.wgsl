@@ -1,3 +1,9 @@
+// Algorithm: Dehaze per-pixel RGB minimum pass, optionally normalized by airlight, for dark-channel estimation
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (dark_channel)
+// Bindings: storage pixels/output/params
+// Entry points: main
+
 // Per-pixel minimum across RGB channels, optionally normalized by airlight.
 // dehaze_mode: 0 = raw min(R,G,B), 1 = normalized min(R/Ar, G/Ag, B/Ab)
 

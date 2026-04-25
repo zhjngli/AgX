@@ -16,6 +16,9 @@ set -euo pipefail
 #   test-features  feature-gated tests (docgen, raw)
 #   rustdoc        cargo doc with warnings-as-errors
 #   doc-links      markdown link validation
+#   book-linkcheck mdbook build with linkcheck backend enabled
+#   external-links external URL validation (opt-in, requires lychee)
+#   wgsl-headers   non-common WGSL header validation
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -119,12 +122,86 @@ check_doc_links() {
         [[ "$d" == "docs/plans/impl/" ]] && continue
         targets+=("$d")
     done
-    # Per-crate and per-module READMEs
+    # Per-crate READMEs plus per-module READMEs under crates/agx/src, including
+    # contributor guides such as crates/agx/src/engine/gpu/README.md.
     while IFS= read -r f; do
         targets+=("$f")
-    done < <(find crates -name "README.md" 2>/dev/null)
+    done < <(
+        {
+            find crates -name "README.md" 2>/dev/null
+            find crates/agx/src -name "README.md" 2>/dev/null
+        } | sort -u
+    )
     check_md_links "${targets[@]}" || return 1
     echo "All documentation links valid"
+}
+
+check_book_linkcheck() {
+    # Generate docgen output the book needs.
+    cargo run -p agx-docgen
+    # Build the book with the linkcheck backend enabled.
+    mdbook build docs/book
+}
+
+check_external_links() {
+    if ! command -v lychee >/dev/null 2>&1; then
+        echo "lychee not installed. Install with: cargo install lychee"
+        return 1
+    fi
+    lychee --config .lychee.toml --verbose './**/*.md'
+}
+
+check_wgsl_headers() {
+    local errors=0
+    local files=()
+
+    while IFS= read -r file; do
+        files+=("$file")
+    done < <(find crates/agx/src/shaders -type f -name '*.wgsl' ! -path '*/common/*' | sort)
+
+    for file in "${files[@]}"; do
+        local header1 header2 header3 header4 header5
+        header1="$(sed -n '1p' "$file")"
+        header2="$(sed -n '2p' "$file")"
+        header3="$(sed -n '3p' "$file")"
+        header4="$(sed -n '4p' "$file")"
+        header5="$(sed -n '5p' "$file")"
+
+        if [ -z "$header5" ]; then
+            echo "ERROR: Missing WGSL header lines in $file"
+            errors=$((errors + 1))
+            continue
+        fi
+
+        if [[ "$header1" != "// Algorithm: "* ]]; then
+            echo "ERROR: Missing Algorithm header in $file"
+            errors=$((errors + 1))
+        fi
+        if [[ "$header2" != "// Canonical explanation: "* ]]; then
+            echo "ERROR: Missing Canonical explanation header in $file"
+            errors=$((errors + 1))
+        fi
+        if [[ "$header3" != "// CPU equivalent: "* ]]; then
+            echo "ERROR: Missing CPU equivalent header in $file"
+            errors=$((errors + 1))
+        fi
+        if [[ "$header4" != "// Bindings: "* ]]; then
+            echo "ERROR: Missing Bindings header in $file"
+            errors=$((errors + 1))
+        fi
+        if [[ "$header5" != "// Entry points: main"* ]]; then
+            echo "ERROR: Missing Entry points header in $file"
+            errors=$((errors + 1))
+        fi
+    done
+
+    if [ "$errors" -gt 0 ]; then
+        echo "$errors WGSL header issue(s) found"
+        return 1
+    fi
+
+    echo "All non-common WGSL headers valid"
+    return 0
 }
 
 # --- Single-check dispatch (used by CI for parallel runs) ---
@@ -137,10 +214,13 @@ if [ "$#" -gt 0 ]; then
         test-features) check_test_features ;;
         rustdoc)       check_rustdoc ;;
         doc-links)     check_doc_links ;;
+        book-linkcheck) check_book_linkcheck ;;
+        external-links) check_external_links ;;
+        wgsl-headers)  check_wgsl_headers ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, all"
             exit 1
             ;;
     esac
@@ -188,6 +268,12 @@ run_check "Rustdoc (cargo doc)" check_rustdoc
 
 # 6. Documentation link validation
 run_check "Documentation links" check_doc_links
+
+# 7. Book link validation
+run_check "Book linkcheck" check_book_linkcheck
+
+# 8. WGSL header validation
+run_check "WGSL headers" check_wgsl_headers
 
 # Summary
 echo ""

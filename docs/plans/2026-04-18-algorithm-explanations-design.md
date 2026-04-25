@@ -197,6 +197,8 @@ sub-project.]
 
 Each of the three shared `.md` files follows the full template. Rustdoc shows `agx::adjust::white_balance`, `agx::adjust::exposure`, and `agx::adjust::basic_tone` as independent module pages. No prose is duplicated — both surfaces pull from the same three files.
 
+**Heading-level exception for bundled files.** Single-shared-file pages keep the template's section headings at `##` (h2), nesting under the wrapper's `# Page title`. The three Basic-adjustment files are different because their wrapper already uses `## White balance`, `## Exposure`, `## Tone sliders` — so the bundled shared files demote their section headings to `###` (h3) to nest cleanly under those wrapper headings instead of rendering as siblings. The shared file's top-of-file HTML comments record this convention so future editors don't accidentally promote them back to `##`.
+
 ### Content sourcing discipline
 
 Every algorithm page is grounded in **existing AgX artifacts**, not invented content. Writers pull from (in priority order):
@@ -290,10 +292,12 @@ Every `.wgsl` file in `crates/agx/src/shaders/` (excluding `common/`) gets a hea
 ```
 
 - **Algorithm** — one line, format `<Algorithm name> — <specific role>` for algorithms spanning multiple shaders.
-- **Canonical explanation** — repo-relative path to the shared `.md` file; grep-target.
-- **CPU equivalent** — repo-relative path to the matching Rust function.
+- **Canonical explanation** — repo-relative path to the shared `.md` file; grep-target. When a single shader implements multiple algorithms (e.g., `gamma_adjustments.wgsl` bundles tone curves, HSL, color grading, basic tone, and LUT), list the paths comma-separated on the same line so each algorithm has a breadcrumb back to its own page.
+- **CPU equivalent** — repo-relative path to the matching Rust function. When a shader bundles multiple algorithms, list the per-algorithm CPU entry points comma-separated.
 - **Bindings** — compact summary of `@group/@binding` bindings with role (input / output / uniform).
 - **Entry points** — names of `@compute` entry functions.
+
+For shared-utility shaders consumed by multiple algorithms (e.g., `blur_horizontal.wgsl` is called by both detail and grain), the convention is the same: comma-separate consumer `.md` paths on the `Canonical explanation` line.
 
 **CI enforcement:** `scripts/verify.sh` gets a simple regex check that every non-common `.wgsl` file starts with the four-line header. Common-utility shaders in `shaders/common/` are exempt.
 

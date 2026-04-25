@@ -1,3 +1,9 @@
+// Algorithm: Dehaze raw transmission map pass from normalized dark channel
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (apply_dehaze)
+// Bindings: storage dc_norm/t_raw/params
+// Entry points: main
+
 // Compute raw transmission map: t = 1 - omega * dark_channel_normalized
 
 struct Params {

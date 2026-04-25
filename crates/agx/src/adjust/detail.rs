@@ -275,8 +275,8 @@ const CLARITY_SIGMA: f32 = 20.0;
 /// Apply the full detail pass (texture, clarity, sharpening) to a pixel buffer.
 ///
 /// This is the primary public interface for the detail module. The engine calls
-/// this after tone mapping and color grading, operating on linear-light RGB pixels
-/// in \[0, 1\].
+/// this after the per-pixel sRGB gamma-space adjustments, operating on sRGB
+/// gamma-space RGB pixels in \[0, 1\].
 pub fn apply_detail_pass(
     buf: &[[f32; 3]],
     width: usize,

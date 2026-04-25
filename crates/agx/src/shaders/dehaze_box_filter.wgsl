@@ -1,3 +1,9 @@
+// Algorithm: Dehaze 1D box mean filter for guided-filter smoothing (horizontal or vertical by params.dehaze_mode)
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (box_filter_1d)
+// Bindings: storage input/output/params
+// Entry points: main
+
 // 1D box mean filter (separable).
 // dehaze_mode: 0 = horizontal, 1 = vertical
 // dehaze_filter_radius: window half-size (e.g. 40 for guided filter)

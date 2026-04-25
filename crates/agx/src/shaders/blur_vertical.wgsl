@@ -1,3 +1,9 @@
+// Algorithm: Separable Gaussian blur vertical pass for detail sharpening and grain sizing
+// Canonical explanation: crates/agx/src/adjust/detail.md, crates/agx/src/adjust/grain.md
+// CPU equivalent: crates/agx/src/adjust/detail.rs (gaussian_blur — also called from grain.rs via super::detail)
+// Bindings: storage input/output/kernel plus Params
+// Entry points: main
+
 // Vertical Gaussian blur pass on a single-channel buffer.
 
 struct Params {

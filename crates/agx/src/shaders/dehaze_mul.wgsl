@@ -1,3 +1,9 @@
+// Algorithm: Dehaze elementwise multiply pass used to build guided-filter covariance terms
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (guided_filter)
+// Bindings: storage input_a/input_b/output
+// Entry points: main
+
 // Element-wise multiply: output[i] = input_a[i] * input_b[i]
 
 @group(0) @binding(0) var<storage, read> input_a: array<f32>;

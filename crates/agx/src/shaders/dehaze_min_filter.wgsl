@@ -1,3 +1,9 @@
+// Algorithm: Dehaze 1D sliding-window minimum filter for dark-channel estimation (horizontal or vertical)
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (min_filter_1d)
+// Bindings: storage input/output/params
+// Entry points: main
+
 // 1D sliding window minimum filter (separable).
 // dehaze_mode: 0 = horizontal, 1 = vertical
 // dehaze_filter_radius: half-window size (e.g. 7 for PATCH_SIZE=15)

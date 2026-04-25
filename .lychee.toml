@@ -1,0 +1,32 @@
+# lychee configuration for AgX
+# https://lychee.cli.rs/
+
+max_retries = 3
+retry_wait_time = 2
+timeout = 30
+max_concurrency = 4
+accept = ["200..=299", "429"]
+scheme = ["http", "https"]
+cache = true
+max_cache_age = "1d"
+
+exclude = [
+  # DOI/ACM/Wiley block CI clients despite the citation URLs being valid.
+  "https://doi.org/10.1137/0717021",
+  "https://dl.acm.org/doi/10.1145/3592127",
+  "https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.13159",
+  # Adobe Help intermittently fails with HTTP/2 protocol errors in lychee.
+  "https://helpx.adobe.com/camera-raw/using/vignette-grain-effects-camera-raw.html",
+  # Unsplash returns 401 to unauthenticated CI link checks for these stable pages.
+  "https://unsplash.com/",
+  "https://unsplash.com/license",
+  # OpenAI's index pages return 403 to unauthenticated CI clients (Cloudflare-style
+  # bot protection); the URL works fine in a browser.
+  "https://openai.com/index/harness-engineering/",
+]
+
+exclude_path = [
+  "target/",
+  "docs/book/book/",
+  ".git/",
+]

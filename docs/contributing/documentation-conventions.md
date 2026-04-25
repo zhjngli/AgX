@@ -29,7 +29,7 @@ For modules whose `//!` doc is short and not reused on the site, inline `//!` li
 
 ## The shared `.md` file convention
 
-When a module's explanation is meant to appear in both rustdoc and the mdbook site, the canonical source lives as a markdown file alongside the Rust source. The Rust file pulls it into rustdoc via `include_str!`; the mdbook page pulls the same file via `{{#include}}`.
+When a module's explanation is meant to appear in both rustdoc and the mdbook site, the canonical source lives as a markdown file alongside the Rust source. The shared file is a sibling of the `.rs` file. The Rust file pulls it into rustdoc via `#![doc = include_str!("<name>.md")]`; the mdbook page pulls the same file via `{{#include}}`.
 
 The canonical worked example is the grain algorithm. The shared file is `crates/agx/src/adjust/grain.md`. The Rust side at `crates/agx/src/adjust/grain.rs` reads:
 
@@ -55,12 +55,42 @@ The mdbook side at `docs/book/src/explanation/grain.md` reads:
 
 There is no anchor mechanism to maintain. The entire shared `.md` file is the explanation content. Editing it updates both surfaces on the next build with no possibility of drift.
 
-The shared `.md` file should contain only prose, with no top-level heading and no cross-references. Reasons:
+Every shared `.md` file starts with an HTML comment block that names the canonical source file and records the bidirectional editing rule:
+
+```markdown
+<!-- Canonical source: crates/agx/src/adjust/<name>.rs -->
+<!-- If you materially change this prose, verify claims against the CPU
+     and GPU implementations. -->
+<!-- If you materially change the algorithm in code, update this file
+     so the explanation and implementation stay in sync. -->
+```
+
+The rule is symmetric: when the algorithm changes materially, update the sibling `.md`; when the sibling `.md` changes materially, verify its claims against the code before committing.
+
+The shared `.md` file should contain only the reusable explanation prose, with no top-level heading and no cross-`.md` links. Reasons:
 
 - Both consuming surfaces add their own outer heading. A heading inside the included file would render twice.
-- Cross-references differ between the two surfaces. Rustdoc intra-doc syntax (`` [`super::dehaze`] ``) does not resolve in mdbook. Conversely, mdbook relative links into `../api/` do not resolve correctly when included in a rustdoc page. Keeping the shared file link-free avoids the cross-surface link problem.
+- Cross-file references differ between the two surfaces. Rustdoc intra-doc syntax (`` [`super::dehaze`] ``) does not resolve in mdbook. Conversely, mdbook relative links into `../api/` or another `.md` file do not resolve correctly when included in a rustdoc page. Keeping shared files free of cross-`.md` links avoids the cross-surface link problem.
 
-Cross-references that need rustdoc validation live in inline `//!` lines on the Rust side, **outside** the include. Cross-references that need mdbook resolution live in the wrapping mdbook page, **outside** the include. The grain example demonstrates both patterns.
+Cross-references that need rustdoc validation live in inline `//!` lines on the Rust side, **outside** the include. Cross-references that need mdbook resolution live in the wrapping mdbook page, **outside** the include. The grain example demonstrates both patterns. External `https://` links are fine in a shared file because both rustdoc and mdbook render them the same way.
+
+Use GitHub-Flavored Markdown footnotes only within the same shared file. Do not use a footnote in a shared file to point at another source file or mdbook page; put that cross-file reference in the wrapping mdbook file instead.
+
+If a shared algorithm also has WGSL shader implementations, the shader files use the structured header format described in "WGSL shader headers" below.
+
+## WGSL shader headers
+
+Non-common WGSL shader files start with a five-line structured header. Keep the field names and order fixed:
+
+```wgsl
+// Algorithm: <short description of the shader pass>
+// Canonical explanation: <shared .md or reference page>
+// CPU equivalent: <Rust source path and function when applicable>
+// Bindings: <storage/uniform bindings in human-readable form>
+// Entry points: main
+```
+
+The header lets maintainers connect each shader to the canonical prose, the CPU implementation it must match, and the bind groups a dispatcher is expected to provide. Current shader headers use `Entry points: main`, and `scripts/verify.sh wgsl-headers` enforces that convention. Common utility modules under `crates/agx/src/shaders/common/` may use simpler file comments when they are not standalone algorithm passes.
 
 ## Linking between surfaces
 
