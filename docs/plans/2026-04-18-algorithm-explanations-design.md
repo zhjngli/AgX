@@ -290,10 +290,12 @@ Every `.wgsl` file in `crates/agx/src/shaders/` (excluding `common/`) gets a hea
 ```
 
 - **Algorithm** — one line, format `<Algorithm name> — <specific role>` for algorithms spanning multiple shaders.
-- **Canonical explanation** — repo-relative path to the shared `.md` file; grep-target.
-- **CPU equivalent** — repo-relative path to the matching Rust function.
+- **Canonical explanation** — repo-relative path to the shared `.md` file; grep-target. When a single shader implements multiple algorithms (e.g., `gamma_adjustments.wgsl` bundles tone curves, HSL, color grading, basic tone, and LUT), list the paths comma-separated on the same line so each algorithm has a breadcrumb back to its own page.
+- **CPU equivalent** — repo-relative path to the matching Rust function. When a shader bundles multiple algorithms, list the per-algorithm CPU entry points comma-separated.
 - **Bindings** — compact summary of `@group/@binding` bindings with role (input / output / uniform).
 - **Entry points** — names of `@compute` entry functions.
+
+For shared-utility shaders consumed by multiple algorithms (e.g., `blur_horizontal.wgsl` is called by both detail and grain), the convention is the same: comma-separate consumer `.md` paths on the `Canonical explanation` line.
 
 **CI enforcement:** `scripts/verify.sh` gets a simple regex check that every non-common `.wgsl` file starts with the four-line header. Common-utility shaders in `shaders/common/` are exempt.
 

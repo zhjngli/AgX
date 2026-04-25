@@ -1,6 +1,6 @@
 // Algorithm: Gamma-space per-pixel adjustment stack for contrast, tone curves, HSL, color grading, and LUT
-// Canonical explanation: crates/agx/src/adjust/basic_tone.md
-// CPU equivalent: crates/agx/src/adjust/mod.rs (apply_per_pixel_adjustments)
+// Canonical explanation: crates/agx/src/adjust/basic_tone.md, crates/agx/src/adjust/tone_curves.md, crates/agx/src/adjust/hsl.md, crates/agx/src/adjust/color_grading.md
+// CPU equivalent: crates/agx/src/adjust/basic_tone.rs (apply_contrast/apply_highlights/apply_shadows/apply_whites/apply_blacks), crates/agx/src/adjust/tone_curves.rs (apply_tone_curves_pre), crates/agx/src/adjust/hsl.rs (apply_hsl), crates/agx/src/adjust/color_grading.rs (apply_color_grading_pre)
 // Bindings: storage pixels/params/tone_curves plus 3D LUT texture+sampler
 // Entry points: main
 

@@ -1,6 +1,6 @@
 // Algorithm: Linear-space white balance and exposure pass before gamma conversion
-// Canonical explanation: crates/agx/src/adjust/white_balance.md
-// CPU equivalent: crates/agx/src/adjust/mod.rs (apply_white_balance_exposure_buffer)
+// Canonical explanation: crates/agx/src/adjust/white_balance.md, crates/agx/src/adjust/exposure.md
+// CPU equivalent: crates/agx/src/adjust/white_balance.rs (apply_white_balance), crates/agx/src/adjust/exposure.rs (apply_exposure)
 // Bindings: storage pixels/params
 // Entry points: main
 
