@@ -1,0 +1,21 @@
+# lychee configuration for AgX
+# https://lychee.cli.rs/
+
+max_retries = 3
+retry_wait_time = 2
+timeout = 30
+max_concurrency = 4
+accept = ["200..=299", "429"]
+scheme = ["http", "https"]
+cache = true
+max_cache_age = "1d"
+
+exclude = [
+  # Domains with consistent false positives go here with a comment.
+]
+
+exclude_path = [
+  "target/",
+  "docs/book/book/",
+  ".git/",
+]

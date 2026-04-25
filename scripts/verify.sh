@@ -17,6 +17,7 @@ set -euo pipefail
 #   rustdoc        cargo doc with warnings-as-errors
 #   doc-links      markdown link validation
 #   book-linkcheck mdbook build with linkcheck backend enabled
+#   external-links external URL validation (opt-in, requires lychee)
 #   wgsl-headers   non-common WGSL header validation
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -142,6 +143,14 @@ check_book_linkcheck() {
     mdbook build docs/book
 }
 
+check_external_links() {
+    if ! command -v lychee >/dev/null 2>&1; then
+        echo "lychee not installed. Install with: cargo install lychee"
+        return 1
+    fi
+    lychee --config .lychee.toml --verbose './**/*.md'
+}
+
 check_wgsl_headers() {
     local errors=0
     local files=()
@@ -206,11 +215,12 @@ if [ "$#" -gt 0 ]; then
         rustdoc)       check_rustdoc ;;
         doc-links)     check_doc_links ;;
         book-linkcheck) check_book_linkcheck ;;
+        external-links) check_external_links ;;
         wgsl-headers)  check_wgsl_headers ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, wgsl-headers, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, all"
             exit 1
             ;;
     esac

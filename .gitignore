@@ -4,3 +4,4 @@ Cargo.lock
 docs/plans/impl/
 .superpowers/
 docs/book/book/
+.lycheecache
