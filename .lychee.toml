@@ -20,6 +20,9 @@ exclude = [
   # Unsplash returns 401 to unauthenticated CI link checks for these stable pages.
   "https://unsplash.com/",
   "https://unsplash.com/license",
+  # OpenAI's index pages return 403 to unauthenticated CI clients (Cloudflare-style
+  # bot protection); the URL works fine in a browser.
+  "https://openai.com/index/harness-engineering/",
 ]
 
 exclude_path = [
