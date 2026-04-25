@@ -1,0 +1,68 @@
+// markdownlint-cli2 configuration for AgX.
+// Rule reference: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+{
+  "config": {
+    "default": true,
+
+    // Long-form prose: don't enforce a fixed line length.
+    "MD013": false,
+
+    // Some files (mdbook chapters that use {{#include}}, files with leading
+    // HTML comments) don't start with a top-level heading.
+    "MD041": false,
+
+    // Duplicate headings are common in our algorithm pages ("How it works",
+    // "Why we chose it", "Parameters and constants") and acceptable.
+    "MD024": false,
+
+    // The shared `.md` files included by both rustdoc and mdbook intentionally
+    // have no top-level heading; only the wrapping pages do.
+    "MD025": false,
+
+    // Allow inline HTML — we use <br/> in mermaid diagram labels and HTML
+    // comment headers in shared `.md` files.
+    "MD033": false,
+
+    // Bare URLs are common in design-doc footnotes and reference lists.
+    "MD034": false,
+
+    // Existing tables use compact pipe style (no surrounding spaces) which is
+    // valid GFM and renders identically. Enforcing aligned style would mean
+    // hundreds of cosmetic edits for no rendered-output change.
+    "MD060": false,
+
+    // Existing design docs and reference pages contain ~70 fenced blocks
+    // without language hints (mostly numerical or text examples). Tightening
+    // this rule is tracked as a future follow-up; new blocks should still
+    // include a hint by convention.
+    "MD040": false,
+
+    // We intentionally use multi-section ordered lists where the second list
+    // continues the previous numbering (e.g., "Phase 2: 4..9", "Phase 3: 10..13").
+    // The auto-fixer for this rule renumbers each section starting at 1, which
+    // changes apparent semantics. Disable.
+    "MD029": false,
+
+    // Math/scaling expressions like "w * h * channels" trip MD037 because the
+    // asterisks can be parsed as emphasis pairs. The auto-fixer drops surrounding
+    // spaces and produces "w *h* channels", which renders as italic text. Disable.
+    "MD037": false,
+
+    // MD038 and MD039 ("no spaces in code spans / link text") have similar
+    // false-positive risk against intentional spacing inside backticks; disable
+    // until we audit existing usage.
+    "MD038": false,
+    "MD039": false
+  },
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "target/**",
+    "docs/book/book/**",
+    "docs/plans/impl/**",
+    "docs/book/src/reference/cli.md",
+    "docs/book/src/reference/preset.md",
+    "node_modules/**"
+  ]
+}

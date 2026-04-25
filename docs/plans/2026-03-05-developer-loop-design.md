@@ -12,6 +12,7 @@ Encode a complete developer workflow into the repo so that any AI agent reading 
 The harness engineering initiative gave agents a map of the architecture and mechanical enforcement of module boundaries. But the agent still relies on external skills or human prompting to know the development *process*. A fresh agent session (Claude Code, Codex, or other) that reads CLAUDE.md currently sees a Definition of Done checklist but no procedural workflow. The gap: agents know what to verify but not how to work.
 
 **Goals:**
+
 - Any agent that reads CLAUDE.md knows the full design-to-merge cycle
 - A single `scripts/verify.sh` command answers "am I done?"
 - Design docs are required for structural changes but not for small fixes
@@ -30,6 +31,7 @@ Add a **Developer Workflow** section with 5 numbered steps:
 5. **Self-review** — re-read the diff, check for scope creep and test quality.
 
 The existing Definition of Done becomes a simplified merge gate:
+
 1. `scripts/verify.sh` passes
 2. `ARCHITECTURE.md` updated if needed
 3. Affected module READMEs updated

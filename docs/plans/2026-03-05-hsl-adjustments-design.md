@@ -168,6 +168,7 @@ oxiraw edit -i photo.jpg -o out.jpg --hsl-red-h 15 --hsl-red-s -30 --hsl-green-l
 ## Scope
 
 **In scope:**
+
 - `HslChannel` and `HslChannels` structs on `Parameters`
 - `apply_hsl()` function in adjust module with pluggable weight function
 - `cosine_weight()` as default weight function
@@ -178,6 +179,7 @@ oxiraw edit -i photo.jpg -o out.jpg --hsl-red-h 15 --hsl-red-s -30 --hsl-green-l
 - Engine integration tests
 
 **Out of scope:**
+
 - Alternative weight functions (polynomial, Gaussian) — the interface supports them but we only implement cosine
 - Color range visualization or UI
 - Interaction with future color grading (3-way wheels)

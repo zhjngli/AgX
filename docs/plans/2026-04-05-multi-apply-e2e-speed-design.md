@@ -40,6 +40,7 @@ Output files are auto-named from the input image stem and preset stem. Output fo
 ```
 
 Example:
+
 ```bash
 agx-cli multi-apply -i sunset_river.raf -p portra_400.toml -p neo_noir.toml -o out/ --noop
 # Produces:
@@ -69,6 +70,7 @@ Setting `--jobs` higher than the number of cores is not harmful to CPU utilizati
 ### Memory considerations
 
 Each concurrent render requires a clone of the decoded image buffer:
+
 - ~300MB per clone at 26MP (6246×4170, 3 channels × f32)
 - `--jobs 1` (default): peak ~600MB (original + one clone)
 - `--jobs 4`: peak ~1.5GB (original + 4 clones)
@@ -150,6 +152,7 @@ Each runner handles one image. Wall time becomes the slowest single image instea
 ## Scope
 
 ### In scope
+
 - `multi-apply` CLI subcommand with `-i`, `-p` (multiple), `-o`, `--noop`, `--jobs`
 - Auto-named output files (`<image_stem>_<preset_stem>.png`)
 - E2E test refactor to use `batch-apply`
@@ -157,6 +160,7 @@ Each runner handles one image. Wall time becomes the slowest single image instea
 - Update `e2e.sh` and `e2e-quick.sh` if needed
 
 ### Out of scope
+
 - Batch-apply across multiple images (that's `batch-edit`)
 - Library-level multi-preset API (current library API is sufficient)
 - Dehaze parallelization (tracked separately)

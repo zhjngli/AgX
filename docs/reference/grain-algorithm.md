@@ -7,6 +7,7 @@ This document describes AgX's film grain simulation: how it works, why it works 
 AgX simulates film grain by generating random noise, optionally blurring it to control particle size, and applying it to the image using exponential modulation. The grain system is designed to produce subtle, pleasing texture that resembles real analog film — not digital noise artifacts.
 
 **User-facing parameters:**
+
 - `grain_type` — selects grain character (Fine, Silver, Harsh)
 - `amount` (0-100) — intensity of the grain effect
 - `size` (0-100) — grain particle size (fine to coarse)
@@ -59,6 +60,7 @@ pixel_out = pixel_in + delta
 ```
 
 Where:
+
 - `amount_factor` uses a per-type curve exponent so different grain types respond differently to the slider
 - `scale = grain_type.contrast * 0.04 * amount_factor` — contrast is applied once here (not during noise generation)
 - `effective_falloff` decreases as amount increases, spreading grain from shadows into midtones/highlights at high intensities
@@ -80,6 +82,7 @@ channel_noise = shared * (1 - effective_chromatic) + independent * effective_chr
 ```
 
 Where:
+
 - `pixel_chroma = max(R,G,B) - min(R,G,B)` — grayscale pixels get zero chromatic divergence
 - `shadow_chromatic_boost = 2 - luma` — ranges from 1.0 (highlights) to 2.0 (shadows), boosting color fringing in dark areas where film grain shows as color shifts rather than luminance changes
 
@@ -142,6 +145,7 @@ Three blending approaches were tried:
 ### Why shadow-heavy luminance falloff
 
 The luminance weight function is `(1 - luma)^(0.5 * effective_falloff)`:
+
 - At luma=0 (black): weight=1.0 — full grain
 - At luma=1 (white): weight=0.0 — no grain
 - The curve shape is controlled by the grain type's base `luma_falloff`, dynamically reduced as amount increases (see "Why dynamic luma falloff" below)
@@ -171,6 +175,7 @@ The lower ceiling works in concert with the reduced `GRAIN_BLUR_SIGMA_THRESHOLD`
 The original value of 0.4 was far too aggressive. It was reduced to 0.08, which worked when contrast was applied during noise generation (scaling the Gaussian std dev). After fixing the double-counting bug (contrast was being applied in both noise generation AND the scale calculation), contrast was removed from noise generation — the noise now has std dev 1.0. This meant the effective strength doubled, requiring a halving of the multiplier from 0.08 to 0.04 to maintain the same output intensity.
 
 At 0.04 with the current per-type amount curves, the math produces appropriately subtle grain at moderate settings and bold grain when pushed:
+
 - amount=50, Silver (contrast=1.2, amount_curve=0.6): visible texture but not distracting
 - amount=100, Harsh (contrast=1.5, amount_curve=0.5): bold and prominent
 

@@ -108,6 +108,7 @@ I(x) = J(x) * t(x) + A * (1 - t(x))
 ```
 
 Where:
+
 - `I(x)` — observed hazy image
 - `J(x)` — scene radiance (what we want to recover)
 - `A` — atmospheric light (global constant, the color of the haze)
@@ -144,6 +145,7 @@ t_raw(x) = 1 - omega * dark_channel(I(x) / A)
 ```
 
 Where `omega` controls the dehaze strength. For the `amount` slider:
+
 - Positive amount (0 to 100): `omega = amount / 100.0` (remove haze)
 - Negative amount (-100 to 0): the effect is reversed — push the image toward the airlight to add haze. Steps 1-2 (dark channel + airlight estimation) still run to obtain `A`, then steps 3-5 are skipped. Instead: `J(x) = I(x) * (1 - |amount|/100) + A * |amount|/100` (linear blend toward airlight).
 
@@ -158,6 +160,7 @@ The raw transmission map from step 3 has blocky artifacts from the patch-based m
 Given guidance image `G` (the original image, converted to grayscale), input `p` (the raw transmission map), and filter radius `r`, window size `(2r+1)`:
 
 For each local window `w_k` centered at pixel `k`:
+
 ```
 a_k = (mean(G * p) - mean(G) * mean(p)) / (var(G) + epsilon)
 b_k = mean(p) - a_k * mean(G)
@@ -174,6 +177,7 @@ Output: `q(i) = mean_k(a_k) * G(i) + mean_k(b_k)` (average `a_k` and `b_k` over 
 ### Step 5: Scene Recovery
 
 For positive amounts (dehaze):
+
 ```
 J(x) = (I(x) - A) / max(t(x), t_min) + A
 ```
@@ -181,6 +185,7 @@ J(x) = (I(x) - A) / max(t(x), t_min) + A
 Where `t_min = 0.1` prevents division by very small transmission values (which would amplify noise in dense haze regions).
 
 For negative amounts (add haze):
+
 ```
 J(x) = I(x) * (1 - strength) + A * strength
 ```
@@ -206,6 +211,7 @@ These are internal constants, not user-facing parameters. They can be tuned duri
 ### Memory Budget
 
 The dehaze pass requires temporary buffers:
+
 - 1 dark channel buffer (single-channel f32, w*h*4 bytes)
 - 1 transmission map buffer (same size)
 - Guided filter intermediates: ~5 single-channel buffers (mean_G, mean_p, mean_Gp, var_G, output)
@@ -229,6 +235,7 @@ pub fn apply_dehaze(
 ```
 
 Contents:
+
 - `DehazeParams` struct with `Default`, `is_neutral()`
 - `min_filter_1d()` — O(n) sliding window min using monotonic deque
 - `dark_channel()` — separable 2D min filter via two 1D passes
@@ -253,6 +260,7 @@ Contents:
 ## Testing Strategy
 
 ### Unit tests (in `dehaze.rs`)
+
 - Dark channel of uniform buffer → uniform value
 - Dark channel picks minimum across RGB channels in patch
 - Min filter on impulse → spreads the minimum across patch window
@@ -266,16 +274,19 @@ Contents:
 - Scene recovery with t_min prevents extreme values
 
 ### Engine tests (in `engine/mod.rs`)
+
 - Default dehaze → render unchanged (identity)
 - Partial dehaze merge/materialize
 - Render with dehaze amount>0 produces different output than neutral
 
 ### Preset tests (in `preset/mod.rs`)
+
 - Round-trip TOML serialization for `[dehaze]`
 - Missing dehaze section defaults to neutral
 - Parameter range validation (amount must be -100 to 100)
 
 ### E2E tests
+
 - 2 dehaze presets:
   - `dehaze_landscape` — amount=50 (moderate dehaze)
   - `haze_effect` — amount=-30 (add haze/fog)

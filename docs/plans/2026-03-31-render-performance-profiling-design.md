@@ -96,11 +96,13 @@ All times in milliseconds (f64). Stages that are skipped (neutral parameters) re
 ### Profiling test matrix
 
 **Images** — cover different decode paths and sizes:
+
 - RAW test images (exercises LibRaw decode)
 - PNG test images from e2e fixtures (standard decode, known dimensions)
 - JPEG test images from e2e fixtures
 
 **Presets** — exercise different pipeline stages:
+
 - `noop` — baseline (decode + encode only)
 - Light presets (exposure/WB/contrast, no heavy buffer ops)
 - Heavy presets (grain + LUT + multiple adjustments)
@@ -113,12 +115,14 @@ Start with a representative subset and expand if data suggests gaps. The infrast
 ### Profiling scripts
 
 **`scripts/profile.sh`** — runs the image x preset x repetition matrix:
+
 1. Builds `agx-cli` with `--features profiling` in release mode
 2. Iterates over selected images and presets
 3. Runs each combo 3 times with `--profile-output`
 4. Collects all JSON into a single results file
 
 **`scripts/profile_summary.sh`** — reads the JSON results and prints a human-readable summary:
+
 - Median time per stage per image/preset combo
 - Percentage of total time per stage
 - Sorted by total render time (slowest first)

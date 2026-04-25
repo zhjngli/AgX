@@ -7,6 +7,7 @@ Transform the e2e test suite from basic sanity checks into a comprehensive visua
 ## Motivation
 
 The current e2e suite has 22 tests but limited coverage:
+
 - Only 5 golden files, all JPEG-sourced
 - RAW tests use sanity checks only (no golden comparison)
 - Presets are trivial (single-parameter tweaks like `exposure = 1.0`)
@@ -28,6 +29,7 @@ The overhaul addresses all of these by building a realistic IMAGE x LOOK test ma
 **EXIF reading dependency:** The decode module cannot import from the `metadata` module (architecture rule). Add `kamadak-exif` as a direct dependency of the `agx` crate. Before decoding, open the file with `exif::Reader` to extract the orientation tag (tag `0x0112`). If the tag is missing or unreadable, default to orientation 1 (no transform). This is a lightweight read — only the EXIF header is parsed, not the full image.
 
 EXIF orientation values and their transforms:
+
 | Value | Transform |
 |-------|-----------|
 | 1 | None (normal) |
@@ -106,6 +108,7 @@ Each look combines 2-4 of these transforms to build its color character.
 #### Per-look transform design
 
 **Portra 400:**
+
 - Soft film-shoulder highlight curve (gentle rolloff, no hard clipping)
 - Lift blue channel in shadows (shadow_lift_b ≈ 0.03-0.05)
 - Slight global desaturation (saturation_scale ≈ 0.85-0.90)
@@ -113,6 +116,7 @@ Each look combines 2-4 of these transforms to build its color character.
 - Goal: organic, flattering skin tones with warm pastel quality
 
 **Neo Noir:**
+
 - Aggressive S-curve (steep midtone contrast, crushed blacks, compressed highlights)
 - Strong teal shadow push (hue rotation in low-luminance region toward cyan/teal)
 - Heavy global desaturation (saturation_scale ≈ 0.4-0.5)
@@ -120,12 +124,14 @@ Each look combines 2-4 of these transforms to build its color character.
 - Goal: high-contrast monochromatic feel with cold undertone
 
 **Blade Runner:**
+
 - Orange/teal color split: warm shadow lift (lift_r, slight lift_g) + cool highlight gain inverted — actually: teal shadows (lift_b, lift_g elevated) + warm/orange highlights (gain_r elevated, gain_b reduced)
 - Moderate S-curve for contrast
 - Slightly elevated saturation in warm tones
 - Goal: neon cyberpunk atmosphere, warm faces against cool backgrounds
 
 **Cinema Warm:**
+
 - Golden midtone push via channel crossfeed (small red→green mix for warmth)
 - Soft highlight compression (film shoulder, less aggressive than Neo Noir)
 - Warm overall shift (gamma biased toward amber)
@@ -133,6 +139,7 @@ Each look combines 2-4 of these transforms to build its color character.
 - Goal: golden hour warmth, nostalgic, earthy
 
 **Kodachrome 64:**
+
 - Per-channel S-curves: strong red and blue curves, moderate green
 - Slight red→green crossfeed for characteristic warmth
 - Elevated saturation (saturation_scale ≈ 1.10-1.15)
@@ -140,6 +147,7 @@ Each look combines 2-4 of these transforms to build its color character.
 - Goal: vivid, saturated, iconic Kodachrome punch
 
 **Nordic Fade:**
+
 - Inverse S-curve (lifted blacks ≈ 0.08-0.12, compressed highlights ≈ 0.85-0.90)
 - Cool hue rotation globally (slight shift toward blue-green)
 - Heavy desaturation (saturation_scale ≈ 0.55-0.65)
@@ -165,6 +173,7 @@ More complex LUT generation with measured spectral film data or empirical matchi
 ### 4. Test Matrix & Golden Files
 
 **Matrix:** 6 images x (noop + applicable looks) = **54 golden files**.
+
 - Color images (5): noop + 9 looks (6 color + 3 B&W) = 10 each = 50
 - B&W images (1): noop + 3 B&W looks = 4
 
@@ -249,6 +258,7 @@ const BW_LOOKS: &[&str] = &["bw_high_contrast", "bw_street", "bw_lofi"];
 ```
 
 Test categories:
+
 1. **Noop** — each image through `agx-cli edit` with no adjustment flags. Golden: `<image>_noop.png`.
 2. **Look matrix** — each image x each look via `agx-cli apply -p <look>.toml`. Golden: `<image>_<look>.png`.
 3. **Error cases** — corrupt file, nonexistent input (kept from current suite).
@@ -259,6 +269,7 @@ The CLI tests exercise the full pipeline: argument parsing → preset loading (i
 #### Library pipeline tests (`tests/library_pipeline.rs`) — slim smoke tests
 
 Minimal API verification, not a matrix:
+
 - One noop decode-render-encode per format (JPEG, RAW) — verifies the public API works
 - One `apply_preset()` call with a look — verifies preset loading through library API
 - One direct `params_mut()` manipulation — verifies programmatic parameter setting

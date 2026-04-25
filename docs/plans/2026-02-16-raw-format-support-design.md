@@ -25,6 +25,7 @@ LibRaw handles demosaicing for both Bayer and X-Trans sensors using algorithms i
 ### System Dependency
 
 LibRaw must be installed on the build machine:
+
 - macOS: `brew install libraw`
 - Linux: `apt install libraw-dev` / `dnf install LibRaw-devel`
 - Windows: download from libraw.org
@@ -96,6 +97,7 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage>
 ```
 
 The function:
+
 1. Initializes a LibRaw processor (`libraw_init`)
 2. Opens the file (`libraw_open_file`)
 3. Unpacks sensor data (`libraw_unpack`)
@@ -159,6 +161,7 @@ Note: testing raw decode requires either a sample raw file in the repo or downlo
 ## Scope
 
 **In scope:**
+
 - LibRaw FFI bindings (thin, ~8 functions)
 - `decode_raw()` function with RAII resource management
 - Unified `decode()` with format auto-detection
@@ -168,6 +171,7 @@ Note: testing raw decode requires either a sample raw file in the repo or downlo
 - Tests with a sample DNG file
 
 **Out of scope (future):**
+
 - Custom demosaicing algorithms (AMaZE, Markesteijn)
 - Direct access to raw sensor data (pre-demosaic)
 - Color space selection (Adobe RGB, ProPhoto RGB working space)

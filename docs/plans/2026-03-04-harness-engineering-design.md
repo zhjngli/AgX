@@ -12,6 +12,7 @@ Apply harness engineering principles — inspired by [OpenAI's Codex team](https
 As oxiraw grows, AI agents (Claude Code, Codex, etc.) need to work effectively across the codebase without constant hand-holding. The harness engineering approach shifts the human role from writing code to designing environments that enable agents to produce consistent, correct work. This benefits both agent-assisted and human-only development.
 
 **Goals:**
+
 - Faster AI-assisted development with fewer wrong turns
 - Ability to scale with parallel agent tasks
 - Better codebase quality through mechanical enforcement
@@ -116,10 +117,12 @@ These rules are enforced by `crates/oxiraw/tests/architecture.rs`.
 ### Metadata Module Refactoring
 
 The current codebase has cross-module coupling between `decode` and `encode` for metadata:
+
 - `decode/raw.rs` imports `encode::ImageMetadata` to return extracted metadata
 - `encode/mod.rs` imports `decode::is_raw_extension` and `decode::raw::extract_raw_metadata`
 
 This is resolved by introducing a `metadata` module:
+
 - `ImageMetadata` struct moves from `encode` to `metadata`
 - All `extract_metadata*` functions move from `encode` to `metadata`
 - `decode/raw.rs::extract_raw_metadata` changes its return type from `Option<ImageMetadata>` to `Option<Vec<u8>>` (raw EXIF bytes), eliminating its dependency on any metadata/encode type
@@ -207,6 +210,7 @@ These are intentionally short — a few paragraphs each. Simple modules can have
 `tests/architecture.rs` mechanically enforces the layering rules by scanning source files for forbidden `use crate::` imports.
 
 **How it works:**
+
 - For each module, scan its `.rs` files for `use crate::` statements
 - Assert that no forbidden cross-module imports exist
 - E.g., verify that files in `src/adjust/` never contain `use crate::engine`

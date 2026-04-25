@@ -126,10 +126,12 @@ At saturation=0, tint is (1, 1, 1) — no color shift. This is computed once per
 Pixel luminance: `lum = 0.2126*r + 0.7152*g + 0.0722*b` (Rec. 709 coefficients applied to gamma-encoded values as a perceptual approximation — using them on gamma values emphasizes perceptual brightness separation, which is preferable for creative color grading weight curves).
 
 Balance remaps luminance before weight computation:
+
 - `balance_factor = 2^(-balance / 100)` — range 0.5 to 2.0 (negative balance → factor > 1 → expands shadows)
 - `lum_adjusted = lum^balance_factor`
 
 3-way weights from adjusted luminance:
+
 - Shadow weight: `(1 - lum_adjusted)^2`
 - Highlight weight: `lum_adjusted^2`
 - Midtone weight: `1.0 - shadow_weight - highlight_weight` = `2 * lum_adjusted * (1 - lum_adjusted)`

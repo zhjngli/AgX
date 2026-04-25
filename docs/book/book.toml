@@ -12,6 +12,7 @@ git-repository-url = "https://github.com/zhjngli/AgX"
 edit-url-template = "https://github.com/zhjngli/AgX/edit/main/docs/book/{path}"
 additional-css = ["theme/extra.css"]
 mathjax-support = false
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [output.html.fold]
 enable = true

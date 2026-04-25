@@ -7,6 +7,7 @@
 ## Problem
 
 The grain size parameter maps to simplex noise frequency via an exponential curve:
+
 ```
 base_freq = 0.1 * (0.02).powf(size / 100.0)
 ```
@@ -58,6 +59,7 @@ The original grain design spec (`docs/plans/2026-03-23-grain-design.md`) rejecte
 The original grain implementation and the first iteration of this fix used multi-octave simplex noise. Simplex noise is spatially coherent by design — neighboring pixels produce correlated values, creating smooth, organic patterns. This is desirable for terrain or cloud generation, but produces the wrong character for film grain: even at high frequencies, simplex noise features are inherently blobby and smooth rather than sharp and discrete.
 
 White noise (independent random values per pixel) combined with Gaussian blur produces the correct grain character because:
+
 - **Unblurred:** pure pixel-level randomness, like fine-grain film (ISO 50-100)
 - **Lightly blurred:** small clusters of correlated pixels, like medium-grain film (ISO 400)
 - **More blurred:** larger soft clusters, like pushed/high-ISO film (ISO 1600+)
@@ -82,6 +84,7 @@ Tuned via visual grid search (3 test images × multiple parameter combinations, 
 - **Reference resolution:** 2000px long edge — sigma scales proportionally so grain particles maintain consistent visual size regardless of image resolution.
 
 Tuning rounds:
+
 1. First round (strength 0.3–0.8, sigma 2.5–5.0): all too aggressive, dark spots problem persisted
 2. Second round (strength 0.05–0.12, sigma 2.0–5.0): sigma ≤2.0 looked good; higher sigma still blotchy
 3. Third round (strength 0.06–0.16, sigma 0.8–1.8): all looked good, confirmed fine-grain range
@@ -149,6 +152,7 @@ The `gaussian_blur` function in `detail.rs` already implements separable single-
 ### Visual verification (manual, during tuning)
 
 Render a test image with grain at size=0, 25, 50, 75, 100:
+
 - Discrete grain particles visible at every step
 - Clear size progression from fine to coarse
 - No cloud-like blobs at any size

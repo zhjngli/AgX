@@ -90,6 +90,7 @@ Decompose each channel (Y, Cb, Cr) independently into 5 detail levels + 1 residu
 **Kernel:** B3-spline `[1/16, 1/4, 3/8, 1/4, 1/16]`
 
 Levels are indexed 0–4. At each level `k` (k = 0, 1, 2, 3, 4):
+
 1. Convolve the current approximation with the B3-spline kernel, using tap spacing of `2^k` pixels (the "à trous" gaps). At level 0, tap spacing is 1 (adjacent pixels). At level 4, tap spacing is 16.
 2. The convolution is separable: horizontal pass then vertical pass
 3. Detail at level `k` = previous approximation − current approximation
@@ -123,6 +124,7 @@ output = sign(x) * max(|x| - threshold, 0)
 ```
 
 Where:
+
 - `strength_factor` maps the user parameter (0–100) to a multiplier range: `param / 100.0 * 3.0`, giving a 0–3 range. For the Y channel this uses `luminance`; for Cb/Cr it uses `color`. These initial values may be tuned based on visual results.
 - `k_level` is a per-level scale factor that increases with level (coarser levels contain less noise, so they need proportionally higher thresholds to avoid over-smoothing structure). Initial schedule: `[1.0, 1.0, 1.2, 1.5, 2.0]` for levels 0–4.
 - **Detail preservation:** The `detail` parameter (0–100) reduces the threshold at level 0 (finest scale). The level-0 threshold is multiplied by `1.0 - detail / 100.0`. At detail=100, level 0 is untouched. At detail=0, level 0 gets full thresholding. This protects fine texture and edges.
