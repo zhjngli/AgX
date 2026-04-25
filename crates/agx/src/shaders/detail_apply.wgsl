@@ -1,3 +1,9 @@
+// Algorithm: Detail sharpening apply pass for unsharp-mask-style contrast enhancement
+// Canonical explanation: crates/agx/src/adjust/detail.md
+// CPU equivalent: crates/agx/src/adjust/detail.rs (apply_detail_pass)
+// Bindings: storage pixels/original_lum/blurred_lum/params
+// Entry points: main
+
 // Apply unsharp mask: adds (original_lum - blurred_lum) * strength to RGB pixels.
 
 struct Params {

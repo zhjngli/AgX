@@ -1,3 +1,9 @@
+// Algorithm: Noise reduction channel reconstruction pass writing denoised YCbCr back to RGB
+// Canonical explanation: crates/agx/src/adjust/denoise.md
+// CPU equivalent: crates/agx/src/adjust/denoise.rs (ycbcr_to_rgb)
+// Bindings: storage pixels/channel_in/params
+// Entry points: main
+
 // Write a denoised YCbCr channel back into the RGB pixel buffer.
 // nr_channel: 0 = Y (luminance), 1 = Cb (blue chroma), 2 = Cr (red chroma)
 

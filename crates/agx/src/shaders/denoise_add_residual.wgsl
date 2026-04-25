@@ -1,3 +1,9 @@
+// Algorithm: Noise reduction reconstruction pass adding the final approximation residual
+// Canonical explanation: crates/agx/src/adjust/denoise.md
+// CPU equivalent: crates/agx/src/adjust/denoise.rs (apply_noise_reduction)
+// Bindings: storage approx/accum
+// Entry points: main
+
 // Add the final approximation (residual) to the denoise accumulator.
 // After all wavelet levels, accum holds the sum of thresholded details.
 // Adding the residual completes the reconstruction.

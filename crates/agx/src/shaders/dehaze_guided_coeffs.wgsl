@@ -1,3 +1,9 @@
+// Algorithm: Dehaze guided-filter coefficient solve pass for `a` and `b`
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (guided_filter)
+// Bindings: storage mean_g/mean_p/mean_gp/mean_gg and a_out/b_out
+// Entry points: main
+
 // Guided filter coefficient computation.
 // a = cov(guide,input) / (var(guide) + eps)
 // b = mean_p - a * mean_g

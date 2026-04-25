@@ -1,3 +1,9 @@
+// Algorithm: Grain compositing pass for film grain with luminance weighting and blur-based size control
+// Canonical explanation: crates/agx/src/adjust/grain.md
+// CPU equivalent: crates/agx/src/adjust/grain.rs (apply_grain_buffer)
+// Bindings: storage pixels/noise/params
+// Entry points: main
+
 // Apply blurred noise to pixel buffer with luminance-weighted grain.
 // Implements per-type config selection and additive/multiplicative blending.
 

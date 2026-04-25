@@ -1,3 +1,9 @@
+// Algorithm: Dehaze guided-filter combine pass for `a * b + c` reconstruction
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (guided_filter)
+// Bindings: storage a/b/c/output
+// Entry points: main
+
 // Fused multiply-add: output[i] = a[i] * b[i] + c[i]
 // Used for guided filter output: t_refined = mean_a * guide + mean_b
 

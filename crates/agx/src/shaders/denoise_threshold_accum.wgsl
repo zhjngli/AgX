@@ -1,3 +1,9 @@
+// Algorithm: Noise reduction detail-threshold accumulation pass for wavelet reconstruction
+// Canonical explanation: crates/agx/src/adjust/denoise.md
+// CPU equivalent: crates/agx/src/adjust/denoise.rs (soft_threshold)
+// Bindings: storage approx/smoothed/accum/params
+// Entry points: main
+
 // Compute wavelet detail, apply soft threshold, accumulate into result,
 // and update approximation buffer for next level.
 //

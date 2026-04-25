@@ -1,3 +1,9 @@
+// Algorithm: Detail luminance extraction pass for the sharpening pipeline
+// Canonical explanation: crates/agx/src/adjust/detail.md
+// CPU equivalent: crates/agx/src/adjust/detail.rs (extract_luminance)
+// Bindings: storage pixels/lum
+// Entry points: main
+
 // Extract luminance from RGB pixel buffer into single-channel luminance buffer.
 
 @group(0) @binding(0) var<storage, read> pixels: array<f32>;

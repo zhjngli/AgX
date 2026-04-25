@@ -1,3 +1,9 @@
+// Algorithm: Gamma-space vignette pass for edge darkening or brightening
+// Canonical explanation: crates/agx/src/adjust/vignette.md
+// CPU equivalent: crates/agx/src/adjust/vignette.rs (apply_vignette_buffer)
+// Bindings: storage pixels/params
+// Entry points: main
+
 // Vignette: darkens/brightens image edges based on distance from center.
 // Runs in gamma (sRGB) space.
 

@@ -19,6 +19,7 @@ jobs:
           - test-features
           - rustdoc
           - doc-links
+          - wgsl-headers
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -28,7 +29,7 @@ jobs:
         with:
           shared-key: fast-checks
       - name: Install libraw
-        if: matrix.check != 'fmt' && matrix.check != 'doc-links'
+        if: matrix.check != 'fmt' && matrix.check != 'doc-links' && matrix.check != 'wgsl-headers'
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
       - name: Run check
         run: ./scripts/verify.sh ${{ matrix.check }}

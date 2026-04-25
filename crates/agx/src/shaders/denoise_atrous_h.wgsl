@@ -1,3 +1,9 @@
+// Algorithm: Noise reduction à trous horizontal B3-spline smoothing pass
+// Canonical explanation: crates/agx/src/adjust/denoise.md
+// CPU equivalent: crates/agx/src/adjust/denoise.rs (atrous_decompose)
+// Bindings: storage input/output/params
+// Entry points: main
+
 // Horizontal B3-spline convolution with strided taps (à trous wavelet).
 // Gap (stride) is 2^level, passed via params.nr_gap.
 

@@ -1,3 +1,9 @@
+// Algorithm: Grain noise synthesis pass generating Gaussian-distributed noise for the grain compositor
+// Canonical explanation: crates/agx/src/adjust/grain.md
+// CPU equivalent: crates/agx/src/adjust/grain.rs (generate_white_noise_buffer)
+// Bindings: storage noise/params
+// Entry points: main
+
 // Generate Gaussian-distributed noise into a single-channel buffer.
 // Uses PCG hash + Box-Muller transform for quality noise generation.
 

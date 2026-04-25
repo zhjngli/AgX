@@ -1,3 +1,9 @@
+// Algorithm: Dehaze scene recovery or fog addition pass using transmission and airlight
+// Canonical explanation: crates/agx/src/adjust/dehaze.md
+// CPU equivalent: crates/agx/src/adjust/dehaze.rs (apply_dehaze)
+// Bindings: storage pixels/transmission/params
+// Entry points: main
+
 // Dehaze scene recovery (positive) or fog addition (negative).
 // dehaze_mode: 0 = positive (remove haze), 1 = negative (add fog)
 //

@@ -1,3 +1,9 @@
+// Algorithm: Noise reduction channel extraction pass converting RGB to YCbCr
+// Canonical explanation: crates/agx/src/adjust/denoise.md
+// CPU equivalent: crates/agx/src/adjust/denoise.rs (rgb_to_ycbcr)
+// Bindings: storage pixels/channel_out/params
+// Entry points: main
+
 // Extract a YCbCr channel from RGB pixel buffer into a single-channel buffer.
 // nr_channel: 0 = Y (luminance), 1 = Cb (blue chroma), 2 = Cr (red chroma)
 
