@@ -141,24 +141,21 @@ behaves.
 
 | Constant | Value | Role | Sensitivity |
 |----------|-------|------|-------------|
-| Hue units | degrees | User-facing hue angle for each wheel | Low |
-| Saturation units | percent | Strength of the tint derived from each hue angle | Medium |
-| Luminance units | `-100` to `+100` (informal — no runtime range validation; the per-pixel luminance result is clamped after the adjustment) | Additive brightness shift for each wheel | High |
-| Balance units | `-100` to `+100` | Shifts the shadow/highlight crossover | High |
-| Rec. 709 luma coefficients | `0.2126`, `0.7152`, `0.0722` | Gamma-space luminance proxy used for zone weighting | Medium |
-| Hue-lobe spacing | `120°` | Separates the RGB cosine lobes used to form the tint | Medium |
-| Balance exponent | `2.0` raised to the power of `-balance / 100` | Remaps luminance before the zone weights are computed | High |
+| Hue units | degrees | User-facing hue angle for each wheel | Wraps modulo 360°; out-of-range hues land at the equivalent angle. |
+| Saturation units | percent | Strength of the tint derived from each hue angle | Scales the tint before mixing; doubling has near-doubled visible effect when other controls are neutral. |
+| Luminance units | `-100` to `+100` (informal — no runtime range validation; the per-pixel luminance result is clamped after the adjustment) | Additive brightness shift for each wheel | At small values feels like "lift the shadows by N%"; large values quickly saturate against the per-pixel `[0, 1]` clamp and stop being visually proportional. |
+| Balance units | `-100` to `+100` | Shifts the shadow/highlight crossover | The whole feel of the wheel weighting; ±50 is a strong shift, ±100 collapses one zone almost entirely. |
+| Rec. 709 luma coefficients | `0.2126`, `0.7152`, `0.0722` | Gamma-space luminance proxy used for zone weighting | Standard Rec. 709 — changing them shifts which pixels count as shadows vs highlights and changes the feel of the entire tool. |
+| Hue-lobe spacing | `120°` | Separates the RGB cosine lobes used to form the tint | Tied to RGB channel symmetry; changing it would distort the tint conversion and break expected channel balance. |
+| Balance exponent | `2.0` raised to the power of `-balance / 100` | Remaps luminance before the zone weights are computed | The exponential shape gives a smooth crossover as the user drags the slider; a linear remap would feel abrupt at the extremes. |
 
-The practical trade-offs are straightforward:
-
-- Changing the hue-lobe spacing would distort the tint conversion and
-  break the expected RGB balance.
-- Changing the luma coefficients would shift which pixels count as
-  shadows or highlights, which would change the feel of the entire
-  tool.
-- Changing the balance exponent would change how quickly the tonal
-  crossover moves as the user drags the slider. The current curve keeps
-  the response smooth instead of abrupt.
+**Beyond the expected range:** color grading does **not** preset-validate
+its slider values, so out-of-range numbers reach the algorithm directly.
+Per-pixel luminance is clamped to `[0, 1]` after the adjustment, so
+pushing a wheel's `luminance` past `±100` mostly saturates against that
+clamp rather than producing larger visible change. Hue values wrap
+modulo 360°. Saturation behaves as a multiplier — values above `100`
+just amplify the tint proportionally.
 
 ## Preset-slider mapping
 

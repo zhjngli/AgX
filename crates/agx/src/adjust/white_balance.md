@@ -88,6 +88,15 @@ range is `[-100, +100]`.
 | Brightness normalization | `norm = 3 / (r_mult + g_mult + b_mult)` | Keeps channel-average brightness constant. | Without normalization, a "warm" shift would also brighten the image overall; with it, the user's shift is purely chromatic. |
 | Channel floor | `0.0` | Prevents negative output. | Trailing `max` handles extreme shifts and out-of-range upstream values. |
 
+**Beyond the expected range:** white balance does not preset-validate
+`temperature` or `tint`, so out-of-range values reach the algorithm.
+At `temperature = 200`, `b_mult = 0` and the blue channel collapses to
+zero (image goes orange-magenta). Past that, multipliers go negative
+and the trailing `max(0, …)` clamps each channel to zero, so very
+large shifts produce a hard channel kill rather than continuing to
+intensify. `tint` follows the same pattern with green. Values past
+`±100` are not useful in practice.
+
 ### Preset-slider mapping
 
 ```toml

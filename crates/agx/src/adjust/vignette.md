@@ -99,6 +99,15 @@ Output is per-channel-clamped to `[0.0, 1.0]` after multiplication so a
 strong brightening or out-of-range upstream value cannot push a channel
 past displayable bounds.
 
+**Beyond the expected range:** vignette does not preset-validate
+`amount`, so out-of-range values reach the algorithm directly. The
+formula extrapolates linearly — `amount = 200` gives a corner
+multiplier of `3.0` before clamping, `amount = -200` gives `-1.0`
+(everything in the corner clamps to black). Values past `±100` quickly
+saturate against the per-channel clamp and stop being visually
+proportional. `shape` accepts only the two enum variants; anything else
+fails preset parsing.
+
 ## Preset-slider mapping
 
 ```toml

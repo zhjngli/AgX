@@ -112,28 +112,20 @@ internal constants below shape interpolation and lookup behavior.
 
 | Constant | Value | Role | Sensitivity |
 |----------|-------|------|-------------|
-| LUT size | `256` | Number of cached samples per curve | Medium |
-| LUT sample step | `1 / 255` | Maps table indices to normalized curve space | Low |
-| Fritsch-Carlson limiter threshold | `9.0` | Clamps tangent pairs when `alpha^2 + beta^2` is too large | High |
-| Near-zero luminance guard | `1e-6` | Switches to gray fallback instead of proportional scaling | High |
-| Zero-length segment guard | `1e-9` | Avoids division by zero for degenerate or repeated x spacing | High |
-| Rec. 709 luma coefficients | `0.2126`, `0.7152`, `0.0722` | Luminance weights shared with the rest of gamma-space color math | Medium |
-| Output clamp | `[0.0, 1.0]` | Keeps sampled and scaled values in the public normalized range | Medium |
+| LUT size | `256` | Number of cached samples per curve | Enough for smooth 8-bit and 10-bit output; doubling it would barely change visible quality but doubles upload cost. Halving introduces visible stair-stepping in steep curves. |
+| LUT sample step | `1 / 255` | Maps table indices to normalized curve space | Pure index math; tied to LUT size. |
+| Fritsch-Carlson limiter threshold | `9.0` | Clamps tangent pairs when `alpha^2 + beta^2` is too large | The standard Fritsch-Carlson bound. Lowering it flattens the curve and removes overshoot at the cost of expressiveness; raising it lets users sketch curves that overshoot near tight control-point clusters. |
+| Near-zero luminance guard | `1e-6` | Switches to gray fallback instead of proportional scaling | Deliberately tiny — only triggers near pure black where proportional scaling becomes numerically unstable. Raising it would visibly desaturate dark midtones; lowering it risks NaN-ish artifacts. |
+| Zero-length segment guard | `1e-9` | Avoids division by zero for degenerate or repeated x spacing | Defensive. Public validation already rejects non-increasing x values; the guard only matters if a malformed curve slips through. |
+| Rec. 709 luma coefficients | `0.2126`, `0.7152`, `0.0722` | Luminance weights shared with the rest of gamma-space color math | Standard Rec. 709 — changing them shifts which pixels register as bright vs dark across every luma-aware adjustment. |
+| Output clamp | `[0.0, 1.0]` | Keeps sampled and scaled values in the public normalized range | Hard clamp at the boundary; not a tuning knob. |
 
-The important trade-offs are straightforward:
-
-- `256` samples are enough to stay smooth on 8-bit and 10-bit output,
-  but still cheap to upload and cache.
-- `9.0` is the standard Fritsch-Carlson bound for limiting tangent
-  pairs. Lowering it makes the curve flatter and less expressive;
-  raising it increases the risk of overshoot.
-- The `1e-6` luminance guard is intentionally small. It only changes the
-  behavior when the pixel is so close to black that proportional scaling
-  would become numerically unstable.
-- The `1e-9` segment guard handles degenerate point spacing defensively.
-  The public validation path rejects non-increasing x values, but the
-  guard keeps the math robust if an unexpected zero-width segment reaches
-  the interpolator.
+**Beyond the expected range:** the public `ToneCurve::validate()` path
+rejects control points outside `[0, 1]` and any non-monotonic x
+sequence. Curves that pass validation but produce y values outside
+`[0, 1]` after Fritsch-Carlson interpolation are clamped at lookup
+time, so out-of-range curves cannot push pixels past valid linear RGB.
+The internal constants above are not user-addressable.
 
 ## Preset-slider mapping
 

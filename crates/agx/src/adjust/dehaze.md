@@ -115,46 +115,22 @@ fixed in code.
 
 | Constant | Value | Role | Sensitivity |
 |----------|-------|------|-------------|
-| `DEHAZE_AMOUNT_MIN` | `-100.0` | Lowest accepted slider value | None |
-| `DEHAZE_AMOUNT_MAX` | `100.0` | Highest accepted slider value | None |
-| Neutral amount | `0.0` | Skips the pass entirely via `is_neutral()` | None |
-| `PATCH_SIZE` | `15` | Dark-channel patch width and height | High |
-| `AIRLIGHT_PERCENTILE` | `0.001` | Top `0.1%` of dark-channel samples used for airlight candidates | Medium |
-| `GUIDED_FILTER_RADIUS` | `40` | Radius of the guided filter box windows | High |
-| `GUIDED_FILTER_EPSILON` | `0.001` | Regularizer for the guided filter coefficients | High |
-| Airlight denominator floor | `0.01` | Minimum `A` component when normalizing `I / A` | Medium |
-| `T_MIN` | `0.1` | Minimum transmission during recovery | High |
-| Output clamp | `[0.0, 1.0]` | Keeps recovered pixels in valid linear RGB range | None |
-| `omega` / fog strength ceiling | `1.0` | Caps `amount / 100` and `-amount / 100` | None |
-| Rayon chunk size | `1024` | Work scheduling chunk for parallel pixel loops | Low |
+| `DEHAZE_AMOUNT_MIN` | `-100.0` | Lowest accepted slider value | Schema bound; widening it would require retuning the strength mapping. |
+| `DEHAZE_AMOUNT_MAX` | `100.0` | Highest accepted slider value | Same — `±100` already saturates `omega` to `1.0`. |
+| Neutral amount | `0.0` | Skips the pass entirely via `is_neutral()` | Hard zero; any non-zero value runs the full pipeline. |
+| `PATCH_SIZE` | `15` | Dark-channel patch width and height | Smaller patches follow local detail tighter but produce noisier transmission; larger patches over-smooth and miss fine haze transitions. |
+| `AIRLIGHT_PERCENTILE` | `0.001` | Top `0.1%` of dark-channel samples used for airlight candidates | Deliberately tiny so airlight comes from the haziest pixels, not ordinary bright surfaces. Raising it 10× picks sunlit objects; lowering it makes the estimate brittle on small images. |
+| `GUIDED_FILTER_RADIUS` | `40` | Radius of the guided filter box windows | Has to be much larger than the min-filter window to smooth its artifacts. Halving leaves visible patch texture in the transmission; doubling over-smooths and bleeds across edges. |
+| `GUIDED_FILTER_EPSILON` | `0.001` | Regularizer for the guided filter coefficients | Larger values flatten local contrast; smaller values hug edges tighter but preserve more noise. A 10× change is visibly different in haze-edge fidelity. |
+| Airlight denominator floor | `0.01` | Minimum `A` component when normalizing `I / A` | Defensive — prevents division blowup on tiny airlight components. Raising it desaturates the recovered image; lowering it can cause speckle on near-black scenes. |
+| `T_MIN` | `0.1` | Minimum transmission during recovery | Caps recovery gain at `1 / T_MIN = 10×`. Lower values restore more in dense haze but can overshoot to white; higher values leave dense haze visibly under-recovered. |
+| Output clamp | `[0.0, 1.0]` | Keeps recovered pixels in valid linear RGB range | Hard clamp; not a tuning knob. |
+| `omega` / fog strength ceiling | `1.0` | Caps `amount / 100` and `-amount / 100` | Hard saturation at the slider extremes; not user-tunable. |
+| Rayon chunk size | `1024` | Work scheduling chunk for parallel pixel loops | Affects only CPU thread scheduling — output is identical regardless. Tiny chunks add overhead; very large chunks reduce parallelism. |
 
-The constants have different jobs:
-
-- `PATCH_SIZE = 15` is the standard dark-channel neighborhood from the
-  original method. Smaller patches follow local detail more tightly but
-  make transmission noisier; larger patches smooth more aggressively and
-  can miss fine haze transitions.
-- `AIRLIGHT_PERCENTILE = 0.001` is deliberately tiny so the airlight is
-  chosen from the haziest-looking pixels rather than from ordinary
-  bright surfaces. Raising it risks picking sunlit objects; lowering it
-  makes the estimate brittle on small images.
-- `GUIDED_FILTER_RADIUS = 40` is much larger than the min-filter half
-  width, which is the point: it smooths over the patch artifacts while
-  still respecting edges from the luminance guide.
-- `GUIDED_FILTER_EPSILON = 0.001` controls how strongly the guide
-  constrains the result. Larger values smooth harder and flatten local
-  contrast; smaller values hug edges more tightly but can preserve more
-  noise.
-- The `0.01` airlight floor and `0.1` transmission floor are defensive
-  clamps. The first prevents dividing by tiny airlight components during
-  normalization; the second prevents unrealistically large recovery
-  gains in dense haze.
-- The repeated `[0, 1]` and `1.0` clamps are not stylistic. They make
-  the positive and negative paths total-order bounded even when the
-  estimated transmission or airlight would otherwise push channels out
-  of range.
-- The `1024` chunk size is not part of the image model. It only affects
-  rayon's work granularity in the CPU implementation.
+**Beyond the expected range:** preset validation rejects `amount`
+outside `-100.0..=100.0`, so out-of-range values never reach the
+algorithm. The internal constants above are not user-addressable.
 
 ## Preset-slider mapping
 

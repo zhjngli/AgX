@@ -64,6 +64,15 @@ exposure-adjusted image — which is what photographers expect:
 | Power base | `2.0` | Photographic-stop semantics. | Hard-coded; switching to a different base would break the "stops" mental model. |
 | Channel floor | `0.0` | Guards against negative output from invalid upstream values. | Multiplier is always positive, so this only matters for malformed input. |
 
+**Beyond the expected range:** exposure does not preset-validate the
+`exposure` field. The math accepts any finite stops value — at `+10`
+stops the multiplier is `1024`, which pushes essentially every channel
+past `1.0` and downstream clamping turns the image solid white. At
+`-10` stops the multiplier is `~0.001` and the image goes near-black.
+Practical preset values stay within `±5` stops; anything more is
+better expressed as a multiplied raw or a different exposure on the
+camera.
+
 ### Preset-slider mapping
 
 ```toml

@@ -124,28 +124,21 @@ math.
 
 | Constant | Value | Role | Sensitivity |
 |----------|-------|------|-------------|
-| Channel count | `8` | Number of color bands exposed to the user | High |
-| Red center | `0°` | Band center for the red channel | High |
-| Orange center | `30°` | Band center for the orange channel | High |
-| Yellow center | `60°` | Band center for the yellow channel | High |
-| Green center | `120°` | Band center for the green channel | High |
-| Aqua center | `180°` | Band center for the aqua channel | High |
-| Blue center | `240°` | Band center for the blue channel | High |
-| Purple center | `270°` | Band center for the purple channel | High |
-| Magenta center | `330°` | Band center for the magenta channel | High |
-| Warm-band half-width | `30°` | Influence radius for red, orange, and yellow | High |
-| Mid-band half-width | `60°` | Influence radius for green and aqua | High |
-| Cool-band half-width | `30°` | Influence radius for blue, purple, and magenta | High |
-| Gray cutoff | `1e-4` | Skips pixels with effectively undefined hue | High |
+| Channel count | `8` | Number of color bands exposed to the user | Defines the entire user surface — adding or removing bands would change the preset schema. |
+| Band centers | `0° / 30° / 60° / 120° / 180° / 240° / 270° / 330°` (red / orange / yellow / green / aqua / blue / purple / magenta) | Hue angle each band targets | Shifts the perceived "what counts as orange" line; the chosen values match Lightroom's HSL layout so presets cross-port well. |
+| Warm-band half-width | `30°` | Influence radius for red, orange, and yellow | Narrower would make warm-band edits more surgical but produce visible band transitions; wider blurs the distinction between adjacent warm bands. |
+| Mid-band half-width | `60°` | Influence radius for green and aqua | Wider than warm/cool bands because the green-aqua region of the wheel is sparser; narrowing would leave gaps where pixels match no band strongly. |
+| Cool-band half-width | `30°` | Influence radius for blue, purple, and magenta | Same trade-offs as the warm-band half-width. |
+| Gray cutoff | `1e-4` | Skips pixels with effectively undefined hue | Deliberately tiny — only suppresses pixels whose hue signal is too weak to trust. Raising it visibly desaturates near-gray pixels under HSL adjustments. |
 
-The important trade-offs are straightforward:
-
-- Narrower half-widths would make the bands more surgical, but they
-  would also make transitions harsher.
-- Wider half-widths would increase overlap, but they would also blur
-  the distinction between neighboring bands.
-- The `1e-4` cutoff is intentionally small. It only suppresses pixels
-  whose hue signal is too weak to trust.
+**Beyond the expected range:** HSL does **not** preset-validate the
+per-channel hue / saturation / luminance shifts, so out-of-range values
+reach the algorithm. Hue shifts are angles in degrees and wrap modulo
+360°. Saturation and luminance shifts are percents that the
+implementation maps to `±1.0` internally; values past `±100` accumulate
+proportionally but the per-pixel result is clamped to `[0, 1]` after the
+adjustment, so very large shifts saturate against the clamp instead of
+producing more visible change.
 
 ## Preset-slider mapping
 

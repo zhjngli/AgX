@@ -186,6 +186,12 @@ not add denoising. If `luminance == 0` and `color == 0`, the channel
 strengths stay at zero, so the output remains unchanged even if
 `detail > 0`.
 
+**Beyond the expected range:** preset validation rejects `luminance`,
+`color`, and `detail` outside `0.0..=100.0`. The internal constants
+(filter taps, gap schedule, level scaling) are part of the algorithm
+itself rather than tuning knobs — they are listed for transparency,
+not exposed for tweaking.
+
 ## Preset-slider mapping
 
 In preset TOML, noise reduction is serialized as:

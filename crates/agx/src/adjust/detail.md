@@ -123,17 +123,24 @@ rest of the numbers below are fixed in code.
 | `clarity` | `-100.0..=100.0` | `0.0` | Mid-frequency local contrast |
 | `texture` | `-100.0..=100.0` | `0.0` | Fine-frequency local contrast |
 
-| Constant | Value | Role |
-|----------|-------|------|
-| `TEXTURE_SIGMA` | `3.0` | Fixed blur scale for texture |
-| `CLARITY_SIGMA` | `20.0` | Fixed blur scale for clarity |
-| `SHARPEN_RADIUS_DEFAULT` | `1.0` | Default sharpening radius |
-| `SHARPEN_THRESHOLD_DEFAULT` | `25.0` | Default sharpening threshold |
-| `SHARPEN_RADIUS_MIN` / `MAX` | `0.5` / `3.0` | Sharpening radius bounds |
-| `SHARPEN_THRESHOLD_MIN` / `MAX` | `0.0` / `100.0` | Sharpening threshold bounds |
-| `SHARPEN_MASKING_MIN` / `MAX` | `0.0` / `100.0` | Sharpening masking bounds |
-| `DETAIL_SLIDER_MIN` / `MAX` | `-100.0` / `100.0` | Clarity and texture bounds |
-| `EDGE_SCALE` | `4.0` | Fixed gradient normalization for masking |
+| Constant | Value | Role | Sensitivity |
+|----------|-------|------|-------------|
+| `TEXTURE_SIGMA` | `3.0` | Fixed blur scale for texture | Defines what "fine" means for the texture slider. Halving it makes texture target even finer detail (single-pixel structure); doubling pushes texture into the same band as clarity. |
+| `CLARITY_SIGMA` | `20.0` | Fixed blur scale for clarity | Defines what "mid-frequency" means. Smaller values make clarity behave like a stronger texture; larger values push it toward global tonal contrast. |
+| `SHARPEN_RADIUS_DEFAULT` | `1.0` | Default sharpening radius | Sets the "no `radius` specified" baseline. |
+| `SHARPEN_THRESHOLD_DEFAULT` | `25.0` | Default sharpening threshold | Sets the "no `threshold` specified" baseline. The chosen value is conservative enough that sharpening rarely amplifies smooth-area noise. |
+| `SHARPEN_RADIUS_MIN` / `MAX` | `0.5` / `3.0` | Sharpening radius bounds | Schema bounds; widening would let users pick blurs so wide the result reads as halos rather than crispness. |
+| `SHARPEN_THRESHOLD_MIN` / `MAX` | `0.0` / `100.0` | Sharpening threshold bounds | Schema bounds. |
+| `SHARPEN_MASKING_MIN` / `MAX` | `0.0` / `100.0` | Sharpening masking bounds | Schema bounds. |
+| `DETAIL_SLIDER_MIN` / `MAX` | `-100.0` / `100.0` | Clarity and texture bounds | Schema bounds; the slider feel was calibrated against this range. |
+| `EDGE_SCALE` | `4.0` | Fixed gradient normalization for masking | Calibrates how the masking slider feels across images. Smaller values make masking gate harder (only the strongest edges sharpen); larger values let masking pass more of the image through. |
+
+**Beyond the expected range:** preset validation rejects out-of-range
+values for every public slider — `sharpening.amount`, `threshold`,
+`masking`, and `clarity` / `texture` are all hard-clamped at
+`0.0..=100.0` (or `±100.0` for clarity / texture) before the algorithm
+runs, and `sharpening.radius` is rejected outside `0.5..=3.0`. The
+internal constants are not user-addressable.
 
 ## Preset-slider mapping
 

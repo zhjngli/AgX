@@ -129,6 +129,15 @@ range, whites and blacks each affect roughly a quarter.
 | `1.0` | constant | full-scale endpoint | Highlights, Shadows, Blacks | Upper bound of normalized channel space. |
 | `100.0` | constant | percent scale | All functions | Converts slider percentages into fractional adjustments. |
 
+**Beyond the expected range:** none of the basic-tone sliders are
+preset-validated, so out-of-range values reach the algorithm directly.
+Each per-channel adjustment is clamped to `[0, 1]` after the math, so
+extreme positive contrast/highlights/whites push pixels to the upper
+clamp (highlights blow out toward solid white) and extreme negative
+values crush toward the lower clamp. Values past `±200` produce no
+additional visible change because almost every pixel is already at the
+clamp; the practical operating range is `±100`.
+
 ### Preset-slider mapping
 
 The preset values map directly to the slider ranges used by the code:
