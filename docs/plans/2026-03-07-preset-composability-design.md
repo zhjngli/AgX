@@ -10,6 +10,7 @@ Make presets composable: users can layer multiple presets, create partial preset
 ## Motivation
 
 Users expect to build editing workflows by combining focused presets:
+
 - A base look preset (exposure, contrast, white balance)
 - A color grading preset (HSL adjustments only)
 - A warm tint overlay (just temperature and tint)
@@ -119,6 +120,7 @@ temperature = 30.0
 ```
 
 When loading, the loader:
+
 1. Reads the TOML into `PartialParameters`
 2. If `extends` is present, recursively loads the base preset
 3. Merges: base partial → this partial (last-write-wins)
@@ -190,6 +192,7 @@ No new module dependencies. `PartialParameters`, `PartialHslChannel`, and `Parti
 ## Scope
 
 **In scope:**
+
 - `PartialParameters`, `PartialHslChannel`, `PartialHslChannels` types
 - Merge (last-write-wins) and materialize operations
 - Preset deserialization to `PartialParameters`
@@ -199,6 +202,7 @@ No new module dependencies. `PartialParameters`, `PartialHslChannel`, and `Parti
 - Tests for all of the above
 
 **Out of scope:**
+
 - Additive merge strategies (sum values)
 - Preset marketplace or remote preset loading
 - Preset validation CLI command

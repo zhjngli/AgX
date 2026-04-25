@@ -5,6 +5,7 @@ Open-source photo editing library + CLI in Rust with a portable, human-readable 
 ## Workspace Layout
 
 Cargo workspace with five crates:
+
 - `crates/agx/` -- core library (decode, engine, adjustments, presets, encode)
 - `crates/agx-cli/` -- thin CLI wrapper (edit, apply, batch-edit)
 - `crates/agx-docgen/` -- dev-only tool for generating CLI and preset reference markdown
@@ -23,6 +24,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 - Tests live alongside source in standard Rust `#[cfg(test)]` modules
 - Structural tests in `crates/agx/tests/architecture.rs` enforce module dependency rules; see "When a Structural Test Fails" in `ARCHITECTURE.md`
 - Commit messages and PR titles use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`, `chore:`, `build:`. For mixed-scope PRs, use the most representative prefix.
+- Do not use `#N` issue/PR refs in commit messages or PR titles/bodies. GitHub auto-links every `#N` to whatever issue or PR carries that number, so internal numbering schemes (e.g. backlog sub-projects "10", "11") get spuriously linked to unrelated PRs and break the rendered text. Spell the number out (`sub-project 11`) or use a different separator. Plain `#N` is fine in markdown under `docs/`.
 
 ## Plan Documents
 
@@ -34,26 +36,33 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 Follow this cycle for features and significant changes. See [`docs/contributing/developer-workflow.md`](docs/contributing/developer-workflow.md) for detailed guidance.
 
 ### 1. Design (if needed)
+
 Write a design doc in `docs/plans/` when the change adds/modifies modules, changes dependencies, or touches 3+ files. Skip for bug fixes, single-file changes, and doc updates.
 
 ### 2. Implement
+
 Work on a feature branch (`feat/`, `fix/`, `refactor/`). Write tests alongside code. Follow module contracts in per-module READMEs. Commit incrementally.
 
 ### 3. Verify
+
 Run `./scripts/verify.sh` for fast checks (format, clippy, unit tests, architecture tests, doc links). Run `./scripts/e2e-quick.sh` for a fast local e2e smoke test (1 JPEG matrix + error cases + library tests, ~15s). Run `./scripts/e2e.sh` for the full e2e golden comparison suite (CI or before merge).
 
 ### 4. Document
+
 Update `ARCHITECTURE.md` if modules, dependencies, or invariants changed. Update affected module READMEs (public API, extension guide). Cross-link any new design docs.
 
 ### 5. Self-review
+
 Re-read the diff. Check: Did I implement what was asked? Did I add anything extra? Do tests verify behavior?
 
 ### 6. E2E (for editing features)
+
 When adding new editing features (adjust/, LUT, preset parameters), also update the e2e test pipeline: look presets, LUTs (via agx-lut-gen), and golden files so the test matrix comprehensively exercises the new capability.
 
 ## Definition of Done
 
 Before merging, verify:
+
 1. `./scripts/verify.sh` passes
 2. `./scripts/e2e-quick.sh` passes (if editing features or pipeline changes were made)
 3. `./scripts/e2e.sh` passes in CI (full matrix)

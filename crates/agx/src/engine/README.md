@@ -1,6 +1,7 @@
 # engine
 
 ## Purpose
+
 Hold the immutable original image and mutable parameters, and render the final output by executing a fixed pipeline of stages.
 
 ## Architecture
@@ -44,12 +45,14 @@ Stages declare their working color space. The executor skips inactive stages (wh
 The GPU pipeline (`gpu/mod.rs`) owns a `GpuRuntime` (device, queue, buffers) and a `ShaderCache` (compiled WGSL compute pipelines). Each stage is a dispatcher function in `gpu/stages/` that creates bind groups and dispatches compute passes. Multi-pass stages (dehaze, denoise, detail, grain) manage their own sequencing internally.
 
 Key GPU submodules:
+
 - `gpu/runtime.rs` — wgpu device, queue, buffer allocation, upload/download
 - `gpu/shaders.rs` — compile and cache WGSL compute pipelines via naga_oil
 - `gpu/params.rs` — `GpuParameters` Pod struct mirroring `Parameters` for uniform upload
 - `gpu/stages/` — per-stage compute dispatchers
 
 ## Public API
+
 - `Parameters` -- all adjustment fields
 - `VignetteParams` -- vignette parameters: `amount` (f32) and `shape` (`VignetteShape`)
 - `PartialParameters` -- partial parameter set for preset composability
@@ -67,7 +70,9 @@ Key GPU submodules:
 - `Engine::render()` -- execute the pipeline, returning `RenderResult`
 
 ## Extension Guide
+
 To add a new pipeline stage:
+
 1. Create `crates/agx/src/engine/stages/my_stage.rs` implementing the `Stage` trait.
 2. Add the stage's pixel math as a buffer-level function in the `adjust` module.
 3. Add the stage to the fixed list in `CpuPipeline::new()` at the correct position.
@@ -77,6 +82,7 @@ To add a new pipeline stage:
 7. Add a cross-path consistency test in `tests/gpu_consistency.rs`.
 
 To add a new per-pixel adjustment (within the existing PerPixelAdjustments stage):
+
 1. Add the adjustment function in `adjust/mod.rs`.
 2. Add a field to `Parameters` and `GpuParameters`.
 3. Add the call in `adjust::apply_per_pixel_adjustments()` at the correct position.
@@ -84,11 +90,13 @@ To add a new per-pixel adjustment (within the existing PerPixelAdjustments stage
 5. Add the field to preset TOML structs in `preset/mod.rs`.
 
 ## Does NOT
+
 - Perform file I/O (decoding or encoding).
 - Define adjustment algorithms (delegates to `adjust` module).
 - Allow pipeline reordering — the fixed order is an invariant that preserves preset compatibility.
 
 ## Key Decisions
+
 - **Always re-render from original.** `render()` starts from `self.original` every time.
 - **Fixed internal pipeline order.** The render order is hardcoded. Consumers cannot reorder stages.
 - **Output is linear sRGB.** The rendered image is returned in linear space.

@@ -94,6 +94,7 @@ cargo run -p agx-cli -- edit \
 ### Metadata Preservation
 
 Metadata (EXIF, ICC profiles) is automatically preserved from input to output:
+
 - **JPEG/PNG**: Lossless byte-level copy via `img-parts`
 - **TIFF-based raw** (CR2, NEF, DNG, ARW): EXIF extracted via `kamadak-exif`
 - **Non-TIFF raw** (RAF, RW2, CR3): Key shooting data reconstructed from LibRaw fields

@@ -19,6 +19,7 @@ Tone curves are the most powerful and flexible tonal control in photo editing. P
 Each curve is defined by 2 or more control points stored as `(x, y)` pairs, where x is input value and y is output value, both `f32` in `[0.0, 1.0]`. Points must be strictly ordered by x.
 
 Endpoint constraints:
+
 - First point: x must be 0.0, y can be any value in [0.0, 1.0] (default 0.0)
 - Last point: x must be 1.0, y can be any value in [0.0, 1.0] (default 1.0)
 - Interior points: x strictly increasing, x in (0.0, 1.0), y in [0.0, 1.0]
@@ -90,6 +91,7 @@ Only non-identity curves need to appear. Missing channels default to identity.
 ### Validation
 
 When parsing control points (from preset TOML or CLI):
+
 - Minimum 2 points
 - First point x must be 0.0, last point x must be 1.0
 - All x strictly increasing

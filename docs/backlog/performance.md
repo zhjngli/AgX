@@ -63,6 +63,7 @@ cargo build --release --features profiling -p agx-cli
 The scripts output to `profile_results.json` (gitignored). Compare against the baseline in the [analysis doc](../plans/2026-04-01-render-performance-analysis.md) to measure improvement. Update the baseline table above when a new round of profiling is done.
 
 **Design docs:**
+
 - [Profiling infrastructure design](../plans/2026-03-31-render-performance-profiling-design.md)
 - [Render performance analysis](../plans/2026-04-01-render-performance-analysis.md)
 

@@ -18,6 +18,7 @@ Fix the grain size frequency mapping so larger sizes produce coarser grain parti
 ## Problem
 
 The current grain size parameter maps to simplex noise frequency via an exponential curve:
+
 ```
 base_freq = 0.1 * (0.02).powf(size / 100.0)
 ```

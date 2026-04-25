@@ -37,14 +37,17 @@ Metadata copy is **best-effort** — if metadata can't be read from the source (
 #### Extraction by Input Format
 
 **Standard formats (JPEG, PNG):**
+
 - `img-parts` reads EXIF and ICC as raw byte blobs. Lossless — all tags preserved verbatim.
 
 **TIFF-based raw formats (CR2, NEF, DNG, ARW, PEF, ORF, etc.):**
+
 - `kamadak-exif` reads EXIF from these files since they use TIFF containers internally.
 - Returns raw EXIF bytes via `Exif::buf()` which can be injected into output.
 - Near-lossless — preserves all standard EXIF tags including maker notes.
 
 **Non-TIFF raw formats (RAF/Fuji, RW2/Panasonic, CR3/Canon, etc.):**
+
 - `kamadak-exif` cannot read these containers.
 - Fallback: read parsed metadata fields from LibRaw's C structs (`imgdata.idata` for camera make/model, `imgdata.other` for ISO/shutter/aperture/focal length/timestamp/GPS, `imgdata.lens` for lens info).
 - Construct EXIF using `little_exif` from the parsed fields.
@@ -127,6 +130,7 @@ The CLI gets `--format <jpeg|png|tiff>` and `--quality <1-100>` on both `edit` a
 ## Scope
 
 **In scope:**
+
 - Metadata byte-level copy (EXIF, ICC, XMP, IPTC) from input to output
 - Raw file metadata: lossless for TIFF-based raw (via kamadak-exif), constructed fallback for non-TIFF raw (via LibRaw fields + little_exif)
 - Additional LibRaw FFI bindings for metadata structs (idata, other, lens)
@@ -136,6 +140,7 @@ The CLI gets `--format <jpeg|png|tiff>` and `--quality <1-100>` on both `edit` a
 - New dependencies: `img-parts`, `kamadak-exif`, `little_exif`
 
 **Out of scope (future):**
+
 - Metadata stripping (--strip-gps, --strip-metadata)
 - Modifying individual EXIF tags (e.g., setting software tag to "oxiraw")
 - EXIF orientation auto-rotation

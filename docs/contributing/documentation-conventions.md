@@ -118,6 +118,62 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
   /// See [`crate::adjust::grain`] for the algorithm.
   ```
 
+## Mermaid diagrams in algorithm pages
+
+Larger algorithm pages can include a Mermaid pipeline diagram alongside the prose. Mdbook renders the diagram via the `mdbook-mermaid` preprocessor, which is already wired into `book.toml`.
+
+Diagrams live in the **wrapping mdbook page** (`docs/book/src/explanation/<algo>.md`), not in the shared `.md` file. Rustdoc has no Mermaid support, so a fenced `mermaid` block placed in a shared `.md` would render as raw DSL text in the API reference. Keeping diagrams in the wrapper is consistent with the existing rule that surface-specific content lives outside the include.
+
+The typical structure is:
+
+````markdown
+# Algorithm name
+
+## Pipeline
+
+```mermaid
+flowchart TD
+    A[Stage A] --> B[Stage B]
+```
+
+One short paragraph summarizing what the diagram shows.
+
+{{#include ../../../../crates/agx/src/adjust/<algo>.md}}
+
+## Related
+
+- [API reference](../api/agx/adjust/<algo>/index.html)
+````
+
+Notes for diagram authors:
+
+- The vendored `mermaid.min.js` and `mermaid-init.js` files in `docs/book/` are gitignored; `scripts/build-docs.sh` and `scripts/verify.sh book-linkcheck` run `mdbook-mermaid install docs/book` before the build to (re)create them.
+- Use ASCII-safe label text (avoid `<`, `>`, raw `&`); HTML entities inside Mermaid labels are fragile across mdbook's markdown escaping. Words like `negative` / `positive` are clearer than `< 0` / `> 0` anyway.
+- Use `<br/>` inside quoted node labels for line breaks.
+
+## Markdown linting
+
+`scripts/verify.sh markdown-lint` runs [`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2) against every `.md` file the lint config reaches. The configuration lives at the repo root in `.markdownlint-cli2.jsonc` and follows the published [markdownlint rule list](https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md).
+
+Active rules cover blank-line discipline (around headings, lists, fenced blocks, tables), heading style, and trailing whitespace. Several rules are intentionally disabled — see comments in `.markdownlint-cli2.jsonc` for the reasoning. Notable disables:
+
+- `MD013` (line length) — long-form prose.
+- `MD041` / `MD025` — many files have leading HTML comments or no top-level heading by design.
+- `MD060` (table column style) — existing tables use compact pipes; aligning would be cosmetic.
+- `MD040` (fenced-block language hints) — too many existing design-doc blocks to retrofit; new code blocks should still include a hint by convention.
+- `MD029` (ordered-list prefix) — auto-fix renumbers intentionally-continued lists, changing apparent semantics.
+- `MD037` / `MD038` / `MD039` — math expressions like `w * h * c` collide with emphasis-pair detection; auto-fix corrupts the prose.
+
+Local invocation, when `markdownlint-cli2` is not on `PATH`, falls back to `npx --yes markdownlint-cli2`. CI runs the linter as the `markdown-lint` entry in the docs matrix; Node is installed via `actions/setup-node`.
+
+To autofix the rules that support it (most blank-line rules):
+
+```bash
+npx --yes markdownlint-cli2 --fix
+```
+
+The `MD040` retrofit and a possible style normalization sweep across older design docs are tracked as future tightening work in [the documentation initiative backlog](../backlog/documentation-initiative.md).
+
 ## Active lints
 
 Both `crates/agx/` and `crates/agx-cli/` carry two crate-level lints:

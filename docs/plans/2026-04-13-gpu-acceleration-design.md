@@ -25,6 +25,7 @@ Port all adjustment math from Rust (CPU) to WGSL compute shaders (GPU) via the w
 **Composable shader modules, dispatched per stage.** WGSL shaders are organized as shared utility functions (`common/color.wgsl`, `common/tone.wgsl`) composed into per-stage shaders. Each stage maps to one or more GPU dispatches. Utility functions are imported via `naga_oil`, which provides a `#import` mechanism for WGSL.
 
 This approach was chosen over:
+
 - **Monolithic shaders** (one huge `.wgsl` per stage) — harder to maintain and test.
 - **One shader per adjustment** (separate `contrast.wgsl`, `hsl.wgsl`, etc.) — too many dispatches, unnecessary overhead.
 
@@ -218,6 +219,7 @@ Each adjustment is its own function, composable and testable. All run in a singl
 2. **`From<&Parameters> for GpuParameters`** — field-by-field conversion, runs on CPU before upload.
 
 The WGSL side declares a matching `Params` struct. Layout correspondence is enforced by either:
+
 - **`wgsl_to_wgpu`** (preferred): auto-generates the Rust `GpuParameters` struct from the WGSL `Params` definition. WGSL becomes the source of truth for struct layout. Good foundation for future single-source documentation.
 - **Manual + test**: maintain both structs, with a unit test asserting `std::mem::size_of::<GpuParameters>()` matches the expected WGSL layout size.
 

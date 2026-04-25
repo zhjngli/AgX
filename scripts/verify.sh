@@ -19,6 +19,7 @@ set -euo pipefail
 #   book-linkcheck mdbook build with linkcheck backend enabled
 #   external-links external URL validation (opt-in, requires lychee)
 #   wgsl-headers   non-common WGSL header validation
+#   markdown-lint  markdownlint-cli2 (style, structure, formatting)
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -139,6 +140,8 @@ check_doc_links() {
 check_book_linkcheck() {
     # Generate docgen output the book needs.
     cargo run -p agx-docgen
+    # mdbook-mermaid's vendored JS assets are gitignored; refresh them.
+    mdbook-mermaid install docs/book
     # Build the book with the linkcheck backend enabled.
     mdbook build docs/book
 }
@@ -149,6 +152,20 @@ check_external_links() {
         return 1
     fi
     lychee --config .lychee.toml --verbose './**/*.md'
+}
+
+check_markdown_lint() {
+    if ! command -v markdownlint-cli2 >/dev/null 2>&1; then
+        if command -v npx >/dev/null 2>&1; then
+            # Fall back to npx so contributors don't need a global install.
+            npx --yes markdownlint-cli2
+            return $?
+        fi
+        echo "markdownlint-cli2 not installed. Install with: npm install -g markdownlint-cli2"
+        echo "(or install Node.js so verify.sh can fall back to 'npx markdownlint-cli2')"
+        return 1
+    fi
+    markdownlint-cli2
 }
 
 check_wgsl_headers() {
@@ -217,10 +234,11 @@ if [ "$#" -gt 0 ]; then
         book-linkcheck) check_book_linkcheck ;;
         external-links) check_external_links ;;
         wgsl-headers)  check_wgsl_headers ;;
+        markdown-lint) check_markdown_lint ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, all"
             exit 1
             ;;
     esac
@@ -274,6 +292,9 @@ run_check "Book linkcheck" check_book_linkcheck
 
 # 8. WGSL header validation
 run_check "WGSL headers" check_wgsl_headers
+
+# 9. Markdown linting
+run_check "Markdown lint" check_markdown_lint
 
 # Summary
 echo ""

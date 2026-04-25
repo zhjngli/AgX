@@ -141,6 +141,7 @@ pub struct GrainParams {
 ```
 
 Types that need `#[derive(JsonSchema)]`:
+
 - `Parameters` and `PartialParameters`
 - All `*Params` structs: `GrainParams`, `DehazeParams`, `DetailParams`, `NoiseReductionParams`, `ColorGradingParams`, `ToneCurveParams`, `VignetteParams`, `SharpeningParams`
 - All preset-related enums: `GrainType`, `VignetteShape`, `ColorSpace`, `HslChannel`, etc.
@@ -262,6 +263,7 @@ See [Grain](../explanation/grain.md) for a deeper explanation.
 ```
 
 Table columns:
+
 - **Field** — fully qualified preset field path as it appears in the TOML file (e.g., `tone.exposure`, `hsl.red.hue`)
 - **Range / Values** — numeric range from schemars annotations, or enum variant list
 - **Default** — from `canonical_default_string()` (see below)
@@ -279,7 +281,7 @@ Both the CLI and preset reference pages require post-processing for mdbook compa
 
 - **Bracket escaping:** Square brackets `[]` in markdown table cells are interpreted by mdbook as links. The preset renderer escapes them as `&#91;&#93;` (e.g., tone curve point arrays, enum variant lists).
 - **CLI title stripping:** `clap-markdown` generates a `# Command-Line Help for \`agx\`` title that conflicts with the page's own title. The sanitizer strips this known title line.
-- **Alias rewriting:** `clap-markdown` renders flag aliases as `[alias: \`name\`]`, which mdbook interprets as links. The sanitizer rewrites these to `(alias: \`name\`)`.
+- **Alias rewriting:** `clap-markdown` renders flag aliases as `[alias: \`name\`]`, which mdbook interprets as links. The sanitizer rewrites these to`(alias: \`name\`)`.
 
 ## Build pipeline
 

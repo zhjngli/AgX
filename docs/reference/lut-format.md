@@ -7,6 +7,7 @@ This document describes 3D LUTs, the `.cube` file format, and how AgX handles th
 A LUT (Look-Up Table) is a pre-computed color transformation. Instead of defining a transformation as a formula (like "multiply by 2"), a LUT stores the result for every possible input. Given an input RGB color, you look up the corresponding output RGB color in the table.
 
 LUTs are widely used for:
+
 - **Film emulation**: Mimicking the look of specific film stocks (Portra 400, Ektar 100, Tri-X)
 - **Color grading**: Applying a cinematic color grade (teal and orange, bleach bypass, etc.)
 - **Technical transforms**: Converting between color spaces or log curves
@@ -95,6 +96,7 @@ Most creative LUTs use size 33, which provides excellent quality with reasonable
 ## What AgX Supports
 
 **Supported:**
+
 - 3D LUTs in `.cube` format
 - `TITLE`, `LUT_3D_SIZE`, `DOMAIN_MIN`, `DOMAIN_MAX` header keywords
 - Trilinear interpolation
@@ -103,6 +105,7 @@ Most creative LUTs use size 33, which provides excellent quality with reasonable
 - Applied in sRGB gamma space after tone adjustments
 
 **Not supported (currently):**
+
 - 1D LUTs (`LUT_1D_SIZE` keyword is ignored, not an error)
 - Shaper LUTs (1D pre-processing before 3D lookup)
 - Tetrahedral interpolation (trilinear is used instead; the quality difference is minimal)
@@ -112,6 +115,7 @@ Most creative LUTs use size 33, which provides excellent quality with reasonable
 ## Where to Find `.cube` LUTs
 
 Many free LUTs are available online:
+
 - Film emulation packs (Fuji, Kodak, etc.)
 - Cinematic color grades
 - Black and white conversions

@@ -37,6 +37,7 @@ Input File ──► Decode ──► Engine (holds original + params) ──►
 ### Engine
 
 The `Engine` is the central struct:
+
 - Owns the original decoded image buffer (immutable after decode).
 - Owns the current parameter state (all adjustment values, defaulting to neutral).
 - `render()` applies all adjustments from scratch in a fixed internal order and returns the result.
@@ -150,6 +151,7 @@ oxiraw/
 - **Raw files** have no inherent color space — they're sensor data. Color space is applied during demosaicing. When we add LibRaw integration, the raw decoder will output to sRGB.
 
 What this means for the implementation:
+
 - Decoded standard images (JPEG/PNG/TIFF) are assumed to be sRGB.
 - We convert sRGB → linear sRGB (using palette crate's `Srgb` → `LinSrgb`) for internal processing.
 - Exposure and white balance operate in linear sRGB space.

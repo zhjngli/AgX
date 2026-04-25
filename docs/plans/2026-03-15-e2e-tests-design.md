@@ -32,6 +32,7 @@ crates/agx-e2e/
 ```
 
 **Dependencies (all `[dev-dependencies]` since this is a test-only crate):**
+
 - `agx = { path = "../agx", features = ["raw"] }` (library under test, with raw support)
 - `agx-cli = { path = "../agx-cli" }` (so `env!("CARGO_BIN_EXE_agx-cli")` resolves the CLI binary)
 - `image` (pixel-level comparison)
@@ -53,12 +54,14 @@ Each test processes a fixture file with specific parameters, then compares the o
 **Comparison method:** Pixel-by-pixel comparison with a per-channel tolerance (e.g., max difference of 2 per channel per pixel). This absorbs platform-level floating point differences without masking real regressions.
 
 **Regenerating goldens:** Set `GOLDEN_UPDATE=1` environment variable to write new golden files instead of comparing. Workflow:
+
 1. Make an intentional pipeline change
 2. Run `GOLDEN_UPDATE=1 cargo test -p agx-e2e`
 3. Review the golden diffs visually
 4. Commit the updated goldens
 
 **Comparison utility** in `src/lib.rs`:
+
 - `compare_images(actual: &Path, golden: &Path, tolerance: u8) -> Result<(), ComparisonError>`
 - `ComparisonError` reports: number of differing pixels, max channel difference, percentage of pixels that differ
 - `fixture_path(relative: &str) -> PathBuf` — resolves paths relative to the fixtures directory
@@ -71,6 +74,7 @@ Each test processes a fixture file with specific parameters, then compares the o
 Test the core `agx` library API directly: decode → Engine → set params → render → encode.
 
 Test cases:
+
 - Process each RAF fixture with default parameters (neutral processing)
 - Process each JPEG fixture with default parameters
 - Apply exposure adjustment (+1 stop) to a RAF
@@ -79,6 +83,7 @@ Test cases:
 - Apply HSL adjustments to a JPEG
 
 Each test:
+
 - Asserts output dimensions match input
 - Asserts output file size > 0
 - Asserts directional sanity (e.g., +1 exposure → higher average brightness)
@@ -89,12 +94,14 @@ Each test:
 Test the `agx` CLI binary with real files via `std::process::Command`, using `env!("CARGO_BIN_EXE_agx-cli")` to locate the binary (enabled by the `agx-cli` dev-dependency).
 
 Test cases:
+
 - `agx edit -i <raf> --exposure 1.0 -o <out>` — basic RAW edit
 - `agx apply -i <jpeg> -p <preset> -o <out>` — preset application to JPEG
 - `agx batch-edit --input-dir <dir> --output-dir <dir>` — batch processing of mixed RAW/JPEG directory
 - `agx edit -i <corrupt-file> -o <out>` — error case: corrupt/unsupported file should fail gracefully
 
 Each test:
+
 - Asserts CLI exits with expected status (0 for success, non-zero for error cases)
 - Asserts output file exists with expected format (for success cases)
 - Compares against golden file (for success cases)
@@ -147,6 +154,7 @@ Update `ARCHITECTURE.md` to include `agx-e2e` as a workspace member (test-only c
 ## Growth pattern
 
 When a new feature is added (e.g., tone curves, sharpening), add a corresponding e2e test case:
+
 1. Add a test that applies the new feature to a fixture file
 2. Generate and commit the golden output
 3. Add sanity checks appropriate to the feature

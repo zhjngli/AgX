@@ -138,6 +138,7 @@ Runs as today but outputs an sRGB gamma-space buffer instead of converting back 
 
 **Phase 2 — Detail pass (new, buffer-level):**
 Operates on the full sRGB gamma buffer. Applies three operations in order:
+
 1. Texture (sigma ~3px, unsharp mask blend)
 2. Clarity (sigma ~20px, unsharp mask blend)
 3. Sharpening (user sigma, unsharp mask + threshold + masking edge map)
@@ -169,6 +170,7 @@ Convert sRGB buffer to single-channel luminance using Rec.709 weights (`0.2126*R
 ### Unsharp Mask (Texture & Clarity)
 
 For each pixel:
+
 ```
 high_freq = luminance - blurred_luminance
 output_r = original_r + strength * high_freq
@@ -185,12 +187,14 @@ Texture uses sigma ≈ 3.0. Clarity uses sigma ≈ 20.0.
 Base unsharp mask with user-configurable radius (sigma = radius, 0.5–3.0), plus two gating mechanisms:
 
 **Threshold (edge magnitude gating):**
+
 - Compute `high_freq = luminance - blurred_luminance`
 - Suppress high_freq below a magnitude threshold controlled by the threshold slider
 - Threshold=100: sharpen everything (threshold at zero). Threshold=0: only sharpen strong edges (high threshold).
 - Implementation: `high_freq *= smoothstep(threshold_low, threshold_high, abs(high_freq))`
 
 **Masking (edge map):**
+
 1. Compute luminance gradient magnitude at each pixel using Sobel or simple finite differences
 2. Normalize gradient using a fixed scale factor (not per-image normalization) so that masking presets are portable across images. The scale factor should be tuned so that typical edge gradients map to the 0.5–1.0 range.
 3. Apply masking slider as a threshold: `mask = smoothstep(threshold, 1.0, gradient)` where threshold scales with the masking parameter (masking=0 → threshold=0 → mask all 1.0 → sharpen everything; masking=100 → threshold high → only sharpen strong edges)
@@ -199,6 +203,7 @@ Base unsharp mask with user-configurable radius (sigma = radius, 0.5–3.0), plu
 ### Memory Budget
 
 The detail pass requires temporary buffers:
+
 - 1 luminance buffer (single-channel f32, w*h*4 bytes)
 - 1 blurred luminance buffer (same size, reused across features)
 - 1 temporary buffer for horizontal blur pass (same size)
@@ -211,6 +216,7 @@ For a 24MP image: ~92MB per buffer, up to ~370MB total during the detail pass. B
 ### New file: `crates/agx/src/adjust/detail.rs`
 
 Keeps `adjust/mod.rs` from growing further (already ~1800 lines with tone curves). Contents:
+
 - `SharpeningParams`, `DetailParams` structs with `Default`, `is_default()`
 - `gaussian_blur(luminance_buffer, sigma) -> blurred_buffer` — separable two-pass
 - `compute_edge_map(luminance_buffer) -> edge_buffer` — gradient magnitude
@@ -232,6 +238,7 @@ Keeps `adjust/mod.rs` from growing further (already ~1800 lines with tone curves
 ## Testing Strategy
 
 ### Unit tests (in `detail.rs`)
+
 - Gaussian blur of uniform buffer → identity (no change)
 - Gaussian blur kernel weights sum to 1.0
 - Separable blur matches naive 2D blur for small test case
@@ -242,16 +249,19 @@ Keeps `adjust/mod.rs` from growing further (already ~1800 lines with tone curves
 - All-default DetailParams → identity output
 
 ### Engine tests (in `engine/mod.rs`)
+
 - Default detail params → render unchanged (identity)
 - Partial detail merge/materialize
 - Render with sharpening produces output different from no sharpening
 
 ### Preset tests (in `preset/mod.rs`)
+
 - Round-trip TOML serialization for `[detail]` and `[detail.sharpening]`
 - Missing detail section defaults to neutral
 - Parameter range validation
 
 ### E2E tests
+
 - 2-3 detail look presets:
   - `sharp_landscape` — sharpening + clarity for landscape photography
   - `soft_portrait` — negative texture for skin smoothing

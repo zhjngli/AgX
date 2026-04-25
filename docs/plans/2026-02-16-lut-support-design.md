@@ -35,6 +35,7 @@ DOMAIN_MAX 1.0 1.0 1.0
 ```
 
 **Header keywords:**
+
 - `TITLE "name"` — optional descriptive title
 - `LUT_3D_SIZE N` — creates N×N×N entries (common sizes: 17, 33, 65)
 - `DOMAIN_MIN r g b` — minimum input values (default 0.0 0.0 0.0)
@@ -73,6 +74,7 @@ pub struct Lut3D {
 ```
 
 **Methods:**
+
 - `Lut3D::from_cube_str(text: &str) -> Result<Self>` — parse .cube text
 - `Lut3D::from_cube_file(path: &Path) -> Result<Self>` — parse .cube file
 - `Lut3D::lookup(&self, r: f32, g: f32, b: f32) -> (f32, f32, f32)` — trilinear interpolation lookup
@@ -178,6 +180,7 @@ Parse errors include line numbers where possible. Invalid LUT size, mismatched e
 ## Scope
 
 **In scope:**
+
 - 3D LUT parsing from `.cube` files
 - Trilinear interpolation
 - Pipeline integration (after tone adjustments, sRGB gamma space)
@@ -187,6 +190,7 @@ Parse errors include line numbers where possible. Invalid LUT size, mismatched e
 - Sample .cube file in `example/`
 
 **Out of scope (future):**
+
 - 1D LUT support
 - LUT generation/export from engine parameters
 - Shaper LUTs (1D pre-processing before 3D LUT)

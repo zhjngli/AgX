@@ -56,6 +56,7 @@ effective_chromatic = grain_type.chromatic * pixel_chroma
 ```
 
 This ensures:
+
 - **Black and white photos:** No color shifts (pixel_chroma ≈ 0 for grayscale pixels)
 - **Vivid colors:** Full chromatic grain effect
 - **Pastels/muted colors:** Proportionally reduced chromatic variation
@@ -78,6 +79,7 @@ These are blend factors in [0, 1] (not on the old user-facing 0-100 scale). Star
 ### Why all types get some chromatic
 
 Even traditionally "BW" grain types (Fine, Silver, Harsh) get a non-zero chromatic value. This is safe because:
+
 - On BW images, pixel_chroma ≈ 0 zeroes out the effect automatically
 - On color images, it adds appropriate film-like variation
 - The grain type represents grain *character*, not image color mode
@@ -112,17 +114,20 @@ No concern — no official release yet. Remove `chromatic` from `GrainParams` an
 ## Testing
 
 ### Unit tests
+
 - Grayscale pixels get no color shift regardless of grain type chromatic value
 - Color pixels get per-channel variation proportional to their saturation
 - Higher chromatic types produce more inter-channel variance than lower ones
 - Existing luminance grain tests continue to pass
 
 ### Visual tuning
+
 - Grid search across chromatic values (0.03-0.20) on color test images
 - Verify color shifts look like film (subtle warm/cool) not digital (RGB speckle)
 - Verify BW test images are unaffected
 
 ### E2E
+
 - Regenerate goldens after final tuning
 - cinestill_800t preset updated (chromatic field removed)
 

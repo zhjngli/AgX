@@ -80,6 +80,7 @@ Applying a LUT designed for sRGB input to linear values would produce incorrect 
 AgX currently works exclusively in **sRGB** color space. This is the standard color space for displays, web, and consumer photography. JPEG and PNG files are sRGB by default.
 
 For the current scope, this means:
+
 - Decoded images (JPEG, PNG, TIFF) are assumed to be sRGB
 - No ICC profile reading or embedding
 - No wide-gamut support (Adobe RGB, ProPhoto RGB, Display P3)

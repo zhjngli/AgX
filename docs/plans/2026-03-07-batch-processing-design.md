@@ -71,6 +71,7 @@ input-dir/sub/IMG_003.jpg  →  output-dir/sub/IMG_003.jpg  (with --recursive)
 ```
 
 With `--suffix _edited`:
+
 ```
 input-dir/IMG_001.jpg  →  output-dir/IMG_001_edited.jpg
 ```
@@ -206,6 +207,7 @@ Rayon is the standard Rust library for data parallelism. No changes to the core 
 ## Scope
 
 **In scope:**
+
 - `batch-apply` and `batch-edit` CLI subcommands
 - File discovery by extension (with `--recursive`)
 - Output naming (mirror structure, optional suffix, format override)
@@ -215,6 +217,7 @@ Rayon is the standard Rust library for data parallelism. No changes to the core 
 - `rayon` dependency for `oxiraw-cli` only
 
 **Out of scope:**
+
 - Changes to the core `oxiraw` library crate
 - Async I/O (tokio) — rayon's CPU parallelism is sufficient; image processing is CPU-bound
 - Glob/pattern matching for input files (use shell globs + `--input-dir` for now)

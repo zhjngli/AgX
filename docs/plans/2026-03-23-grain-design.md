@@ -91,6 +91,7 @@ The six grain types match Capture One's model. Each type is a named combination 
 | Harsh | High contrast, gritty | Strong high-frequency octave | Weak (grain visible everywhere) | Pushed high-ISO film |
 
 Internally, each type maps to a configuration struct controlling:
+
 - Octave count and relative weights
 - Contrast/amplitude curve applied to the raw noise
 - Luminance falloff curve shape and strength
@@ -108,6 +109,7 @@ All color film exhibits chromatic grain to some degree. It's especially visible 
 All grain types apply luminance-aware falloff — grain is strongest in midtones and reduced in deep shadows and blown highlights. This matches real film behavior: unexposed silver halide crystals don't produce visible grain in pure black areas, and fully saturated areas have uniform density that masks grain.
 
 The falloff is baked in (not user-configurable) but varies per grain type:
+
 - Types like `soft` and `fine` have strong falloff — grain fades significantly in shadows and highlights
 - Types like `harsh` and `cubic` have weak falloff — grain remains visible across the full tonal range
 - This is controlled by the internal per-type configuration, not exposed to users
@@ -119,6 +121,7 @@ Output values are clamped to [0.0, 1.0] after grain application to prevent out-o
 ### Validation
 
 All numeric parameters are validated in the preset module:
+
 - `amount`: must be in range 0.0-100.0
 - `size`: must be in range 0.0-100.0
 - `chromatic`: must be in range 0.0-100.0
@@ -168,6 +171,7 @@ Wait — to achieve grain-before-vignette (industry standard), we need to adjust
 This moves vignette from its current position (per-pixel, before detail buffer) to after the detail buffer pass. This is a minor pipeline reorder — vignette is a position-dependent darkening/brightening effect that is order-independent with respect to detail (sharpening doesn't interact with vignette). The reorder is justified by the grain placement requirement and aligns with darktable's ordering (sharpen → grain → vignette).
 
 Grain is applied:
+
 - **After detail pass (sharpening/clarity):** You don't want sharpening to amplify grain. Both Lightroom and darktable confirm this ordering — Lightroom explicitly documents that "grain is overlaid over the sharpened image." Darktable's default pipeline order is: sharpen → grain → soften → vignette.
 - **Before vignette:** This is the industry standard (both darktable and Lightroom). Vignette darkening naturally reduces grain visibility in corners. Requires moving vignette after the detail buffer pass (see above).
 - **In sRGB gamma space:** Grain is a perceptual effect applied after tonal adjustments. The luminance-aware falloff math is simpler in gamma space where perceptual brightness is roughly linear.
@@ -186,6 +190,7 @@ Neither physical scenario matches "grain before vignette" where vignette suppres
 **New file:** `crates/agx/src/adjust/grain.rs`
 
 Following the same pattern as other adjust functions. Pure pixel math, no I/O. Contains:
+
 - `GrainType` enum with serde support
 - `GrainParams` struct with `is_neutral()` (true when `amount == 0`)
 - Internal `GrainTypeConfig` struct mapping each type to octave weights, contrast curve, and luminance falloff
@@ -196,12 +201,14 @@ Following the same pattern as other adjust functions. Pure pixel math, no I/O. C
 **Module dependencies:** Adds `rand` crate to `crates/agx/Cargo.toml` for seed generation (`rand::thread_rng().gen::<u64>()`). This is the only new external dependency.
 
 **Engine integration:**
+
 - `grain` field on `Parameters` with `Default` returning neutral (amount=0)
 - `PartialGrainParams` following the merge/materialize/From pattern for preset composability
 - Applied per-pixel in the post-detail-pass loop, after detail and before vignette (see Pipeline Position for the vignette reorder)
 - `GrainPrecomputed` constructed at the top of `render()` when grain is active, with a random seed from `rand`
 
 **Preset support:**
+
 ```toml
 [grain]
 type = "silver"
@@ -219,6 +226,7 @@ All fields optional with serde defaults. Missing `[grain]` section = no grain.
 ### Testing Strategy
 
 **Unit tests (fixed seed):**
+
 - Default params are neutral / `is_neutral()` checks
 - Simplex noise spatial coherence — neighboring pixels produce correlated values
 - Grain type differentiation — different types produce measurably different output (variance, frequency)
@@ -229,6 +237,7 @@ All fields optional with serde defaults. Missing `[grain]` section = no grain.
 - Resolution awareness — grain character consistent across different image dimensions
 
 **E2E golden tests (multiple fixed seeds):**
+
 - Each grain e2e preset specifies multiple fixed seeds (3-5) in its TOML configuration
 - The e2e harness renders one golden per (image, look, seed) combination and validates against all of them
 - This requires extending the e2e framework: the `run_image_matrix` helper needs to iterate over a preset's seed list, generating and comparing a golden for each seed. Golden file naming adds a seed suffix, e.g. `temple_blossoms_grain_silver_seed1.png`, `temple_blossoms_grain_silver_seed2.png`.
