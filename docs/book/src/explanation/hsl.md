@@ -2,8 +2,8 @@
 
 {{#include ../../../../crates/agx/src/adjust/hsl.md}}
 
-## Related
+## See also
 
-- [API reference](../api/agx/adjust/hsl/index.html)
-- [Basic adjustments](basic.md)
-- [Color grading](color-grading.md)
+- Concept references: [Color](../reference/concepts/color.md) (HSL entry), [Color models](../reference/concepts/color-models.md) (HSL section)
+- API references: [HSL](../api/agx/adjust/hsl/index.html)
+- Related explanations: [Color grading](color-grading.md), [Tone curves](tone-curves.md)

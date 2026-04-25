@@ -2,6 +2,8 @@
 
 {{#include ../../../../crates/agx/src/adjust/grain.md}}
 
-## Related
+## See also
 
-- [Grain API reference](../api/agx/adjust/grain/index.html)
+- Concept references: [Effects](../reference/concepts/effects.md) (grain entry), [Color models](../reference/concepts/color-models.md) (luminance section — grain is luma-weighted)
+- API references: [grain](../api/agx/adjust/grain/index.html)
+- Related explanations: [Noise reduction](denoise.md) (the inverse direction), [Vignette](vignette.md)

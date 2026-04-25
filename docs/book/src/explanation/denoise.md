@@ -19,8 +19,8 @@ The `luminance`, `color`, and `detail` sliders parameterize the threshold streng
 
 {{#include ../../../../crates/agx/src/adjust/denoise.md}}
 
-## Related
+## See also
 
-- [API reference](../api/agx/adjust/denoise/index.html)
-- [Detail pass](detail.md) — same frequency-decomposition motif, different goal
-- [Grain](grain.md) — synthesises noise rather than removing it
+- Concept references: [Detail](../reference/concepts/detail.md) (noise reduction entry), [Color models](../reference/concepts/color-models.md)
+- API references: [noise reduction](../api/agx/adjust/denoise/index.html)
+- Related explanations: [Detail pass](detail.md), [Dehaze](dehaze.md), [Grain](grain.md)
