@@ -27,7 +27,7 @@ The GPU pipeline follows the same fixed stage order as the CPU pipeline:
 8. Vignette.
 9. sRGB to linear conversion.
 
-## Dual-Path Principle
+## Dual-path principle
 
 Algorithm math is documented once in the `adjust/` sibling `.md` files. The CPU
 Rust functions and GPU WGSL shaders are two implementations of the same math,
@@ -47,7 +47,7 @@ for separable filters and multi-pass reductions. It must still produce output
 within the consistency tolerance for the same `Parameters`, optional LUT, and
 input image.
 
-## Related Algorithm Explanations
+## Related algorithm explanations
 
 - [Exposure](../../adjust/exposure.md)
 - [White balance](../../adjust/white_balance.md)
@@ -61,7 +61,7 @@ input image.
 - [Detail](../../adjust/detail.md)
 - [Grain](../../adjust/grain.md)
 
-## Parameter Layout
+## Parameter layout
 
 `GpuParameters` in `params.rs` is the flat `#[repr(C)]` Rust struct uploaded to
 the GPU. WGSL shaders declare a matching `Params` struct and bind it as storage
@@ -99,7 +99,7 @@ Layout guardrails:
 - Prefer appending fields at the end of a 16-byte lane or adding a new lane over
   inserting into the middle of the struct.
 
-## Adding A New Adjustment To Both Paths
+## Adding a new adjustment to both paths
 
 1. Implement the Rust-side adjustment in `../../adjust/<name>.rs` and add the
    sibling `../../adjust/<name>.md` as the canonical algorithm explanation.
@@ -127,7 +127,7 @@ unless the difference is an implementation detail needed to maintain or debug
 the shader. The shared algorithm page explains what the operation means; this
 README explains how to keep the two implementations synchronized.
 
-## Debugging The GPU Path
+## Debugging the GPU path
 
 Use the opt-in GPU path explicitly:
 
@@ -168,7 +168,7 @@ llvmpipe and CI gotchas:
   `cargo test -p agx --features gpu --test gpu_consistency` when validating GPU
   changes locally.
 
-## Known Limitations
+## Known limitations
 
 - GPU consistency tests require an available adapter and return early when none
   exists. The CI coverage gap is tracked in the

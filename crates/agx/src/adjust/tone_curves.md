@@ -180,4 +180,4 @@ does the same linear-in-LUT lookup at render time.
 
 ## References
 
-[^fritsch-carlson]: F. N. Fritsch and R. E. Carlson (1980). *Monotone Piecewise Cubic Interpolation.* SIAM Journal on Numerical Analysis 17(2): 238-246. DOI: <https://doi.org/10.1137/0717021>.
+[^fritsch-carlson]: F. N. Fritsch and R. E. Carlson (1980). *Monotone Piecewise Cubic Interpolation.* SIAM J. Numer. Anal. 17(2): 238–246. DOI: <https://doi.org/10.1137/0717021>.

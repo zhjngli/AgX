@@ -110,9 +110,11 @@ fn hue_distance(a: f32, b: f32) -> f32 {
 }
 
 // Cosine falloff weight: 1.0 at center, 0.0 at half_width.
+const PI: f32 = 3.14159265358979323846;
+
 fn cosine_weight(hue_dist: f32, half_width: f32) -> f32 {
     if hue_dist >= half_width {
         return 0.0;
     }
-    return cos(hue_dist / half_width * 3.14159265) * 0.5 + 0.5;
+    return cos(hue_dist / half_width * PI) * 0.5 + 0.5;
 }

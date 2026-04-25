@@ -15,7 +15,7 @@ Film grain gives digital images a less sterile surface by reintroducing the kind
 3. Compute per-pixel luminance and use it to weight the grain strength.
 4. Blend the noise back into each RGB channel with a type-specific amount curve.
 
-The current implementation has three grain presets: `GrainType::{Fine,Silver,Harsh}`. Each preset maps to a fixed internal tuple in `GrainTypeConfig`:
+The current implementation has three grain presets: `GrainType::{Fine,Silver,Harsh}`. The original design considered six (adding `Soft`, `Cubic`, and `Tabular` for finer-grained stock emulation) but only the three above are implemented today; the others are deferred until preset authors actually need that resolution. Each preset maps to a fixed internal tuple in `GrainTypeConfig`:
 
 - `contrast`: scales the final noise amplitude.
 - `luma_falloff`: controls how quickly grain fades from shadows into highlights.
@@ -93,4 +93,6 @@ The CPU and GPU implementations line up on the user-facing controls, luminance w
 
 ## References
 
-[^grain-bias]: 2026-03-23 grain design, 2026-03-27 grain size fix design, and 2026-03-29 chromatic grain design.
+No canonical external paper applies — AgX's grain is an original
+implementation. The decisions above are recorded in the AgX design
+docs: [grain](https://github.com/zhjngli/AgX/blob/main/docs/plans/2026-03-23-grain-design.md), [grain size fix](https://github.com/zhjngli/AgX/blob/main/docs/plans/2026-03-27-grain-size-fix-design.md), and [chromatic grain](https://github.com/zhjngli/AgX/blob/main/docs/plans/2026-03-29-chromatic-grain-design.md).

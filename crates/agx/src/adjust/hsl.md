@@ -195,3 +195,10 @@ center hues, the same half-widths, and the same shortest-arc hue math.
 The CPU code exposes `WeightFn` so the window function stays swappable,
 while the current pipeline uses `cosine_weight` on both sides of the
 renderer.
+
+## References
+
+No canonical external paper applies — eight-band HSL with cosine-window
+hue selection is a conventional photo-editor formulation. AgX-specific
+band centers, half-widths, and the shortest-arc hue math are recorded
+inline in the source.

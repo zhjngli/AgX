@@ -35,7 +35,7 @@ precompute step does the expensive, loop-invariant work:
 
 - convert each wheel from hue/saturation into an RGB tint
 - normalize each wheel's luminance shift into `[-1.0, 1.0]`
-- compute the balance exponent with `2^(-balance / 100)`
+- compute the balance exponent — `2.0` raised to the power of `-balance / 100` (in code, `2.0_f32.powf(-balance / 100.0)`; not bitwise XOR)
 - cache whether balance is active at all
 
 That keeps the inner loop free of repeated trig and `powf` work when the
@@ -143,11 +143,11 @@ behaves.
 |----------|-------|------|-------------|
 | Hue units | degrees | User-facing hue angle for each wheel | Low |
 | Saturation units | percent | Strength of the tint derived from each hue angle | Medium |
-| Luminance units | `-100` to `+100` | Additive brightness shift for each wheel | High |
+| Luminance units | `-100` to `+100` (informal — no runtime range validation; the per-pixel luminance result is clamped after the adjustment) | Additive brightness shift for each wheel | High |
 | Balance units | `-100` to `+100` | Shifts the shadow/highlight crossover | High |
 | Rec. 709 luma coefficients | `0.2126`, `0.7152`, `0.0722` | Gamma-space luminance proxy used for zone weighting | Medium |
 | Hue-lobe spacing | `120°` | Separates the RGB cosine lobes used to form the tint | Medium |
-| Balance exponent | `2^(-balance / 100)` | Remaps luminance before the zone weights are computed | High |
+| Balance exponent | `2.0` raised to the power of `-balance / 100` | Remaps luminance before the zone weights are computed | High |
 
 The practical trade-offs are straightforward:
 
@@ -217,3 +217,11 @@ The CPU and GPU implementations follow the same math. The CPU version
 precomputes wheel tints and balance data once per render, and the GPU
 path uploads the same derived values into storage buffers before running
 the per-pixel grading pass.
+
+## References
+
+No canonical external paper applies — three-way lift/gamma/gain color
+grading is a long-standing convention in colorist tooling rather than a
+published algorithm. AgX-specific calibration (Rec. 709 luma proxy,
+120° hue-lobe spacing, exponential balance) is recorded inline in the
+source.

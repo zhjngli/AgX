@@ -20,7 +20,8 @@ The shared machinery is a separable Gaussian blur plus a luminance-only
 unsharp mask:
 
 1. Convert each RGB pixel to luminance with the Rec. 709 weights stored
-   in `adjust::LUMA_R`, `adjust::LUMA_G`, and `adjust::LUMA_B`.
+   in the parent `adjust` module as `LUMA_R`, `LUMA_G`, and `LUMA_B`
+   (referenced as `super::LUMA_R` etc. inside `detail.rs`).
 2. Build a 1D Gaussian kernel whose half-width is `ceil(3 * sigma)`.
 3. Blur horizontally, then vertically, clamping sample coordinates at
    the image edges.
@@ -73,11 +74,18 @@ Sharpening adds two gates on top of the basic unsharp mask:
 - `threshold` removes low-magnitude high-frequency differences before
   they get amplified. In code, the slider is converted with
   `threshold / 255.0`, and pixels below that absolute luminance delta
-  are left unchanged.
+  are left unchanged. Note the slider feels inverted relative to
+  intuition: a *higher* `threshold` value protects more pixels from
+  sharpening (only strong edges pass through), so it suppresses
+  sharpening; a *lower* value lets even subtle detail get sharpened.
 - `masking` computes a simple edge map from luminance gradients and
-  uses `smoothstep` to limit sharpening to stronger edges. The edge map
-  is normalized with the fixed `EDGE_SCALE = 4.0` constant so the
-  slider behaves consistently across images.
+  uses `smoothstep` (a Hermite interpolation that smoothly transitions
+  from `0.0` to `1.0` as the input crosses a band) to limit sharpening
+  to stronger edges. The edge map is normalized with the fixed
+  `EDGE_SCALE = 4.0` constant so the slider behaves consistently across
+  images. **GPU caveat:** the GPU dispatcher currently hard-codes
+  `detail_masking = 0.0`, so this gate is CPU-only today (see Source
+  below).
 
 The result is a conventional sharpening control with a little more
 protection against noise and smooth-surface artifacts than a plain
@@ -111,7 +119,7 @@ rest of the numbers below are fixed in code.
 | `sharpening.amount` | `0.0..=100.0` | `0.0` | Sharpening strength |
 | `sharpening.radius` | `0.5..=3.0` | `1.0` | Sharpening blur sigma |
 | `sharpening.threshold` | `0.0..=100.0` | `25.0` | Hard cutoff for low-magnitude detail |
-| `sharpening.masking` | `0.0..=100.0` | `0.0` | Edge-aware sharpening gate |
+| `sharpening.masking` | `0.0..=100.0` | `0.0` | Edge-aware sharpening gate (CPU-only — GPU path hard-codes 0.0) |
 | `clarity` | `-100.0..=100.0` | `0.0` | Mid-frequency local contrast |
 | `texture` | `-100.0..=100.0` | `0.0` | Fine-frequency local contrast |
 
@@ -162,3 +170,10 @@ The CPU path implements the full threshold and masking behavior. The
 current GPU dispatcher runs the same three sequential passes, but it
 sets `detail_masking = 0.0` today, so the masking gate is not yet part
 of the GPU path.
+
+## References
+
+No canonical external paper applies — the unsharp-mask construction is
+the standard photo-editing formulation, and AgX's three-band split
+plus the `EDGE_SCALE = 4.0` calibration are AgX-specific design
+choices recorded inline in the source.

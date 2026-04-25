@@ -207,4 +207,4 @@ elsewhere in the render pipeline.
 
 [^dcp]: Kaiming He, Jian Sun, and Xiaoou Tang (2009). *Single Image Haze Removal Using Dark Channel Prior.* CVPR 2009. DOI: <https://doi.org/10.1109/CVPR.2009.5206515> PDF: <https://people.csail.mit.edu/kaiming/publications/cvpr09.pdf>
 
-[^guided]: Kaiming He, Jian Sun, and Xiaoou Tang (2013). *Guided Image Filtering.* IEEE Transactions on Pattern Analysis and Machine Intelligence, 35(6), 1397-1409. DOI: <https://doi.org/10.1109/TPAMI.2012.213> PDF: <https://people.csail.mit.edu/kaiming/publications/pami12guidedfilter.pdf>
+[^guided]: Kaiming He, Jian Sun, and Xiaoou Tang (2013, online-first 2012). *Guided Image Filtering.* IEEE Trans. Pattern Anal. Mach. Intell. 35(6): 1397–1409. DOI: <https://doi.org/10.1109/TPAMI.2012.213> PDF: <https://people.csail.mit.edu/kaiming/publications/pami12guidedfilter.pdf>
