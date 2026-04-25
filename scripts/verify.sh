@@ -120,10 +120,16 @@ check_doc_links() {
         [[ "$d" == "docs/plans/impl/" ]] && continue
         targets+=("$d")
     done
-    # Per-crate and per-module READMEs
+    # Per-crate READMEs plus per-module READMEs under crates/agx/src, including
+    # contributor guides such as crates/agx/src/engine/gpu/README.md.
     while IFS= read -r f; do
         targets+=("$f")
-    done < <(find crates -name "README.md" 2>/dev/null)
+    done < <(
+        {
+            find crates -name "README.md" 2>/dev/null
+            find crates/agx/src -name "README.md" 2>/dev/null
+        } | sort -u
+    )
     check_md_links "${targets[@]}" || return 1
     echo "All documentation links valid"
 }
