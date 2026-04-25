@@ -47,9 +47,9 @@ stronger core than a linear `1 - d²` would, and avoids a hard ring at
 the boundary. AgX hard-codes this curve rather than exposing it as a
 slider — see "Why we chose it" below.
 
-On the CPU path, [`VignettePrecomputed::new`] caches `half_w`,
+On the CPU path, `VignettePrecomputed::new` caches `half_w`,
 `half_h`, the per-axis reciprocals, and the normalized strength once
-per render. [`apply_vignette_pre`] reuses those cached values, so the
+per render. `apply_vignette_pre` reuses those cached values, so the
 hot path is a handful of multiplies plus the clamp. The GPU shader
 reproduces the same mask equation but recomputes the geometry terms per
 invocation rather than sharing a struct.
@@ -109,7 +109,7 @@ shape  = "circular"     # optional; defaults to "elliptical"
 
 `amount` maps linearly to `strength`: `strength = amount / 100.0`. A
 preset that omits `[vignette]` entirely, or sets `amount = 0.0`, takes
-the early-out path in [`apply_vignette`] and skips the multiplication
+the early-out path in `apply_vignette` and skips the multiplication
 loop. Preset composition (`merge`/`materialize`) treats the two fields
 independently — a child preset can override `amount` without touching
 `shape`.

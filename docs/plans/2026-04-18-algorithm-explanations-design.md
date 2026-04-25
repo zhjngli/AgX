@@ -197,6 +197,8 @@ sub-project.]
 
 Each of the three shared `.md` files follows the full template. Rustdoc shows `agx::adjust::white_balance`, `agx::adjust::exposure`, and `agx::adjust::basic_tone` as independent module pages. No prose is duplicated — both surfaces pull from the same three files.
 
+**Heading-level exception for bundled files.** Single-shared-file pages keep the template's section headings at `##` (h2), nesting under the wrapper's `# Page title`. The three Basic-adjustment files are different because their wrapper already uses `## White balance`, `## Exposure`, `## Tone sliders` — so the bundled shared files demote their section headings to `###` (h3) to nest cleanly under those wrapper headings instead of rendering as siblings. The shared file's top-of-file HTML comments record this convention so future editors don't accidentally promote them back to `##`.
+
 ### Content sourcing discipline
 
 Every algorithm page is grounded in **existing AgX artifacts**, not invented content. Writers pull from (in priority order):

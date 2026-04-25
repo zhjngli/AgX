@@ -3,38 +3,90 @@
      and GPU implementations. -->
 <!-- If you materially change the algorithm in code, update this file
      so the explanation and implementation stay in sync. -->
+<!-- This file is included into the bundled "Basic adjustments" mdbook
+     page, so its top-level headings are ### (h3) to nest under the
+     wrapper's `## Exposure` heading. -->
 
-## How it works
+Exposure scales linear-light pixel values by a power-of-two factor so
+that the slider value reads as photographic stops: `+1` brightens by a
+factor of two, `-1` halves the light, `0` leaves the image alone. AgX
+applies this in linear space before gamma encoding so the math behaves
+like a real exposure change.
 
-Exposure is measured in stops. One stop means a factor of two in light
-intensity, so the adjustment converts the slider value into a multiplier
-with:
+### How it works
 
-```text
-factor = 2^stops
-```
-
-That gives the expected photographic behavior:
-
-- `0` stops -> `1.0`x, no change
-- `+1` stop -> `2.0`x, twice as bright
-- `-1` stop -> `0.5`x, half as bright
-
-The code applies that multiplier to each linear-light channel value and
-clamps the result at zero:
+The slider value (`stops`) is converted into a multiplier and applied
+per channel:
 
 ```text
-output = max(0, input * factor)
+factor          = 2^stops
+output_channel  = max(0, input_channel * factor)
 ```
 
-The clamp keeps the result valid when an invalid upstream value would
-otherwise push a channel below zero. The exposure multiplier itself is
-always positive because it comes from `2^stops`.
+The multiplier is always positive because it comes from a power of two,
+so the trailing `max(0, …)` only matters when an upstream value would
+otherwise be negative — the clamp keeps the output well-defined even
+for invalid input.
 
-Exposure runs in linear space before gamma encoding because stops are a
-ratio of light, not a ratio of display-encoded values. If the same
-multiplier were applied after gamma encoding, the adjustment would skew
-the midtones and no longer behave like a true photographic exposure
-change. Applying it before gamma encoding preserves the intended
-brightness relationship and lets the later sRGB encoding happen after
-the light-level math is done.
+The expected slider feel:
+
+- `0` stops → multiplier `1.0`, no change
+- `+1` stop → `2.0`, twice as bright
+- `-1` stop → `0.5`, half as bright
+- `+2` stops → `4.0`, four times as bright
+
+Working in linear space matters. Stops are a *ratio of light energy*,
+not a ratio of display-encoded brightness, so the multiplier only
+behaves photographically when it lands on linear pixel values. Applied
+after gamma encoding the same multiplier would skew midtones and
+clip the highlights asymmetrically, no longer matching how a camera's
+exposure dial behaves.
+
+### Why we chose it
+
+The whole adjustment is a single multiply, which is exactly the level of
+machinery the operation deserves. Some editors expose exposure as a log
+slider with a hidden non-linearity; AgX keeps it as a literal `2^stops`
+so a preset author can reason about a "+0.5 stop" lift the same way they
+reason about a half-stop in a camera.
+
+The pipeline placement is the other choice. Exposure runs in linear
+space alongside white balance, before sRGB encoding. This means the
+later tone sliders, HSL, and color grading all see the
+exposure-adjusted image — which is what photographers expect:
+"correct" exposure first, then shape the look on top.
+
+### Parameters and constants
+
+| Parameter / constant | Value | Role | Sensitivity |
+|----------------------|-------|------|-------------|
+| `exposure` (preset) | `f32`, in stops, default `0.0` | Brightness shift. | Each unit doubles or halves the light. `+0.5` ≈ 41% brighter, `-0.5` ≈ 29% darker. No hard upper bound, but very large values quickly push everything past 1.0 in linear space — the highlight tail is then handled by downstream clamping or tone shaping. |
+| Power base | `2.0` | Photographic-stop semantics. | Hard-coded; switching to a different base would break the "stops" mental model. |
+| Channel floor | `0.0` | Guards against negative output from invalid upstream values. | Multiplier is always positive, so this only matters for malformed input. |
+
+### Preset-slider mapping
+
+```toml
+[tone]
+exposure = 0.5   # +½ stop
+```
+
+The `exposure` field maps directly to `stops` — no hidden non-linearity
+on the slider value. Preset composition merges this field independently
+of the other tone sliders. A preset that omits `[tone]` or sets
+`exposure = 0.0` leaves the image unchanged at this stage.
+
+### Source
+
+- **CPU (Rust):** [`crates/agx/src/adjust/exposure.rs`](https://github.com/zhjngli/AgX/blob/main/crates/agx/src/adjust/exposure.rs)
+- **CPU buffer orchestrator:** [`apply_white_balance_exposure_buffer`](https://github.com/zhjngli/AgX/blob/main/crates/agx/src/adjust/mod.rs) bundles exposure with white balance for a single buffer pass.
+- **GPU (WGSL):** [`crates/agx/src/shaders/linear_adjustments.wgsl`](https://github.com/zhjngli/AgX/blob/main/crates/agx/src/shaders/linear_adjustments.wgsl) (combined linear-space WB + exposure pass).
+
+The CPU and GPU implementations share the same `2^stops` multiplier and
+linear-space placement.
+
+### References
+
+No canonical external paper applies — `2^stops` is the standard
+photographic exposure formulation. The pipeline placement and slider
+range are documented inline in the source.
