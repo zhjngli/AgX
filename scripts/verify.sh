@@ -16,6 +16,7 @@ set -euo pipefail
 #   test-features  feature-gated tests (docgen, raw)
 #   rustdoc        cargo doc with warnings-as-errors
 #   doc-links      markdown link validation
+#   book-linkcheck mdbook build with linkcheck backend enabled
 #   wgsl-headers   non-common WGSL header validation
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -134,6 +135,13 @@ check_doc_links() {
     echo "All documentation links valid"
 }
 
+check_book_linkcheck() {
+    # Generate docgen output the book needs.
+    cargo run -p agx-docgen
+    # Build the book with the linkcheck backend enabled.
+    mdbook build docs/book
+}
+
 check_wgsl_headers() {
     local errors=0
     local files=()
@@ -197,11 +205,12 @@ if [ "$#" -gt 0 ]; then
         test-features) check_test_features ;;
         rustdoc)       check_rustdoc ;;
         doc-links)     check_doc_links ;;
+        book-linkcheck) check_book_linkcheck ;;
         wgsl-headers)  check_wgsl_headers ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, wgsl-headers, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, wgsl-headers, all"
             exit 1
             ;;
     esac
@@ -250,7 +259,10 @@ run_check "Rustdoc (cargo doc)" check_rustdoc
 # 6. Documentation link validation
 run_check "Documentation links" check_doc_links
 
-# 7. WGSL header validation
+# 7. Book link validation
+run_check "Book linkcheck" check_book_linkcheck
+
+# 8. WGSL header validation
 run_check "WGSL headers" check_wgsl_headers
 
 # Summary

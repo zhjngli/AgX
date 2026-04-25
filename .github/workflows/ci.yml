@@ -17,9 +17,6 @@ jobs:
           - test-lib
           - test-cli
           - test-features
-          - rustdoc
-          - doc-links
-          - wgsl-headers
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -29,7 +26,7 @@ jobs:
         with:
           shared-key: fast-checks
       - name: Install libraw
-        if: matrix.check != 'fmt' && matrix.check != 'doc-links' && matrix.check != 'wgsl-headers'
+        if: matrix.check != 'fmt'
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
       - name: Run check
         run: ./scripts/verify.sh ${{ matrix.check }}
@@ -43,6 +40,48 @@ jobs:
       - run: |
           if [ "${{ needs.fast-checks-matrix.result }}" != "success" ]; then
             echo "Fast checks matrix failed: ${{ needs.fast-checks-matrix.result }}"
+            exit 1
+          fi
+
+  docs-matrix:
+    name: Docs (${{ matrix.check }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - rustdoc
+          - doc-links
+          - book-linkcheck
+          - wgsl-headers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: docs-checks
+      - name: Install libraw
+        if: matrix.check == 'rustdoc' || matrix.check == 'book-linkcheck'
+        run: sudo apt-get update && sudo apt-get install -y libraw-dev
+      - name: Install mdbook and preprocessors
+        if: matrix.check == 'book-linkcheck'
+        run: |
+          cargo install --locked mdbook --version 0.4.40
+          cargo install --locked mdbook-linkcheck --version 0.7.7
+          cargo install --locked mdbook-mermaid --version 0.14.0
+          cargo install --locked mdbook-katex --version 0.9.0
+      - name: Run check
+        run: ./scripts/verify.sh ${{ matrix.check }}
+
+  docs-checks:
+    name: Docs checks
+    runs-on: ubuntu-latest
+    if: always()
+    needs: docs-matrix
+    steps:
+      - run: |
+          if [ "${{ needs.docs-matrix.result }}" != "success" ]; then
+            echo "Docs matrix failed: ${{ needs.docs-matrix.result }}"
             exit 1
           fi
 
