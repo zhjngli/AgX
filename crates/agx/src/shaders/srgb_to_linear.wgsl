@@ -1,5 +1,5 @@
 // Algorithm: sRGB-to-linear conversion pass for scene-referred processing
-// Canonical explanation: docs/reference/color-spaces.md
+// Canonical explanation: docs/book/src/reference/concepts/color-spaces.md
 // CPU equivalent: crates/agx/src/adjust/mod.rs (srgb_to_linear)
 // Bindings: storage pixels
 // Entry points: main

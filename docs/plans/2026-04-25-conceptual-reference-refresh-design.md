@@ -121,7 +121,7 @@ The grouping (Foundations / Photography lexicon / AgX-specific) appears as visua
 
 The whole point of the conceptual layer is that other surfaces can link into it without breaking. The contract has four directional rules:
 
-1. **Concepts → Explanation (always).** Every lexicon section ends with a `→ See [<algorithm>](../../explanation/<page>.md)` footer line. Foundation and AgX-specific pages link to relevant explanation pages where they exist.
+1. **Concepts → Explanation (always).** Every lexicon section ends with a link footer to the relevant explanation page (e.g., "→ See contrast explanation" for the contrast entry). Foundation and AgX-specific pages link to relevant explanation pages where they exist.
 2. **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/*.md` (i.e., the page that wraps a sibling `.md` include — not the sibling itself) gets a `## See also` block at the bottom listing relevant concept pages. This is added in this sub-project, including resolving the existing `TODO(sub-project-5)` in `explanation/basic.md`.
 3. **Sibling `.md` files stay link-free.** Files at `crates/agx/src/adjust/*.md` contain no cross-`.md` links. The umbrella initiative documents this rule informally; this sub-project formalizes it via the `sibling-md-clean` enforcement check below.
 4. **Tutorials / how-tos → Concepts (forward-compatible).** Tutorials and how-tos cite concept anchors directly (`reference/concepts/color.md#white-balance`). This sub-project doesn't ship tutorials but lists the canonical anchors for commonly-cited terms in the conventions doc so #6 and #7 don't have to invent them.
@@ -130,7 +130,7 @@ The whole point of the conceptual layer is that other surfaces can link into it 
 
 Each concept has one canonical defining location. Other pages mention the term and link to its home rather than re-defining. Concrete examples:
 
-- "LUT" is defined in `lut-format.md`. The lexicon `color.md` notes "AgX applies LUTs as part of color grading → see [LUT format](lut-format.md)" but does not define what a LUT is.
+- "LUT" is defined in `lut-format.md`. The lexicon `color.md` notes (paraphrased) "AgX applies LUTs as part of color grading; see the LUT format page" rather than redefining LUT itself.
 - "Linear vs sRGB" is defined in `color-spaces.md`. Other pages reference it by link.
 - "Pipeline order" is defined in `render-pipeline.md`. Other pages cite it.
 

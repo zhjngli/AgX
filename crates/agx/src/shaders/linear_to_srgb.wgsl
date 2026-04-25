@@ -1,5 +1,5 @@
 // Algorithm: Linear-to-sRGB conversion pass for display-referred encoding
-// Canonical explanation: docs/reference/color-spaces.md
+// Canonical explanation: docs/book/src/reference/concepts/color-spaces.md
 // CPU equivalent: crates/agx/src/adjust/mod.rs (linear_to_srgb)
 // Bindings: storage pixels
 // Entry points: main

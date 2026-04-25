@@ -1,7 +1,7 @@
 # Grain Simulation Design
 
 **Date:** 2026-03-23
-**Status:** Implemented — see [docs/reference/grain-algorithm.md](../reference/grain-algorithm.md) for current algorithm
+**Status:** Implemented — see the grain explanation in the mdbook for algorithm details
 **Category:** Editing — Grain simulation
 
 ## Problem

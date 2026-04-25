@@ -154,4 +154,4 @@ After structured profiling identifies the heaviest stages, run `cargo flamegraph
 
 - [`docs/backlog/performance.md`](../backlog/performance.md) — performance backlog with speculative optimization ideas
 - [`crates/agx/src/engine/mod.rs`](../../crates/agx/src/engine/mod.rs) — render pipeline implementation
-- [`docs/reference/grain-algorithm.md`](../reference/grain-algorithm.md) — grain algorithm (one of the heavier pipeline stages)
+- Grain algorithm (mdbook explanation) — one of the heavier pipeline stages
