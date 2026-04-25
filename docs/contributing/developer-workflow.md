@@ -122,6 +122,16 @@ Update documentation alongside code. The rule: if someone reads the docs after y
 
 For style guidance on `///` comments, `//!` comments, the shared `.md` file convention for cross-surface explanations, and the active rustdoc lints, see [documentation-conventions.md](documentation-conventions.md).
 
+### New adjustment-bearing modules
+
+When adding a new `adjust/` submodule or any algorithm-bearing module:
+
+1. Create a sibling `.md` next to the `.rs` following the template in [`documentation-conventions.md`](documentation-conventions.md).
+2. Add `#![doc = include_str!("<name>.md")]` at the top of the `.rs` file so rustdoc picks up the explanation.
+3. Create or update the appropriate wrapping mdbook page under `docs/book/src/explanation/` with `{{#include}}` pointing at the sibling, and add or update the `SUMMARY.md` chapter in pipeline order.
+4. If the module ships with WGSL shaders, give each shader the five-line structured header from the WGSL section of `documentation-conventions.md`.
+5. If the module ships with GPU code, update `crates/agx/src/engine/gpu/README.md`.
+
 ## 5. Self-Review
 
 Before declaring done, re-read your diff and ask:
