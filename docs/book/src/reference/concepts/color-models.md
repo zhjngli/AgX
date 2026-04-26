@@ -38,7 +38,7 @@ AgX uses luminance as a weighting signal in places where "how bright is this pix
 |-----------|-------|--------|
 | White balance | RGB (linear) | Per-channel multipliers correct color cast at the channel level |
 | Exposure | RGB (linear) | Uniform multiplier across all channels |
-| Contrast, highlights, shadows, whites, blacks | RGB (sRGB gamma) — selectors driven by luminance | Targets defined perceptually |
+| Contrast, highlights, shadows, whites, blacks | RGB (sRGB gamma) | Targets defined perceptually; tonal regions are selected by luminance |
 | Tone curves (RGB channel) | RGB | Per-channel response shaping |
 | Tone curves (luma channel) | Luminance | Brightness shaping that preserves hue and saturation |
 | HSL | HSL | Selective edits per color band |

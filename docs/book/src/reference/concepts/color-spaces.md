@@ -30,7 +30,7 @@ If you do math in the wrong space, you get wrong results. Multiplying linear val
 
 ## Working space
 
-A render pipeline does math on pixel values somewhere in the linear-vs-gamma spectrum. The space the pipeline does its math in is the **working space**. AgX's working space is sRGB — both the linear-light variant (for physical operations like exposure and white balance) and the gamma-encoded variant (for perceptual operations like contrast and tone curves).
+A render pipeline does math on pixel values somewhere in the linear-vs-gamma spectrum. The space the pipeline does its math in is the **working space**. AgX's working space is sRGB — both the linear-light variant (for physical operations like exposure, white balance, dehaze, and noise reduction) and the gamma-encoded variant (for perceptual operations like contrast and tone curves).
 
 Working in sRGB constrains the gamut to what an sRGB display can show. The trade-off is simplicity and a clean match to the input format that consumer cameras and editing software already use. Wider working spaces (Adobe RGB, ProPhoto RGB, Display P3) can hold colors that would clip in sRGB, at the cost of more careful color management.
 
@@ -43,18 +43,20 @@ Each operation in the rendering pipeline runs in the color space where it's math
 ```
 Original image (linear sRGB)
   |
-  |-- 1. White balance (linear) -- channel multipliers
-  |-- 2. Exposure (linear) -- multiply by 2^stops
+  |-- White balance (linear) -- per-channel multipliers
+  |-- Exposure (linear) -- multiply by 2^stops
+  |-- Dehaze (linear) -- local-contrast restoration
+  |-- Noise reduction (linear) -- luminance + chroma denoise
   |
   |-- Convert: linear -> sRGB gamma
   |
-  |-- 3. Contrast (sRGB gamma) -- push values away from midpoint
-  |-- 4. Highlights (sRGB gamma) -- adjust bright regions
-  |-- 5. Shadows (sRGB gamma) -- adjust dark regions
-  |-- 6. Whites (sRGB gamma) -- adjust upper range
-  |-- 7. Blacks (sRGB gamma) -- adjust lower range
-  |-- 8. HSL adjustments (sRGB gamma) -- per-channel hue/saturation/luminance
-  |-- 9. LUT application (sRGB gamma)
+  |-- Per-pixel adjustments (sRGB gamma):
+  |     contrast, highlights, shadows, whites, blacks,
+  |     tone curves, HSL, color grading, LUT
+  |
+  |-- Detail pass (sRGB gamma) -- sharpen, clarity, texture
+  |-- Grain (sRGB gamma)
+  |-- Vignette (sRGB gamma)
   |
   |-- Convert: sRGB gamma -> linear
   |
@@ -83,7 +85,7 @@ LUTs are created by colorists while looking at a screen displaying sRGB. When a 
 
 Applying a LUT designed for sRGB input to linear values would produce incorrect colors. AgX applies LUTs in sRGB gamma space, which is correct for the vast majority of creative `.cube` LUTs.
 
-## Current Limitations
+## Current limitations
 
 AgX currently works exclusively in **sRGB** color space. This is the standard color space for displays, web, and consumer photography. JPEG and PNG files are sRGB by default.
 
@@ -93,7 +95,7 @@ For the current scope, this means:
 - No ICC profile reading or embedding
 - No wide-gamut support (Adobe RGB, ProPhoto RGB, Display P3)
 
-## Future: Wider Color Spaces
+## Future: wider color spaces
 
 Future versions may add:
 

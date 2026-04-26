@@ -11,9 +11,9 @@ Corrects (or creatively shifts) the color cast of a scene. AgX exposes two param
 
 White balance runs in linear-light RGB because color casts are physical properties of the light source.
 
-## Color temperature
+### Color temperature
 
-A measurement of the color of light, expressed in Kelvin. Lower temperatures are warmer (orange/red, ~2700K candle, ~3200K tungsten), higher temperatures are cooler (blue, ~6500K daylight, ~10000K shade). When you set a white balance temperature, you're telling AgX what color the light source actually was so it can neutralize the cast.
+**Background concept.** A measurement of the color of light, expressed in Kelvin. Lower temperatures are warmer (orange/red, ~2700K candle, ~3200K tungsten), higher temperatures are cooler (blue, ~6500K daylight, ~10000K shade). When you set a white balance temperature, you're telling AgX what color the light source actually was so it can neutralize the cast.
 
 ## HSL
 

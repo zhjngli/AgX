@@ -2,7 +2,7 @@
 
 This document describes 3D LUTs, the `.cube` file format, and how AgX handles them.
 
-## What Is a LUT?
+## What is a LUT?
 
 A LUT (Look-Up Table) is a pre-computed color transformation. Instead of defining a transformation as a formula (like "multiply by 2"), a LUT stores the result for every possible input. Given an input RGB color, you look up the corresponding output RGB color in the table.
 
@@ -116,7 +116,10 @@ Most creative LUTs use size 33, which provides excellent quality with reasonable
 
 AgX ships a set of generated `.cube` LUTs used by the e2e test pipeline and as starting points for film-emulation looks. The generator lives in the `agx-lut-gen` crate (`crates/agx-lut-gen/`); the bundled outputs live in `crates/agx-e2e/fixtures/looks/luts/`.
 
-The generator is a small Rust binary that, for each named LUT, evaluates a transformation function over a regular 3D grid in input RGB and writes the result as a `.cube` file. Each generated LUT is parameterized by a film stock model (Portra 400, Kodachrome 64, Cinestill 800T, Tmax 100, Tri-X 400) or a stylistic look (Blade Runner, Cinema Warm, Dune, Faded BW, High Contrast BW, Neo Noir).
+The generator is a small Rust binary that, for each named LUT, evaluates a transformation function over a regular 3D grid in input RGB and writes the result as a `.cube` file. The current set splits into two categories:
+
+- **Film stocks:** Portra 400, Kodachrome 64, Cinestill 800T, Tmax 100, Tri-X 400.
+- **Stylistic looks:** Blade Runner, Cinema Warm, Dune, Faded BW, High Contrast BW, Neo Noir.
 
 Why generate LUTs in code rather than authoring them in a colorist tool:
 

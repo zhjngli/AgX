@@ -4,7 +4,7 @@ Tone refers to the distribution of light and dark in an image — everything tha
 
 ## Exposure
 
-Simulates changing the amount of light reaching the sensor. Doubling exposure doubles the linear-light value of every pixel. AgX exposes exposure in stops (a logarithmic unit: +1 stop = 2× brighter, +2 stops = 4× brighter); the AgX range is -5 to +5.
+Simulates changing the amount of light reaching the sensor. Doubling exposure doubles the linear-light value of every pixel. AgX exposes exposure in stops (a logarithmic unit: +1 stop = 2× brighter, +2 stops = 4× brighter). Practical values stay within ±5 stops; beyond that, the math still works but most pixels saturate or go near-black.
 
 ## Contrast
 
@@ -32,4 +32,4 @@ A per-channel mapping from input value to output value, drawn as a curve. AgX pr
 
 ---
 
-See: [Basic adjustments](../../explanation/basic.md) (white balance, exposure, tonal sliders) and [Tone curves](../../explanation/tone-curves.md) for the algorithm-level math behind these knobs.
+See: [Basic adjustments](../../explanation/basic.md) (exposure and tonal sliders — white balance lives under [Color](color.md)) and [Tone curves](../../explanation/tone-curves.md) for the algorithm-level math behind these knobs.

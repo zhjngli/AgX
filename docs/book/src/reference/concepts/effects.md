@@ -4,9 +4,7 @@ Effects are overlaid or added artifacts — they don't restore or correct anythi
 
 ## Grain
 
-Simulates film grain by generating spatial noise and modulating each pixel by it. Real film shows grain because silver halide crystals form in discrete clumps; the developed image is built from these random particles. AgX models the look — independent noise per pixel, blurred to control particle size, modulated exponentially so brightening and darkening are perceptually symmetric.
-
-Grain is shadow-weighted (more visible in dark areas, where real film grain dominates), and chromatic intensity is type-driven rather than user-exposed (grayscale pixels never show color shifts; saturated shadows show the most).
+Simulates film grain by adding spatial noise to the image. Real film shows grain because silver halide crystals form in discrete clumps; AgX models the look without the chemistry. The effect is shadow-weighted — grain is more visible in dark areas, matching how real film behaves at higher ISOs.
 
 See [Grain](../../explanation/grain.md) for the full algorithm and the design history behind the choices.
 

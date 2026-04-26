@@ -16,7 +16,15 @@ This also makes presets composable: a base "neutral starting point" preset can b
 
 ## The `extends` chain
 
-A preset can declare `extends: "<other-preset>"` to inherit from another preset. AgX resolves the chain at load time:
+A preset can declare an `extends` field inside its `[metadata]` block to inherit from another preset:
+
+```toml
+[metadata]
+name = "warm-cinematic"
+extends = "neutral-base.toml"
+```
+
+AgX resolves the chain at load time:
 
 1. Load the parent preset and its partial parameters.
 2. Load the child preset and its partial parameters.
