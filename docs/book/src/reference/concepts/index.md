@@ -1,3 +1,27 @@
 # Concepts
 
-This section is being built. The existing reference docs at `docs/reference/` (color spaces, LUT format, grain algorithm) will be moved here and expanded as part of the conceptual reference refresh sub-project. See the [documentation initiative](https://github.com/zhjngli/AgX/blob/main/docs/plans/2026-04-06-documentation-initiative-design.md) for the planned content and timeline.
+The conceptual reference covers the photographic and AgX-specific ideas the rest of the documentation builds on. It serves CLI users, preset authors, and curious photo nerds — readers who want to look up *what* a concept is, separately from the algorithmic *how* (covered under [Explanation](../../explanation/index.md)) and the field-level schema (covered by the auto-generated [Preset format](../preset.md) page).
+
+## Foundations
+
+The substrate everything else relies on.
+
+- [Color spaces](color-spaces.md) — Linear vs sRGB, why each pipeline operation runs in its space, and AgX's working-space model.
+- [Color models](color-models.md) — RGB, HSL, and luminance: when AgX uses each.
+
+## Photography lexicon
+
+Short entries grouped by photographer-panel mental model. Tutorials and how-to guides cite these by anchor (e.g., `color.md#white-balance`).
+
+- [Tone](tone.md) — Exposure, contrast, highlights, shadows, whites, blacks, tone curves.
+- [Color](color.md) — White balance, HSL, color grading.
+- [Detail](detail.md) — Sharpening, clarity, dehaze, noise reduction.
+- [Effects](effects.md) — Grain, vignette.
+
+## AgX-specific
+
+Concepts that aren't covered by general photography references because they are AgX inventions or AgX integrations.
+
+- [Preset model](preset-model.md) — How presets compose, override, and extend.
+- [Render pipeline](render-pipeline.md) — The conceptual journey from decoded image to encoded output.
+- [LUT format](lut-format.md) — `.cube` files, trilinear interpolation, and how AgX generates its bundled LUTs.

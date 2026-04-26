@@ -207,3 +207,53 @@ mdbook serve docs/book --open
 ## Where the deployed site lives
 
 Pushes to `main` trigger `.github/workflows/docs.yml`, which builds and deploys the site to `https://zhjngli.github.io/AgX/`. mdbook content lives at the root (e.g., `https://zhjngli.github.io/AgX/explanation/grain.html`); rustdoc content lives at `/api/` (e.g., `https://zhjngli.github.io/AgX/api/agx/adjust/grain/index.html`).
+
+## Conceptual reference principles
+
+The conceptual reference quadrant lives at `docs/book/src/reference/concepts/`. Sub-project 5 of the documentation initiative shaped this surface; the principles here govern how it evolves.
+
+- **Purpose split.** Conceptual reference covers *what* a concept is in photography or AgX terms. Algorithm explanations cover *how* AgX implements it (with math). Tutorials say *do this*. How-to guides say *achieve this goal*. Each surface stays in its lane — content does not leak across.
+- **Lexicon vs deep dive.** Photographic vocabulary (the `tone.md`, `color.md`, `detail.md`, `effects.md` pages) stays terse: 2-4 sentences per term. Foundations (color spaces, color models) and AgX-specific concepts (preset model, render pipeline, LUT format) get full pages with depth. Don't promote a lexicon entry to its own page unless it visibly outgrows a paragraph.
+- **Lexicon grouping.** Photographer-panel mental model — `tone.md` / `color.md` / `detail.md` / `effects.md`. Not pipeline order. New algorithms join the page that matches their photographic role, not the page that matches their pipeline position.
+- **Anchor stability.** Headings in `reference/concepts/*.md` are public link targets cited by tutorials, how-to guides, and explanation pages. Renaming a heading is a breaking change to the doc surface. `mdbook-linkcheck` (in `book-linkcheck`) will fail the build if you rename a heading without updating callers, but you should also `git grep` for the old name to find indirect references.
+- **Single home per concept.** Each concept has one canonical defining location. Other pages mention the term and link to its home rather than re-defining. For example, "LUT" is defined in `lut-format.md`; `color.md` mentions it but does not redefine it.
+- **Per-page depth ceiling.** A concept page covers its scope in 1-3 screens, AgX-shaped, links out for theory. If a page balloons, split it or move detail to an explanation page.
+
+## Cross-link contract
+
+The conceptual reference surface holds together because of four directional rules. The first three are mechanically enforced; the fourth is the contract tutorials and how-to guides can rely on.
+
+- **Concepts → Explanation (always).** Every lexicon page ends with a footer linking to the relevant `explanation/` page(s). Foundation and AgX-specific pages link to relevant explanations where they exist. Code review.
+- **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/*.md` (the page that wraps a sibling `.md` include — not the sibling itself) ends with a `## See also` block listing relevant concept pages, the rustdoc API references, and related explanations. Enforced by `scripts/verify.sh back-links`.
+- **Sibling `.md` cleanliness.** Files at `crates/agx/src/adjust/*.md` (the canonical algorithm-explanation prose included by both rustdoc and mdbook) contain no relative or non-HTTPS markdown links. External `https://` links remain allowed (they render uniformly across rustdoc and mdbook). The convention exists for the cross-surface reasons documented under "The shared `.md` file convention" above; sub-project 5 added `scripts/verify.sh sibling-md-clean` to enforce it.
+- **Tutorials / how-to guides → Concepts (forward-compatible).** Tutorials and how-to guides cite concept anchors directly: `reference/concepts/color.md#white-balance`. Anchors are auto-generated from headings; renaming a heading is a breaking change. The conceptual reference is the stable surface tutorials lean on.
+
+## Reviewer checklist for `docs/` PRs
+
+For PRs that touch `docs/book/src/reference/concepts/` or `docs/book/src/explanation/`, the reviewer ticks:
+
+- [ ] New or changed concept page stays within depth ceiling (1-3 screens, AgX-shaped, links out for theory).
+- [ ] No definition duplicates an existing definition elsewhere in the docs.
+- [ ] Renamed headings: callers updated (or the linkcheck failure is acknowledged and fixed).
+- [ ] New lexicon entry placed under the right group (panel mental model, not pipeline order).
+- [ ] Cross-link footers present (concepts → explanation; explanation → concepts).
+
+The mechanical checks (`back-links`, `sibling-md-clean`, `book-no-internal-refs`, `book-linkcheck`, `doc-links`, `markdown-lint`) cover the easy cases; the checklist above covers the judgment calls.
+
+## Public surface boundary
+
+The published mdbook site at `docs/book/src/` is end-user content: CLI users, preset authors, and curious photo nerds. It must not leak project-internal artifacts.
+
+Specifically, content under `docs/book/src/` must not link to:
+
+- `docs/plans/` — design docs and implementation plans (project planning).
+- `docs/backlog/` — work backlog (project management).
+- `docs/contributing/` — contributor guides (this file included).
+
+Why: these surfaces serve different audiences and have different expectations. A reader landing on a tutorial doesn't want to be sent into a roadmap document; a contributor reading conventions doesn't expect them to be cited from the user-facing render-pipeline page. Mixing the two blurs the audience boundary and tends to drag stale planning details onto the published site.
+
+Repo-level entry points (`README.md`, `ARCHITECTURE.md`) are different — they are explicitly contributor-facing and may link freely into `docs/plans/`, `docs/backlog/`, and `docs/contributing/`. Only `docs/book/src/` is constrained by this rule.
+
+Mechanical enforcement: `scripts/verify.sh book-no-internal-refs` greps `docs/book/src/**/*.md` for markdown links into those three directories and fails the build if any are found.
+
+Prose-form leaks (mentioning "the documentation initiative" or a specific sub-project number in the published prose without linking) escape the mechanical check. They are caught by the reviewer checklist and the principle that published prose should describe AgX as a finished tool, not as a project under construction. When a placeholder page needs to say "this section isn't ready yet," prefer a short "Coming soon" framed in terms of the planned content, not a pointer to internal planning.

@@ -195,7 +195,7 @@ agx/
 
 The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. This makes the system order-independent from the user's perspective — presets are purely declarative parameter values, not operation sequences.
 
-All processing happens in **sRGB** color space. Exposure and white balance operate in linear sRGB; contrast, highlights, shadows, whites, blacks, HSL, and LUTs operate in sRGB gamma space. See `docs/reference/color-spaces.md` for a detailed explanation.
+All processing happens in **sRGB** color space. Exposure and white balance operate in linear sRGB; contrast, highlights, shadows, whites, blacks, HSL, and LUTs operate in sRGB gamma space. See `docs/book/src/reference/concepts/color-spaces.md` for a detailed explanation.
 
 ## Testing
 

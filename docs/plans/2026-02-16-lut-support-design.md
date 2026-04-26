@@ -157,8 +157,8 @@ crates/oxiraw/src/
 
 ### Documentation Deliverables
 
-- **`docs/reference/color-spaces.md`** — linear vs sRGB gamma explanation, why operations live where they do, how LUTs fit in
-- **`docs/reference/lut-format.md`** — .cube format reference, how oxiraw parses it, supported features, limitations
+- **`docs/book/src/reference/concepts/color-spaces.md`** — linear vs sRGB gamma explanation, why operations live where they do, how LUTs fit in
+- **`docs/book/src/reference/concepts/lut-format.md`** — .cube format reference, how oxiraw parses it, supported features, limitations
 - **Doc comments** on all public LUT types and methods
 - **`README.md`** — add LUT section with CLI and library usage examples
 - **`example/`** — add a sample .cube LUT file

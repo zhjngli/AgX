@@ -15,6 +15,15 @@
 - [CLI](reference/cli.md)
 - [Preset format](reference/preset.md)
 - [Concepts](reference/concepts/index.md)
+  - [Color spaces](reference/concepts/color-spaces.md)
+  - [Color models](reference/concepts/color-models.md)
+  - [Tone](reference/concepts/tone.md)
+  - [Color](reference/concepts/color.md)
+  - [Detail](reference/concepts/detail.md)
+  - [Effects](reference/concepts/effects.md)
+  - [Preset model](reference/concepts/preset-model.md)
+  - [Render pipeline](reference/concepts/render-pipeline.md)
+  - [LUT format](reference/concepts/lut-format.md)
 
 # Explanation
 

@@ -32,7 +32,7 @@ Three kinds of work ship together:
 
 Explicitly deferred to other sub-projects:
 
-- **Color-spaces conceptual reference page.** Deferred to sub-project #5, which moves `docs/reference/color-spaces.md` into `docs/book/src/reference/concepts/` and expands it.
+- **Color-spaces conceptual reference page.** Deferred to sub-project #5, which moves the documentation into `docs/book/src/reference/concepts/` and expands it.
 - **Render pipeline conceptual overview.** Deferred to sub-project #5 and #8.
 - **CLI and preset reference pages.** Already delivered by sub-project #3.
 - **Tutorials and how-to guides.** Deferred to sub-projects #6 and #7.

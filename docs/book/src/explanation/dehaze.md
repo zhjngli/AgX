@@ -25,8 +25,8 @@ Positive `amount` runs the full Dark Channel Prior recovery path; negative `amou
 
 {{#include ../../../../crates/agx/src/adjust/dehaze.md}}
 
-## Related
+## See also
 
-- [API reference](../api/agx/adjust/dehaze/index.html)
-- [Noise reduction](denoise.md) — also a frequency-domain pass
-- [Detail pass](detail.md) — also uses separable filters
+- Concept references: [Detail](../reference/concepts/detail.md) (dehaze entry)
+- API references: [dehaze](../api/agx/adjust/dehaze/index.html)
+- Related explanations: [Detail pass](detail.md), [Noise reduction](denoise.md)

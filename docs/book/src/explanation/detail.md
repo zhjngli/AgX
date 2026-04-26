@@ -2,8 +2,8 @@
 
 {{#include ../../../../crates/agx/src/adjust/detail.md}}
 
-## Related
+## See also
 
-- [API reference](../api/agx/adjust/detail/index.html)
-- [Noise reduction](denoise.md) — same separable-filter motif
-- [Dehaze](dehaze.md) — also does local contrast work
+- Concept references: [Detail](../reference/concepts/detail.md) (sharpening and clarity entries)
+- API references: [detail](../api/agx/adjust/detail/index.html)
+- Related explanations: [Dehaze](dehaze.md), [Noise reduction](denoise.md)

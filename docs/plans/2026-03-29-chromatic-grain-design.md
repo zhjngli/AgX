@@ -1,7 +1,7 @@
 # Chromatic Grain: Type-Driven Color Variation
 
 **Date:** 2026-03-29
-**Status:** Implemented — see [docs/reference/grain-algorithm.md](../reference/grain-algorithm.md) for current algorithm
+**Status:** Implemented — see the grain explanation in the mdbook for algorithm details
 **Branch:** `fix/grain-size-algorithm` (continuation of grain rework)
 
 ## Problem
