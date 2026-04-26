@@ -57,6 +57,7 @@ jobs:
           - markdown-lint
           - back-links
           - sibling-md-clean
+          - book-no-internal-refs
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

@@ -22,6 +22,7 @@ set -euo pipefail
 #   markdown-lint  markdownlint-cli2 (style, structure, formatting)
 #   back-links     verify every explanation wrapper has a "## See also" block
 #   sibling-md-clean verify sibling .md files are link-free
+#   book-no-internal-refs verify mdbook content does not link to docs/plans, docs/backlog, or docs/contributing
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -220,6 +221,22 @@ check_sibling_md_clean() {
     return 0
 }
 
+check_book_no_internal_refs() {
+    # The published mdbook site is end-user content. Internal planning
+    # (docs/plans/), backlog (docs/backlog/), and contributor guides
+    # (docs/contributing/) belong outside the published surface — readers
+    # don't need them, and exposing them blurs the public/internal line.
+    local hits
+    hits="$(grep -rn -E '\]\([^)]*docs/(plans|backlog|contributing)/' docs/book/src/ || true)"
+    if [ -n "$hits" ]; then
+        echo "ERROR: published mdbook content links to internal docs (plans/backlog/contributing):"
+        echo "$hits"
+        return 1
+    fi
+    echo "No internal-doc links in published book content"
+    return 0
+}
+
 check_wgsl_headers() {
     local errors=0
     local files=()
@@ -289,10 +306,11 @@ if [ "$#" -gt 0 ]; then
         markdown-lint) check_markdown_lint ;;
         back-links)    check_back_links ;;
         sibling-md-clean) check_sibling_md_clean ;;
+        book-no-internal-refs) check_book_no_internal_refs ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, back-links, sibling-md-clean, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, back-links, sibling-md-clean, book-no-internal-refs, all"
             exit 1
             ;;
     esac
@@ -355,6 +373,9 @@ run_check "Back-links" check_back_links
 
 # 11. Sibling .md cleanliness
 run_check "Sibling .md cleanliness" check_sibling_md_clean
+
+# 12. Book content has no links to internal planning/backlog/contributor docs
+run_check "Book content surface boundary" check_book_no_internal_refs
 
 # Summary
 echo ""

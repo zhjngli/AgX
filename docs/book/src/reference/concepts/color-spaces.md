@@ -104,5 +104,3 @@ Future versions may add:
 - **Display P3**: Apple's wide-gamut display standard
 - **ICC profile handling**: Read embedded profiles from input images, embed profiles in output
 - **Log input LUTs**: Support for LUTs designed for video log curves (S-Log3, LogC)
-
-See the [color management backlog](https://github.com/zhjngli/AgX/blob/main/docs/backlog/color-management.md) for the full roadmap.

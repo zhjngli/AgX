@@ -25,7 +25,3 @@ Concepts that aren't covered by general photography references because they are 
 - [Preset model](preset-model.md) — How presets compose, override, and extend.
 - [Render pipeline](render-pipeline.md) — The conceptual journey from decoded image to encoded output.
 - [LUT format](lut-format.md) — `.cube` files, trilinear interpolation, and how AgX generates its bundled LUTs.
-
----
-
-Contributors: see [Documentation conventions](https://github.com/zhjngli/AgX/blob/main/docs/contributing/documentation-conventions.md) for the principles that shape this surface (cross-link contract, anchor stability, depth ceiling, reviewer checklist).

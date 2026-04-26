@@ -238,4 +238,22 @@ For PRs that touch `docs/book/src/reference/concepts/` or `docs/book/src/explana
 - [ ] New lexicon entry placed under the right group (panel mental model, not pipeline order).
 - [ ] Cross-link footers present (concepts → explanation; explanation → concepts).
 
-The mechanical checks (`back-links`, `sibling-md-clean`, `book-linkcheck`, `doc-links`, `markdown-lint`) cover the easy cases; the checklist above covers the judgment calls.
+The mechanical checks (`back-links`, `sibling-md-clean`, `book-no-internal-refs`, `book-linkcheck`, `doc-links`, `markdown-lint`) cover the easy cases; the checklist above covers the judgment calls.
+
+## Public surface boundary
+
+The published mdbook site at `docs/book/src/` is end-user content: CLI users, preset authors, and curious photo nerds. It must not leak project-internal artifacts.
+
+Specifically, content under `docs/book/src/` must not link to:
+
+- `docs/plans/` — design docs and implementation plans (project planning).
+- `docs/backlog/` — work backlog (project management).
+- `docs/contributing/` — contributor guides (this file included).
+
+Why: these surfaces serve different audiences and have different expectations. A reader landing on a tutorial doesn't want to be sent into a roadmap document; a contributor reading conventions doesn't expect them to be cited from the user-facing render-pipeline page. Mixing the two blurs the audience boundary and tends to drag stale planning details onto the published site.
+
+Repo-level entry points (`README.md`, `ARCHITECTURE.md`) are different — they are explicitly contributor-facing and may link freely into `docs/plans/`, `docs/backlog/`, and `docs/contributing/`. Only `docs/book/src/` is constrained by this rule.
+
+Mechanical enforcement: `scripts/verify.sh book-no-internal-refs` greps `docs/book/src/**/*.md` for markdown links into those three directories and fails the build if any are found.
+
+Prose-form leaks (mentioning "the documentation initiative" or a specific sub-project number in the published prose without linking) escape the mechanical check. They are caught by the reviewer checklist and the principle that published prose should describe AgX as a finished tool, not as a project under construction. When a placeholder page needs to say "this section isn't ready yet," prefer a short "Coming soon" framed in terms of the planned content, not a pointer to internal planning.
