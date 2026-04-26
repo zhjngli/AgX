@@ -190,7 +190,7 @@ Lands the install page, the Getting Started tutorial, and supporting infrastruct
 
 - New `docs/book/src/install.md` — one-line `cargo install agx-cli`, plus a brief "verify your install" command.
 - New `docs/book/src/tutorials/getting-started.md` — replaces the existing `tutorials/index.md` "Coming soon" placeholder, which is deleted in the same commit.
-- Updated `docs/book/src/SUMMARY.md` — `[Install](install.md)` as a top-level link before Tutorials; the Tutorials entry repointed from `tutorials/index.md` to `tutorials/getting-started.md`.
+- Updated `docs/book/src/SUMMARY.md` — a top-level `Install` link before Tutorials (pointing at `install.md`); the Tutorials entry repointed from `tutorials/index.md` to `tutorials/getting-started.md`.
 - New `scripts/verify.sh` function `check_doc_commands` (see "Drift control" below). Wired into the default check list and into the CI rollup.
 - `example/` curation:
   - User-provided replacement / additional images committed under `example/images/`.
@@ -215,7 +215,7 @@ PR 2 ships even if PR 3 slips. The result is a half-complete how-to landing for 
 
 Embedded shell commands in `install.md`, `tutorials/getting-started.md`, and the six `how-to/*.md` pages reference live CLI flags, preset file paths, and image file paths. None of those are checked by any existing verify step:
 
-- `check_md_links` validates `[text](path.md)` links to other markdown files.
+- `check_md_links` validates markdown-relative links to other markdown files.
 - `check_book_linkcheck` validates intra-site links.
 - `check_external_links` validates outbound URLs.
 - `check_markdown_lint` validates style.
