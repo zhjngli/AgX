@@ -226,11 +226,58 @@ check_book_no_internal_refs() {
     # (docs/plans/), backlog (docs/backlog/), and contributor guides
     # (docs/contributing/) belong outside the published surface — readers
     # don't need them, and exposing them blurs the public/internal line.
-    local hits
-    hits="$(grep -rn -E '\]\([^)]*docs/(plans|backlog|contributing)/' docs/book/src/ || true)"
-    if [ -n "$hits" ]; then
-        echo "ERROR: published mdbook content links to internal docs (plans/backlog/contributing):"
-        echo "$hits"
+    #
+    # Walk each markdown link target, resolve it relative to the file's
+    # location, normalise via `realpath`, and reject any normalised path
+    # that lives under one of the three internal directories. This catches
+    # `../../contributing/foo.md`-style relative links that a literal grep
+    # would miss.
+    local errors=0
+    local link_re='\[([^]]*)\]\(([^)]+)\)'
+    local fence_re='^[[:space:]]*```'
+    local repo_root
+    repo_root="$(pwd -P)"
+
+    while IFS= read -r file; do
+        local dir
+        dir="$(dirname "$file")"
+        local in_code_block=0
+        while IFS= read -r line; do
+            if [[ "$line" =~ $fence_re ]]; then
+                in_code_block=$((1 - in_code_block))
+                continue
+            fi
+            if [ "$in_code_block" -eq 1 ]; then
+                continue
+            fi
+            local remaining="$line"
+            while [[ "$remaining" =~ $link_re ]]; do
+                local target="${BASH_REMATCH[2]}"
+                # Drop fragment and query suffixes; we only care about the file path.
+                target="${target%%#*}"
+                target="${target%%\?*}"
+                # Skip external links and anchor-only links.
+                if [[ -n "$target" && "$target" != http* ]]; then
+                    local resolved
+                    resolved="$(cd "$dir" 2>/dev/null && realpath "$target" 2>/dev/null || true)"
+                    if [ -n "$resolved" ]; then
+                        local rel="${resolved#$repo_root/}"
+                        case "$rel" in
+                            docs/plans/*|docs/backlog/*|docs/contributing/*)
+                                local link_text="${BASH_REMATCH[1]}"
+                                echo "ERROR: $file links to internal $rel via [$link_text]($target)"
+                                errors=$((errors + 1))
+                                ;;
+                        esac
+                    fi
+                fi
+                remaining="${remaining#*"${BASH_REMATCH[0]}"}"
+            done
+        done < "$file"
+    done < <(find docs/book/src -type f -name '*.md' | sort)
+
+    if [ "$errors" -gt 0 ]; then
+        echo "$errors internal-doc link(s) found in published book content"
         return 1
     fi
     echo "No internal-doc links in published book content"
@@ -292,19 +339,22 @@ check_wgsl_headers() {
 
 # --- Documentation command runner ---
 # Extracts shell command blocks (bash/sh/shell) from tutorial, how-to, and
-# install pages and executes the agx-cli invocations against example/ inputs.
-# Catches drift in flag names, preset filenames, and image filenames that
-# link checking and markdown linting do not see.
+# install pages and executes the embedded workspace-binary invocations
+# against example/ inputs. Catches drift in flag names, preset filenames,
+# and image filenames that link checking and markdown linting do not see.
 #
 # Substitutions applied per command line:
 #   - "cargo install agx-cli" lines are skipped (they are publish-time
 #     examples, not runnable in CI).
 #   - "agx-cli " is rewritten to "cargo run --release -p agx-cli -- " so the
 #     check uses the in-tree binary regardless of PATH state.
-#   - Any path passed to `-o` or `--output` is rewritten to a per-block
-#     tempdir to avoid clobbering the working tree.
+#   - Output paths passed to `-o`, `--output`, and `--output-dir` are
+#     rewritten to per-block tempdirs. File outputs preserve the original
+#     extension (so `-o foo.png` writes a real PNG, not the default JPEG).
 #
-# Exit code 0 = every command ran cleanly and produced its declared output.
+# After execution, every declared output path is asserted to exist (and to
+# be non-empty if it is a directory). Exit code 0 = every command ran
+# cleanly and produced its declared outputs.
 check_doc_commands() {
     local errors=0
     local tmp_root
@@ -342,7 +392,7 @@ check_doc_commands() {
             fi
             if [[ "$line" =~ $fence_close_re ]]; then
                 in_block=0
-                if [ "$block_ignored" -eq 0 ] && [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"cargo run -p agx-cli"* ]]; then
+                if [ "$block_ignored" -eq 0 ] && [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"cargo run -p agx-cli"* || "$block_buf" == *"cargo run -p agx-lut-gen"* ]]; then
                     _run_doc_block "$file" "$block_buf" "$tmp_root" || errors=$((errors + 1))
                 fi
                 block_buf=""
@@ -391,13 +441,37 @@ _run_doc_block() {
         | sed 's|agx-cli |__AGX_RUN__ |g' \
         | sed 's|__AGX_RUN__|cargo run --release -p agx-cli --|g')"
 
-    # Rewrite -o / --output paths to a per-block tempdir. `TMPDIR=...; mktemp -d`
+    # Rewrite output paths to a per-block tempdir. `TMPDIR=...; mktemp -d`
     # works on both BSD and GNU mktemp; `mktemp -d -p ...` is GNU-only.
+    #
+    # Use sentinels containing `@` characters so the substitution passes
+    # do not interfere with each other. `$block_tmp` from mktemp contains
+    # a dot (`tmp.XXXXX`), and a naive multi-pass substitution would let
+    # Pass 3 re-match Pass 2's already-rewritten output up to the dot.
+    # Sentinels avoid that by being un-path-like; we expand them to the
+    # real tempdir in a final pass.
     local block_tmp
     block_tmp="$(TMPDIR="$tmp_root" mktemp -d)"
+    local sentinel_dir='@@AGX_OUTDIR@@'
+    local sentinel_file='@@AGX_OUTFILE@@'
     rewritten="$(printf '%s\n' "$rewritten" \
-        | sed -E "s| -o [^[:space:]]+| -o $block_tmp/out|g" \
-        | sed -E "s| --output [^[:space:]]+| --output $block_tmp/out|g")"
+        | sed -E "s| --output-dir [^[:space:]]+| --output-dir ${sentinel_dir}|g" \
+        | sed -E "s| -o [^[:space:]]*\.([a-zA-Z0-9]+)| -o ${sentinel_file}.\1|g" \
+        | sed -E "s| --output [^[:space:]]*\.([a-zA-Z0-9]+)| --output ${sentinel_file}.\1|g" \
+        | sed -E "s| -o [^[:space:]@]+| -o ${sentinel_file}|g" \
+        | sed -E "s| --output [^[:space:]@]+| --output ${sentinel_file}|g" \
+        | sed "s|${sentinel_dir}|${block_tmp}|g" \
+        | sed "s|${sentinel_file}|${block_tmp}/out|g")"
+
+    # Capture every declared output path so we can assert post-execution
+    # that the binary actually produced what the doc claims.
+    local declared_outputs=()
+    local path
+    while IFS= read -r path; do
+        [ -n "$path" ] && declared_outputs+=("$path")
+    done < <(printf '%s\n' "$rewritten" \
+        | grep -oE '[[:space:]](-o|--output|--output-dir)[[:space:]]+[^[:space:]]+' \
+        | awk '{print $NF}')
 
     echo ""
     echo "--- Running embedded block from $file ---"
@@ -407,6 +481,18 @@ _run_doc_block() {
         echo "ERROR: command block from $file failed"
         return 1
     fi
+
+    for path in "${declared_outputs[@]+"${declared_outputs[@]}"}"; do
+        if [ -d "$path" ]; then
+            if [ -z "$(ls -A "$path" 2>/dev/null)" ]; then
+                echo "ERROR: declared output dir $path is empty after running block from $file"
+                return 1
+            fi
+        elif [ ! -f "$path" ]; then
+            echo "ERROR: declared output $path missing after running block from $file"
+            return 1
+        fi
+    done
     return 0
 }
 
