@@ -1,0 +1,71 @@
+# Getting started with AgX
+
+Assumes AgX is installed — see [Install](../install.md).
+
+In ten minutes, you'll edit your first photo two ways: by applying a preset (one command, full look) and by tweaking inline parameters (the slider model underneath). Both produce a real PNG on disk.
+
+This tutorial uses a sample image and preset bundled in the AgX repository. If you cloned the repo, run the commands from its root. If you installed via `cargo install agx-cli` only, download the [`example/`](https://github.com/zhjngli/AgX/tree/main/example) directory or swap the paths for your own image and preset.
+
+## Apply a preset
+
+Run:
+
+```bash
+agx-cli apply \
+  -i example/images/sunset_river.png \
+  -p example/presets/golden-hour.toml \
+  -o golden-hour.png
+```
+
+AgX decodes the source, renders it through every adjustment in the preset (tone, white balance, HSL, optional LUT — see the [preset model](../reference/concepts/preset-model.md)), and writes a new PNG.
+
+![Original](../assets/tutorials/apply-before.jpg)
+![After applying golden-hour.toml](../assets/tutorials/apply-after.jpg)
+
+Open `golden-hour.png` in your image viewer. The result should be warmer, with lifted shadows and pulled-back highlights — a late-afternoon feel.
+
+Try a different preset by swapping `-p`:
+
+```bash
+agx-cli apply \
+  -i example/images/sunset_river.png \
+  -p example/presets/moody-dark.toml \
+  -o moody-dark.png
+```
+
+Each `.toml` file in `example/presets/` is a complete editing recipe. Presets are plain text — open one in your editor to see what's inside.
+
+## Tweak the result with `edit`
+
+A preset is just a saved bundle of parameters. To see the parameters themselves, use `edit` instead of `apply`:
+
+```bash
+agx-cli edit \
+  -i example/images/sunset_river.png \
+  -o tweaked.png \
+  --exposure 0.5 \
+  --shadows 30 \
+  --highlights -20
+```
+
+Three flags, three [basic adjustments](../explanation/basic.md): brighten the image by half a stop, lift the shadows, pull back the highlights. The `agx-cli edit` command exposes the same internals a preset addresses; the only difference is whether the values come from a `.toml` file or the command line.
+
+![Original](../assets/tutorials/edit-before.jpg)
+![After --exposure 0.5 --shadows 30 --highlights -20](../assets/tutorials/edit-after.jpg)
+
+Try other flags. The full list lives in the [CLI reference](../reference/cli.md). Common ones:
+
+- `--temperature` (white balance, in Kelvin shift)
+- `--contrast` and `--saturation`
+- `--vignette-amount` (see the [vignette explanation](../explanation/vignette.md))
+- `--grain-amount` (see the [grain explanation](../explanation/grain.md))
+
+## What's next
+
+You've seen the two foundational AgX commands. Where to go from here:
+
+- [CLI reference](../reference/cli.md) — every subcommand and flag, generated from the source.
+- [Preset format reference](../reference/preset.md) — every field, type, and default.
+- [Algorithm explanations](../explanation/index.md) — how each adjustment works under the hood.
+
+How-to guides for specific tasks (batch-apply across a folder, multi-apply for side-by-side comparison, write your own preset, custom LUTs) are coming in the next docs PR.

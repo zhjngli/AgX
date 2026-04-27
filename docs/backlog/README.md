@@ -94,6 +94,7 @@ Major features that require significant design work or change the project's scop
 | File | Summary |
 |------|---------|
 | [documentation-initiative.md](documentation-initiative.md) | Umbrella epic: mdbook site, rustdoc retrofit, auto-gen CLI/preset ref, algorithm explanations, tutorials, how-tos |
+| [sample-content-rework.md](sample-content-rework.md) | Curate stronger sample images and refresh e2e goldens, README hero images, and docs thumbnails together |
 
 ### Color and Formats
 

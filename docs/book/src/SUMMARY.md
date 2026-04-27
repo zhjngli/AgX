@@ -1,10 +1,11 @@
 # Summary
 
 [Introduction](introduction.md)
+[Install](install.md)
 
 # Tutorials
 
-- [Coming soon](tutorials/index.md)
+- [Getting started](tutorials/getting-started.md)
 
 # How-to guides
 

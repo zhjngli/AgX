@@ -290,6 +290,115 @@ check_wgsl_headers() {
     return 0
 }
 
+# --- Documentation command runner ---
+# Extracts shell command blocks (bash/sh/shell) from tutorial, how-to, and
+# install pages and executes the agx-cli invocations against example/ inputs.
+# Catches drift in flag names, preset filenames, and image filenames that
+# link checking and markdown linting do not see.
+#
+# Substitutions applied per command line:
+#   - "cargo install agx-cli" lines are skipped (they are publish-time
+#     examples, not runnable in CI).
+#   - "agx-cli " is rewritten to "cargo run --release -p agx-cli -- " so the
+#     check uses the in-tree binary regardless of PATH state.
+#   - Any path passed to `-o` or `--output` is rewritten to a per-block
+#     tempdir to avoid clobbering the working tree.
+#
+# Exit code 0 = every command ran cleanly and produced its declared output.
+check_doc_commands() {
+    local errors=0
+    local tmp_root
+    tmp_root="$(mktemp -d)"
+
+    local files=()
+    [ -f docs/book/src/install.md ] && files+=(docs/book/src/install.md)
+    for f in docs/book/src/tutorials/*.md docs/book/src/how-to/*.md; do
+        [ -f "$f" ] && files+=("$f")
+    done
+
+    local fence_open_re='^[[:space:]]*```(bash|sh|shell)[[:space:]]*$'
+    local fence_close_re='^[[:space:]]*```[[:space:]]*$'
+
+    for file in "${files[@]+"${files[@]}"}"; do
+        local in_block=0
+        local block_buf=""
+        while IFS= read -r line; do
+            if [ "$in_block" -eq 0 ]; then
+                if [[ "$line" =~ $fence_open_re ]]; then
+                    in_block=1
+                    block_buf=""
+                fi
+                continue
+            fi
+            if [[ "$line" =~ $fence_close_re ]]; then
+                in_block=0
+                if [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"cargo run -p agx-cli"* ]]; then
+                    _run_doc_block "$file" "$block_buf" "$tmp_root" || errors=$((errors + 1))
+                fi
+                block_buf=""
+                continue
+            fi
+            if [[ -n "$block_buf" ]]; then
+                block_buf="$block_buf"$'\n'"$line"
+            else
+                block_buf="$line"
+            fi
+        done < "$file"
+    done
+
+    rm -rf "$tmp_root"
+
+    if [ "$errors" -gt 0 ]; then
+        echo "$errors doc-command failure(s)"
+        return 1
+    fi
+    echo "All embedded agx-cli doc commands ran cleanly"
+    return 0
+}
+
+# Internal helper used by check_doc_commands. Rewrites and executes a single
+# fenced shell block.
+_run_doc_block() {
+    local file="$1"
+    local block="$2"
+    local tmp_root="$3"
+
+    # Skip blocks that are pure `cargo install agx-cli` or comments — those
+    # are publish-time examples that don't make sense in CI.
+    local non_install
+    non_install="$(printf '%s\n' "$block" | grep -v '^[[:space:]]*\(cargo install\|#\|\\\\\)' || true)"
+    if [ -z "${non_install// }" ]; then
+        return 0
+    fi
+
+    # Substitute `agx-cli ` (including the trailing space) with the in-tree
+    # run cmd. A sentinel guards against double-substitution on lines that
+    # already say `cargo run -p agx-cli`.
+    local rewritten
+    rewritten="$(printf '%s\n' "$block" \
+        | sed 's|cargo run -p agx-cli --|__AGX_RUN__|g' \
+        | sed 's|agx-cli |__AGX_RUN__ |g' \
+        | sed 's|__AGX_RUN__|cargo run --release -p agx-cli --|g')"
+
+    # Rewrite -o / --output paths to a per-block tempdir. `TMPDIR=...; mktemp -d`
+    # works on both BSD and GNU mktemp; `mktemp -d -p ...` is GNU-only.
+    local block_tmp
+    block_tmp="$(TMPDIR="$tmp_root" mktemp -d)"
+    rewritten="$(printf '%s\n' "$rewritten" \
+        | sed -E "s| -o [^[:space:]]+| -o $block_tmp/out|g" \
+        | sed -E "s| --output [^[:space:]]+| --output $block_tmp/out|g")"
+
+    echo ""
+    echo "--- Running embedded block from $file ---"
+    printf '%s\n' "$rewritten"
+
+    if ! ( set -e; eval "$rewritten" ) ; then
+        echo "ERROR: command block from $file failed"
+        return 1
+    fi
+    return 0
+}
+
 # --- Single-check dispatch (used by CI for parallel runs) ---
 if [ "$#" -gt 0 ]; then
     case "$1" in
@@ -307,10 +416,11 @@ if [ "$#" -gt 0 ]; then
         back-links)    check_back_links ;;
         sibling-md-clean) check_sibling_md_clean ;;
         book-no-internal-refs) check_book_no_internal_refs ;;
+        doc-commands) check_doc_commands ;;
         all)           ;;  # fall through to full run below
         *)
             echo "Unknown check: $1"
-            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, back-links, sibling-md-clean, book-no-internal-refs, all"
+            echo "Valid checks: fmt, clippy, test-lib, test-cli, test-features, rustdoc, doc-links, book-linkcheck, external-links, wgsl-headers, markdown-lint, back-links, sibling-md-clean, book-no-internal-refs, doc-commands, all"
             exit 1
             ;;
     esac
@@ -376,6 +486,9 @@ run_check "Sibling .md cleanliness" check_sibling_md_clean
 
 # 12. Book content has no links to internal planning/backlog/contributor docs
 run_check "Book content surface boundary" check_book_no_internal_refs
+
+# 13. Embedded doc command drift
+run_check "Doc commands" check_doc_commands
 
 # Summary
 echo ""
