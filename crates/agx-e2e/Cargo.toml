@@ -11,5 +11,5 @@ publish = false
 image = "0.25"
 
 [dev-dependencies]
-agx = { path = "../agx", features = ["raw"] }
+agx = { package = "agx-photo", path = "../agx", features = ["raw"] }
 tempfile = "3"

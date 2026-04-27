@@ -1,9 +1,18 @@
 [package]
-name = "agx"
+name = "agx-photo"
 version = "0.1.0"
 edition = "2021"
 description = "An open-source photo editing library with a readable, portable preset format"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/zhjngli/AgX"
+homepage = "https://github.com/zhjngli/AgX"
+documentation = "https://docs.rs/agx-photo"
+readme = "../../README.md"
+keywords = ["photo", "image", "editing", "preset", "lut"]
+categories = ["multimedia::images", "command-line-utilities"]
+
+[lib]
+name = "agx"
 
 [dependencies]
 image = "0.25"
