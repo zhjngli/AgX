@@ -24,3 +24,4 @@ The `luminance`, `color`, and `detail` sliders parameterize the threshold streng
 - Concept references: [Detail](../reference/concepts/detail.md) (noise reduction entry), [Color models](../reference/concepts/color-models.md)
 - API references: [noise reduction](../api/agx/adjust/denoise/index.html)
 - Related explanations: [Detail pass](detail.md), [Dehaze](dehaze.md), [Grain](grain.md)
+- How-tos: [Write your own preset](../how-to/write-preset.md)

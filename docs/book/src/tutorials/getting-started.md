@@ -64,8 +64,10 @@ Try other flags. The full list lives in the [CLI reference](../reference/cli.md)
 
 You've seen the two foundational AgX commands. Where to go from here:
 
+- [Apply a preset to a folder of photos](../how-to/batch-apply.md) — run `batch-apply` over a directory.
+- [Compare looks side-by-side](../how-to/multi-apply.md) — `multi-apply` for preset audition.
+- [Write your own preset](../how-to/write-preset.md) — author a TOML preset from scratch.
+- [Compose layered looks](../how-to/compose-looks.md) — stack presets at apply time.
 - [CLI reference](../reference/cli.md) — every subcommand and flag, generated from the source.
 - [Preset format reference](../reference/preset.md) — every field, type, and default.
 - [Algorithm explanations](../explanation/index.md) — how each adjustment works under the hood.
-
-How-to guides for specific tasks (batch-apply across a folder, multi-apply for side-by-side comparison, write your own preset, custom LUTs) are coming in the next docs PR.

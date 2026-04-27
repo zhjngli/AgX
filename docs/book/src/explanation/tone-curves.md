@@ -24,3 +24,4 @@ The Fritsch-Carlson tangent limiter at LUT-build time is what keeps the cubic He
 - Concept references: [Tone](../reference/concepts/tone.md) (tone curves entry), [Color models](../reference/concepts/color-models.md) (luminance section)
 - API references: [tone curves](../api/agx/adjust/tone_curves/index.html)
 - Related explanations: [Basic adjustments](basic.md), [HSL](hsl.md), [Color grading](color-grading.md)
+- How-tos: [Write your own preset](../how-to/write-preset.md)
