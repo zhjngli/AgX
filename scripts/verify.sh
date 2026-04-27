@@ -309,7 +309,6 @@ check_doc_commands() {
     local errors=0
     local tmp_root
     tmp_root="$(mktemp -d)"
-    trap 'rm -rf "$tmp_root"' RETURN
 
     local files=()
     [ -f docs/book/src/install.md ] && files+=(docs/book/src/install.md)
@@ -346,6 +345,8 @@ check_doc_commands() {
             fi
         done < "$file"
     done
+
+    rm -rf "$tmp_root"
 
     if [ "$errors" -gt 0 ]; then
         echo "$errors doc-command failure(s)"
