@@ -9,7 +9,13 @@
 
 # How-to guides
 
-- [Coming soon](how-to/index.md)
+- [Overview](how-to/index.md)
+- [Apply a preset to a folder](how-to/batch-apply.md)
+- [Compare looks side-by-side](how-to/multi-apply.md)
+- [Write your own preset](how-to/write-preset.md)
+- [Extend a preset](how-to/extend-preset.md)
+- [Author a custom .cube LUT](how-to/custom-lut.md)
+- [Compose layered looks](how-to/compose-looks.md)
 
 # Reference
 
