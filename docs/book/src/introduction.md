@@ -12,7 +12,8 @@ AgX is an open-source preset-first photo editing library and command-line tool, 
 
 This site is organized using the [Diataxis framework](https://diataxis.fr/). Pick the section that matches what you want to do:
 
-- **[Tutorials](tutorials/index.md)** — learning-oriented walkthroughs. Start here if you are new to AgX.
+- **[Install](install.md)** — install the CLI and verify it works.
+- **[Tutorials](tutorials/getting-started.md)** — learning-oriented walkthroughs. Start here if you are new to AgX.
 - **[How-to guides](how-to/index.md)** — task-oriented recipes. Start here if you know what you want to do but not how.
 - **[Reference](reference/cli.md)** — exhaustive lookup material. The CLI reference, preset format reference, and conceptual reference live here.
 - **[Explanation](explanation/index.md)** — discussion-oriented background. How AgX's algorithms work and why they were designed that way.
