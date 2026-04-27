@@ -55,7 +55,7 @@ A reference page must not contain "Why X" sections. An explanation page must not
 
 ### Rule 3 — Page structure within a section
 
-Every section has an `index.md` landing page that orients the reader: what is here, how to navigate, what to read first. Sibling pages within a section share a consistent skeleton where reasonable. Algorithm explanation pages share one skeleton (mermaid diagram → prose include → `Related`). Conceptual explanation pages share a different skeleton (intro → named subsections → `See also`). Reference concept pages share another (intro → named subsections covering the topic → `See also`). Consistency within a section, variation across sections.
+Every section has an `index.md` landing page that orients the reader: what is here, how to navigate, what to read first. Sibling pages within a section share a consistent skeleton where reasonable. Algorithm explanation pages share one skeleton (mermaid diagram → prose include → `See also`). Conceptual explanation pages share a different skeleton (intro → named subsections → `See also`). Reference concept pages share another (intro → named subsections covering the topic → `See also`). Consistency within a section, variation across sections.
 
 ### Rule 4 — Section structure within a page
 

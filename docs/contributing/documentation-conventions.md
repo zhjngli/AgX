@@ -166,7 +166,7 @@ One short paragraph summarizing what the diagram shows.
 
 {{#include ../../../../crates/agx/src/adjust/<algo>.md}}
 
-## Related
+## See also
 
 - [API reference](../api/agx/adjust/<algo>/index.html)
 ````
