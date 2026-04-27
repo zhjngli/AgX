@@ -27,6 +27,16 @@ AgX is a **preset-first** photo editing tool. The goal is not to replace Lightro
 - **Metadata preservation**: EXIF and ICC profiles carried through the pipeline
 - **Library + CLI**: use as a Rust library or through the command-line interface
 
+## Install
+
+```bash
+cargo install agx-cli
+```
+
+The CLI is published as [`agx-cli`](https://crates.io/crates/agx-cli). The library is published as [`agx-photo`](https://crates.io/crates/agx-photo) (the bare `agx` name is taken on crates.io by an unrelated crate).
+
+For source builds, see the [contributing docs](docs/contributing/developer-workflow.md).
+
 ## Sample Images
 
 These before/after pairs are from the e2e test suite — each processed through the full decode, engine render, and encode pipeline with a film-inspired look preset and 3D LUT.
@@ -229,7 +239,14 @@ The CLI enables raw support by default. To use the library without raw support (
 ```toml
 # Cargo.toml — no "raw" feature, only standard formats
 [dependencies]
-agx = "0.1"
+agx-photo = "0.1"
+```
+
+The library is published as `agx-photo` but its Rust crate name remains `agx`, so existing `use agx::...` imports work unchanged. With raw support:
+
+```toml
+[dependencies]
+agx-photo = { version = "0.1", features = ["raw"] }
 ```
 
 ## License
