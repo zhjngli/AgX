@@ -11,7 +11,7 @@ set -euo pipefail
 # Named checks (used by CI to parallelize):
 #   fmt            cargo fmt --check
 #   clippy         cargo clippy -D warnings
-#   test-lib       cargo test -p agx
+#   test-lib       cargo test -p agx-photo
 #   test-cli       cargo test -p agx-cli
 #   test-features  feature-gated tests (docgen, raw)
 #   rustdoc        cargo doc with warnings-as-errors
@@ -101,7 +101,7 @@ check_clippy() {
 }
 
 check_test_lib() {
-    cargo test -p agx
+    cargo test -p agx-photo
 }
 
 check_test_cli() {
@@ -109,9 +109,9 @@ check_test_cli() {
 }
 
 check_test_features() {
-    cargo test -p agx --features docgen
+    cargo test -p agx-photo --features docgen
     cargo test -p agx-docgen
-    cargo test -p agx --features raw
+    cargo test -p agx-photo --features raw
 }
 
 check_rustdoc() {
@@ -348,7 +348,7 @@ run_check "Format (cargo fmt)" check_fmt
 run_check "Lint (cargo clippy)" check_clippy
 
 # 3. Library tests (unit + architecture)
-run_check "Library tests (cargo test -p agx)" check_test_lib
+run_check "Library tests (cargo test -p agx-photo)" check_test_lib
 
 # 4. CLI tests
 run_check "CLI tests (cargo test -p agx-cli)" check_test_cli
