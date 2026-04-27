@@ -58,6 +58,7 @@ jobs:
           - back-links
           - sibling-md-clean
           - book-no-internal-refs
+          - doc-commands
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -65,7 +66,7 @@ jobs:
         with:
           shared-key: docs-checks
       - name: Install libraw
-        if: matrix.check == 'rustdoc' || matrix.check == 'book-linkcheck'
+        if: matrix.check == 'rustdoc' || matrix.check == 'book-linkcheck' || matrix.check == 'doc-commands'
         run: sudo apt-get update && sudo apt-get install -y libraw-dev
       - name: Install mdbook and preprocessors
         if: matrix.check == 'book-linkcheck'
