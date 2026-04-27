@@ -32,4 +32,4 @@ A per-channel mapping from input value to output value, drawn as a curve. AgX pr
 
 ---
 
-See: [Basic adjustments](../../explanation/basic.md) (exposure and tonal sliders — white balance lives under [Color](color.md)) and [Tone curves](../../explanation/tone-curves.md) for the algorithm-level math behind these knobs.
+See: [Basic adjustments](../../explanation/algorithms/basic.md) (exposure and tonal sliders — white balance lives under [Color](color.md)) and [Tone curves](../../explanation/algorithms/tone-curves.md) for the algorithm-level math behind these knobs.

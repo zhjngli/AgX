@@ -173,7 +173,7 @@ check_markdown_lint() {
 
 check_back_links() {
     local errors=0
-    for f in docs/book/src/explanation/*.md; do
+    for f in docs/book/src/explanation/algorithms/*.md docs/book/src/explanation/concepts/*.md docs/book/src/explanation/*.md; do
         [ -f "$f" ] || continue
         case "$f" in
             */index.md) continue ;;

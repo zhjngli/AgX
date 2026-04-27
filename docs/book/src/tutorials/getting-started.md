@@ -48,7 +48,7 @@ agx-cli edit \
   --highlights -20
 ```
 
-Three flags, three [basic adjustments](../explanation/basic.md): brighten the image by half a stop, lift the shadows, pull back the highlights. The `agx-cli edit` command exposes the same internals a preset addresses; the only difference is whether the values come from a `.toml` file or the command line.
+Three flags, three [basic adjustments](../explanation/algorithms/basic.md): brighten the image by half a stop, lift the shadows, pull back the highlights. The `agx-cli edit` command exposes the same internals a preset addresses; the only difference is whether the values come from a `.toml` file or the command line.
 
 ![Original](../assets/tutorials/edit-before.jpg)
 ![After --exposure 0.5 --shadows 30 --highlights -20](../assets/tutorials/edit-after.jpg)
@@ -57,8 +57,8 @@ Try other flags. The full list lives in the [CLI reference](../reference/cli.md)
 
 - `--temperature` (warm/cool slider — positive warmer, negative cooler)
 - `--contrast` and `--saturation`
-- `--vignette-amount` (see the [vignette explanation](../explanation/vignette.md))
-- `--grain-amount` (see the [grain explanation](../explanation/grain.md))
+- `--vignette-amount` (see the [vignette explanation](../explanation/algorithms/vignette.md))
+- `--grain-amount` (see the [grain explanation](../explanation/algorithms/grain.md))
 
 ## What's next
 

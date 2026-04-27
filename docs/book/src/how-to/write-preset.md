@@ -40,16 +40,16 @@ Open `/tmp/my-look.png`. Tweak any value — re-run — see the change.
 
 Each section corresponds to a stage of the render pipeline. The full set:
 
-- `[tone]` — basic adjustments (exposure, contrast, highlights, shadows, whites, blacks). See the [basic adjustments explanation](../explanation/basic.md).
+- `[tone]` — basic adjustments (exposure, contrast, highlights, shadows, whites, blacks). See the [basic adjustments explanation](../explanation/algorithms/basic.md).
 - `[white_balance]` — temperature and tint shifts.
-- `[hsl]` — per-color hue / saturation / luminance adjustments. See [HSL](../explanation/hsl.md).
-- `[color_grading]` — split-toning across shadows / midtones / highlights. See [color grading](../explanation/color-grading.md).
-- `[tone_curve]` — RGB and per-channel tone curves. See [tone curves](../explanation/tone-curves.md).
-- `[detail]` — sharpening, clarity, texture. See [detail pass](../explanation/detail.md).
-- `[dehaze]` — haze removal. See [dehaze](../explanation/dehaze.md).
-- `[noise_reduction]` — luminance and color denoise. See [noise reduction](../explanation/denoise.md).
-- `[grain]` — film grain simulation. See [grain](../explanation/grain.md).
-- `[vignette]` — corner darkening or lightening. See [vignette](../explanation/vignette.md).
+- `[hsl]` — per-color hue / saturation / luminance adjustments. See [HSL](../explanation/algorithms/hsl.md).
+- `[color_grading]` — split-toning across shadows / midtones / highlights. See [color grading](../explanation/algorithms/color-grading.md).
+- `[tone_curve]` — RGB and per-channel tone curves. See [tone curves](../explanation/algorithms/tone-curves.md).
+- `[detail]` — sharpening, clarity, texture. See [detail pass](../explanation/algorithms/detail.md).
+- `[dehaze]` — haze removal. See [dehaze](../explanation/algorithms/dehaze.md).
+- `[noise_reduction]` — luminance and color denoise. See [noise reduction](../explanation/algorithms/denoise.md).
+- `[grain]` — film grain simulation. See [grain](../explanation/algorithms/grain.md).
+- `[vignette]` — corner darkening or lightening. See [vignette](../explanation/algorithms/vignette.md).
 - `[lut]` — apply a `.cube` LUT. See [authoring a custom LUT](custom-lut.md).
 
 Every field's type, valid range, and default is documented in the [preset format reference](../reference/preset.md), generated from the source schema.

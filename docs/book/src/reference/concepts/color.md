@@ -29,6 +29,6 @@ Color grading sits in RGB (sRGB gamma) and uses luminance to weight the regions.
 
 ---
 
-See: [Basic adjustments](../../explanation/basic.md) (white balance section), [HSL](../../explanation/hsl.md), and [Color grading](../../explanation/color-grading.md) for the algorithm-level math behind these knobs.
+See: [Basic adjustments](../../explanation/algorithms/basic.md) (white balance section), [HSL](../../explanation/algorithms/hsl.md), and [Color grading](../../explanation/algorithms/color-grading.md) for the algorithm-level math behind these knobs.
 
 LUTs also produce color transforms; AgX applies them as part of the color stage. See [LUT format](lut-format.md) for what a LUT is and how AgX handles it.

@@ -6,7 +6,7 @@ Effects are overlaid or added artifacts — they don't restore or correct anythi
 
 Simulates film grain by adding spatial noise to the image. Real film shows grain because silver halide crystals form in discrete clumps; AgX models the look without the chemistry. The effect is shadow-weighted — grain is more visible in dark areas, matching how real film behaves at higher ISOs.
 
-See [Grain](../../explanation/grain.md) for the full algorithm and the design history behind the choices.
+See [Grain](../../explanation/algorithms/grain.md) for the full algorithm and the design history behind the choices.
 
 ## Vignette
 
@@ -16,4 +16,4 @@ AgX's vignette is creative — symmetric, controllable in amount and falloff. Le
 
 ---
 
-See: [Grain](../../explanation/grain.md) and [Vignette](../../explanation/vignette.md) for the algorithm-level math behind these knobs.
+See: [Grain](../../explanation/algorithms/grain.md) and [Vignette](../../explanation/algorithms/vignette.md) for the algorithm-level math behind these knobs.
