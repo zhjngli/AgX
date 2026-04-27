@@ -11,7 +11,7 @@ AgX's documentation is organized using the [Diataxis framework](https://diataxis
 - **Reference** is information-oriented. The reader needs to look something up — a CLI flag, a preset field, a function signature, a color space conversion.
 - **Explanation** is understanding-oriented. The reader wants to know how something works under the hood and why it was designed that way.
 
-Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types in a later sub-project); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only.
+Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types via the `agx-docgen` crate); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only.
 
 ## Item-level documentation: `///` comments
 
@@ -109,7 +109,7 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
 - **Mdbook to mdbook:** use mdbook's native relative-link resolution — relative paths from the file's location to the target file.
 
   ```markdown
-  [Tutorials](../tutorials/index.md)
+  [Tutorials](../tutorials/getting-started.md)
   ```
 
 - **Rustdoc to rustdoc:** use intra-doc link syntax. The `deny(rustdoc::broken_intra_doc_links)` lint validates these.

@@ -2,9 +2,9 @@
 
 A preset is a portable, human-readable description of an edit. AgX's preset model has three parts:
 
-1. **Metadata** — name, version, author, optional description.
+1. **Metadata** — name, version, author, and an optional `extends` reference.
 2. **Partial parameters** — a set of overrides on the engine's default parameters. Any parameter the preset doesn't mention keeps the default.
-3. **Optional LUT** — a `.cube` file path or inline LUT data, applied at the LUT stage of the pipeline.
+3. **Optional LUT** — a `.cube` file path applied at the LUT stage of the pipeline.
 
 The combination is enough to reproduce an edit from a clean image without any GUI state, sidecar file, or hidden context.
 
@@ -32,7 +32,9 @@ AgX resolves the chain at load time:
 
 The chain can be arbitrarily deep. A leaf preset specifies only its incremental changes from its parent; the parent specifies its incremental changes from its parent; and so on up to a base preset (or to the engine defaults if no `extends` is set).
 
-The merge rule is **field-level override**, not deep merge. If both parent and child specify a `tone_curve`, the child's tone curve fully replaces the parent's — there is no per-curve-point inheritance.
+The merge is **recursive through composite sections, last-write-wins at the leaf**. AgX walks each top-level partial section (`tone`, `hsl`, `tone_curve`, `color_grading`, `vignette`, `dehaze`, `noise_reduction`, `grain`, `detail`) and merges fields from the parent and child by union. The child's specified fields win at the leaf level; any field the child doesn't mention is inherited from the parent.
+
+Concretely, if the parent sets `tone_curve.luma` and the child sets `tone_curve.rgb`, the merged preset has both — the child does not replace the parent's `luma` curve just because both presets opened a `[tone_curve]` table. If both parent and child set `tone_curve.luma`, the child's curve fully replaces the parent's at that leaf — AgX does not interpolate or merge individual control points within a single curve.
 
 ## Mental model
 

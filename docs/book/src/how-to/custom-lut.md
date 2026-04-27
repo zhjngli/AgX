@@ -4,7 +4,6 @@ AgX supports 3D LUTs in the [Adobe `.cube` format](../reference/concepts/lut-for
 
 ## Prerequisites
 
-- AgX installed (see [Install](../install.md)).
 - A text editor (for hand-written LUTs) or the AgX source checkout (for `agx-lut-gen`).
 
 ## Hand-write a tiny LUT
@@ -39,13 +38,16 @@ Production LUTs are usually 17×17×17, 33×33×33, or 65×65×65 — those have
 
 ## Generate a LUT with `agx-lut-gen`
 
-AgX includes a dev-only `agx-lut-gen` crate that emits canonical `.cube` LUTs corresponding to specific looks. From an AgX source checkout:
+AgX includes a dev-only `agx-lut-gen` crate that emits canonical `.cube` LUTs for AgX's bundled looks (Portra 400, Neo Noir, B&W High Contrast, and similar). From an AgX source checkout, point it at an output directory:
 
-```bash
-cargo run -p agx-lut-gen -- --help
+```bash ignore
+cargo run -p agx-lut-gen -- --output-dir /tmp/agx-luts
+ls /tmp/agx-luts/
 ```
 
-Outputs the list of bakeable looks. Each one writes a `.cube` file you can load through `--lut` or reference from a preset's `[lut]` section.
+The tool generates one `.cube` file per look into the directory you pass. Use any of them with `--lut <path>` or reference one from a preset's `[lut]` section.
+
+If you omit `--output-dir`, the tool writes into `crates/agx-e2e/fixtures/looks/luts/` — the e2e suite's golden LUT directory. Always pass `--output-dir` unless you are intentionally regenerating the e2e fixtures.
 
 ## Reference a LUT from a preset
 
@@ -54,10 +56,9 @@ In a `.toml` preset, the `[lut]` section embeds the LUT path:
 ```toml
 [lut]
 path = "lift-shadows.cube"
-amount = 1.0
 ```
 
-AgX resolves `path` relative to the preset file. The `amount` field blends the LUT result with the pre-LUT image (1.0 = full LUT, 0.0 = no LUT).
+AgX resolves `path` relative to the preset file. The LUT is applied at full strength when present; there is no blend-amount field in the current schema. To partially apply a LUT, bake the blend into the `.cube` file itself.
 
 ## See also
 

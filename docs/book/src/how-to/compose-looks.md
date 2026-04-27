@@ -4,7 +4,6 @@ AgX can layer multiple presets in a single render. Each preset is applied in ord
 
 ## Prerequisites
 
-- AgX installed (see [Install](../install.md)).
 - Two or more `.toml` presets you want to layer.
 
 ## Steps
