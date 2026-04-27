@@ -31,7 +31,7 @@ tint = 5.0
 
 Apply it:
 
-```bash
+```bash ignore
 agx-cli apply -i example/images/sunset_river.png -p my-look.toml -o /tmp/my-look.png
 ```
 

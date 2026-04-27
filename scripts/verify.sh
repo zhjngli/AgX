@@ -316,26 +316,37 @@ check_doc_commands() {
         [ -f "$f" ] && files+=("$f")
     done
 
-    local fence_open_re='^[[:space:]]*```(bash|sh|shell)[[:space:]]*$'
+    # Fence opener accepts `bash`, `sh`, `shell`. An optional `ignore` info
+    # string after the language tag skips the block — used for illustrative
+    # blocks that reference files the reader is told to create.
+    local fence_open_re='^[[:space:]]*```(bash|sh|shell)([[:space:]]+ignore)?[[:space:]]*$'
     local fence_close_re='^[[:space:]]*```[[:space:]]*$'
 
     for file in "${files[@]+"${files[@]}"}"; do
         local in_block=0
         local block_buf=""
+        local block_ignored=0
         while IFS= read -r line; do
             if [ "$in_block" -eq 0 ]; then
                 if [[ "$line" =~ $fence_open_re ]]; then
                     in_block=1
                     block_buf=""
+                    # BASH_REMATCH[2] holds the optional " ignore" suffix.
+                    if [ -n "${BASH_REMATCH[2]:-}" ]; then
+                        block_ignored=1
+                    else
+                        block_ignored=0
+                    fi
                 fi
                 continue
             fi
             if [[ "$line" =~ $fence_close_re ]]; then
                 in_block=0
-                if [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"cargo run -p agx-cli"* ]]; then
+                if [ "$block_ignored" -eq 0 ] && [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"cargo run -p agx-cli"* ]]; then
                     _run_doc_block "$file" "$block_buf" "$tmp_root" || errors=$((errors + 1))
                 fi
                 block_buf=""
+                block_ignored=0
                 continue
             fi
             if [[ -n "$block_buf" ]]; then
