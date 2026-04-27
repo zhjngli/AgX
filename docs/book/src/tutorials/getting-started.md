@@ -55,7 +55,7 @@ Three flags, three [basic adjustments](../explanation/basic.md): brighten the im
 
 Try other flags. The full list lives in the [CLI reference](../reference/cli.md). Common ones:
 
-- `--temperature` (white balance, in Kelvin shift)
+- `--temperature` (warm/cool slider — positive warmer, negative cooler)
 - `--contrast` and `--saturation`
 - `--vignette-amount` (see the [vignette explanation](../explanation/vignette.md))
 - `--grain-amount` (see the [grain explanation](../explanation/grain.md))

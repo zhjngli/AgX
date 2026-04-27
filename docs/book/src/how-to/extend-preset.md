@@ -4,7 +4,6 @@ AgX presets compose. A preset can declare an `extends` reference to a base prese
 
 ## Prerequisites
 
-- AgX installed (see [Install](../install.md)).
 - A base preset you want to build on.
 
 ## A base preset

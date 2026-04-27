@@ -13,7 +13,9 @@ White balance runs in linear-light RGB because color casts are physical properti
 
 ### Color temperature
 
-**Background concept.** A measurement of the color of light, expressed in Kelvin. Lower temperatures are warmer (orange/red, ~2700K candle, ~3200K tungsten), higher temperatures are cooler (blue, ~6500K daylight, ~10000K shade). When you set a white balance temperature, you're telling AgX what color the light source actually was so it can neutralize the cast.
+**Background concept.** Photographers describe the color of light in Kelvin. Lower temperatures are warmer (orange/red, ~2700K candle, ~3200K tungsten), higher temperatures are cooler (blue, ~6500K daylight, ~10000K shade). Cameras and editors that "set" a white-balance temperature in Kelvin interpret that as the source-light temperature and shift the image to neutralise its cast.
+
+**AgX's `temperature` slider is not a Kelvin value.** It is a creative warm-cool slider: positive values warm the image (boost red, reduce blue), negative values cool it. The mapping is dimensionless — the slider controls a relative channel-multiplier shift, not a Kelvin delta. Use the slider with the photographer's intuition above as a guide, but read the on-screen result rather than expecting a specific Kelvin source-temperature interpretation.
 
 ## HSL
 

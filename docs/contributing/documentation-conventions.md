@@ -11,7 +11,7 @@ AgX's documentation is organized using the [Diataxis framework](https://diataxis
 - **Reference** is information-oriented. The reader needs to look something up — a CLI flag, a preset field, a function signature, a color space conversion.
 - **Explanation** is understanding-oriented. The reader wants to know how something works under the hood and why it was designed that way.
 
-Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types in a later sub-project); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only.
+Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types via the `agx-docgen` crate); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only.
 
 ## Item-level documentation: `///` comments
 
@@ -109,7 +109,7 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
 - **Mdbook to mdbook:** use mdbook's native relative-link resolution — relative paths from the file's location to the target file.
 
   ```markdown
-  [Tutorials](../tutorials/index.md)
+  [Tutorials](../tutorials/getting-started.md)
   ```
 
 - **Rustdoc to rustdoc:** use intra-doc link syntax. The `deny(rustdoc::broken_intra_doc_links)` lint validates these.
@@ -224,7 +224,7 @@ The conceptual reference quadrant lives at `docs/book/src/reference/concepts/`. 
 The conceptual reference surface holds together because of four directional rules. The first three are mechanically enforced; the fourth is the contract tutorials and how-to guides can rely on.
 
 - **Concepts → Explanation (always).** Every lexicon page ends with a footer linking to the relevant `explanation/` page(s). Foundation and AgX-specific pages link to relevant explanations where they exist. Code review.
-- **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/*.md` (the page that wraps a sibling `.md` include — not the sibling itself) ends with a `## See also` block listing relevant concept pages, the rustdoc API references, and related explanations. Enforced by `scripts/verify.sh back-links`.
+- **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/*.md` (the page that wraps a sibling `.md` include — not the sibling itself) ends with a `## See also` block listing relevant concept pages, the rustdoc API references, related explanations, and (where applicable) how-to recipes. `scripts/verify.sh back-links` mechanically enforces *presence* of the heading; the *contents* of each block are a code-review concern — the check does not validate that the listed targets exist or are relevant.
 - **Sibling `.md` cleanliness.** Files at `crates/agx/src/adjust/*.md` (the canonical algorithm-explanation prose included by both rustdoc and mdbook) contain no relative or non-HTTPS markdown links. External `https://` links remain allowed (they render uniformly across rustdoc and mdbook). The convention exists for the cross-surface reasons documented under "The shared `.md` file convention" above; sub-project 5 added `scripts/verify.sh sibling-md-clean` to enforce it.
 - **Tutorials / how-to guides → Concepts (forward-compatible).** Tutorials and how-to guides cite concept anchors directly: `reference/concepts/color.md#white-balance`. Anchors are auto-generated from headings; renaming a heading is a breaking change. The conceptual reference is the stable surface tutorials lean on.
 
@@ -237,6 +237,7 @@ For PRs that touch `docs/book/src/reference/concepts/` or `docs/book/src/explana
 - [ ] Renamed headings: callers updated (or the linkcheck failure is acknowledged and fixed).
 - [ ] New lexicon entry placed under the right group (panel mental model, not pipeline order).
 - [ ] Cross-link footers present (concepts → explanation; explanation → concepts).
+- [ ] `## See also` block contents are accurate and current — the mechanical check only verifies the heading exists, not what's inside it.
 
 The mechanical checks (`back-links`, `sibling-md-clean`, `book-no-internal-refs`, `book-linkcheck`, `doc-links`, `markdown-lint`) cover the easy cases; the checklist above covers the judgment calls.
 

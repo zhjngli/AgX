@@ -193,7 +193,7 @@ agx/
 │   │       ├── lut/     # 3D LUT parsing and interpolation
 │   │       ├── preset/  # TOML preset serialization + composability
 │   │       └── error.rs # error types
-│   ├── agx-cli/         # CLI wrapper (edit, apply, batch-edit)
+│   ├── agx-cli/         # CLI wrapper (apply, edit, batch-apply, batch-edit, multi-apply)
 │   ├── agx-e2e/         # e2e test suite (golden file comparison)
 │   └── agx-lut-gen/     # dev tool for generating .cube LUT files
 ├── example/             # sample images, presets, and LUTs

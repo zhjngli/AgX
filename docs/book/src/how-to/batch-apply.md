@@ -4,7 +4,6 @@ Render every image in a directory through one preset, in parallel.
 
 ## Prerequisites
 
-- AgX installed (see [Install](../install.md)).
 - A folder of input images.
 - A `.toml` preset.
 

@@ -4,7 +4,6 @@ An AgX preset is a TOML file. Every section maps to one stage of the [render pip
 
 ## Prerequisites
 
-- AgX installed (see [Install](../install.md)).
 - A text editor.
 - One sample image you want to test against.
 
@@ -45,7 +44,7 @@ Each section corresponds to a stage of the render pipeline. The full set:
 - `[white_balance]` — temperature and tint shifts.
 - `[hsl]` — per-color hue / saturation / luminance adjustments. See [HSL](../explanation/hsl.md).
 - `[color_grading]` — split-toning across shadows / midtones / highlights. See [color grading](../explanation/color-grading.md).
-- `[tone_curves]` — RGB and per-channel tone curves. See [tone curves](../explanation/tone-curves.md).
+- `[tone_curve]` — RGB and per-channel tone curves. See [tone curves](../explanation/tone-curves.md).
 - `[detail]` — sharpening, clarity, texture. See [detail pass](../explanation/detail.md).
 - `[dehaze]` — haze removal. See [dehaze](../explanation/dehaze.md).
 - `[noise_reduction]` — luminance and color denoise. See [noise reduction](../explanation/denoise.md).

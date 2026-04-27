@@ -4,7 +4,6 @@ Render one image through several presets in a single command. Useful when you're
 
 ## Prerequisites
 
-- AgX installed (see [Install](../install.md)).
 - One input image.
 - Two or more `.toml` presets.
 
