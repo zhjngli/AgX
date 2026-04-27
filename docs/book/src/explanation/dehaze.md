@@ -30,3 +30,4 @@ Positive `amount` runs the full Dark Channel Prior recovery path; negative `amou
 - Concept references: [Detail](../reference/concepts/detail.md) (dehaze entry)
 - API references: [dehaze](../api/agx/adjust/dehaze/index.html)
 - Related explanations: [Detail pass](detail.md), [Noise reduction](denoise.md)
+- How-tos: [Write your own preset](../how-to/write-preset.md)

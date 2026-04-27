@@ -29,3 +29,4 @@ Each wheel's hue/saturation pair is converted to an RGB `tint` once per render v
 - Concept references: [Color](../reference/concepts/color.md) (color grading entry), [Color models](../reference/concepts/color-models.md)
 - API references: [color grading](../api/agx/adjust/color_grading/index.html)
 - Related explanations: [Basic adjustments](basic.md), [HSL](hsl.md), [Tone curves](tone-curves.md)
+- How-tos: [Write your own preset](../how-to/write-preset.md), [Compose layered looks](../how-to/compose-looks.md)
