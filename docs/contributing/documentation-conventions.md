@@ -11,7 +11,33 @@ AgX's documentation is organized using the [Diataxis framework](https://diataxis
 - **Reference** is information-oriented. The reader needs to look something up — a CLI flag, a preset field, a function signature, a color space conversion.
 - **Explanation** is understanding-oriented. The reader wants to know how something works under the hood and why it was designed that way.
 
-Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types via the `agx-docgen` crate); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only.
+### Surface mapping
+
+Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types via the `agx-docgen` crate); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only at `docs/book/src/explanation/concepts/`.
+
+### Authoring rules
+
+Five rules govern content placement and page structure. New PRs are reviewed against these rules.
+
+#### Rule 1 — The category test (which quadrant?)
+
+A page belongs in the quadrant that matches its **dominant reader intent**, not its topic. A page about color spaces could live in reference (look up the conversion formulas) or explanation (understand why operations live in different spaces). Apply the test by asking: "what is the reader trying to do *right now*?" — look up a fact (reference), follow a recipe (how-to), learn from scratch (tutorial), or understand the why (explanation). One topic can have multiple pages, one per quadrant where reader demand exists.
+
+#### Rule 2 — One quadrant per page
+
+A reference page must not contain "Why X" sections. An explanation page must not contain exhaustive enumeration of fields and ranges. When a single page would naturally serve both intents, split it: factual lookup material stays in reference; rationale and design discussion move to a paired explanation page. Pages in this kind of pair link to each other via a `See also` block.
+
+#### Rule 3 — Page structure within a section
+
+Every section has an `index.md` landing page that orients the reader: what is here, how to navigate, what to read first. Sibling pages within a section share a consistent skeleton where reasonable. Algorithm explanation pages share one skeleton (mermaid diagram → prose include → `See also`). Conceptual explanation pages share a different skeleton (intro → named subsections → `See also`). Reference concept pages share another (intro → named subsections → `See also`). Consistency within a section, variation across sections.
+
+#### Rule 4 — Section structure within a page
+
+Headings should reflect reader intent, not implementation structure. `## Why pipeline order matters` is a reader-intent heading; `## Implementation` is not. Headings starting with "Why" or "How" usually belong in explanation pages. Headings that are nouns naming an artifact (a CLI flag, a type, a color space, a preset field) usually belong in reference pages. When a heading in a page does not match the page's quadrant, that is a signal to split.
+
+#### Rule 5 — Cross-quadrant linking
+
+Reference pages link out to explanation for the "why" via a `See also` block at the bottom. Explanation pages link to reference for exhaustive lookup. Tutorials link forward to how-to and reference for next steps. How-tos link back to reference for fields and forward to explanation for context. The site's link graph should be navigable: from any quadrant, the reader can reach the others. `mdbook-linkcheck` enforces that the links resolve; the rule itself is about *what* to link, not *how* to express it.
 
 ## Item-level documentation: `///` comments
 

@@ -17,7 +17,7 @@ Two things have changed since the umbrella design was written:
 
 The original #8 framing — "add four pages" — is now too narrow. Adding architectural prose alongside the existing algorithm pages without addressing the category errors in `concepts/` would permanently encode an inconsistent split: explanation content in the reference quadrant, and the new explanation pages duplicating part of what `concepts/` already covers.
 
-#8 should instead deliver three intertwined things: codify Diataxis-derived rules for content placement and page structure; apply those rules to the existing pages with category errors; add the missing prose explanations the umbrella design called for.
+Sub-project 8 should instead deliver three intertwined things: codify Diataxis-derived rules for content placement and page structure; apply those rules to the existing pages with category errors; add the missing prose explanations the umbrella design called for.
 
 ## Goal
 
