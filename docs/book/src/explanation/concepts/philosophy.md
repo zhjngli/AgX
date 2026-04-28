@@ -12,7 +12,7 @@ The contrast with operation-log editors is sharp. Most photo editors store edits
 
 ## Batch-oriented, not pixel-level
 
-AgX is good at one specific thing: applying a consistent look to many images. The library exposes a render engine that consumes a parameter set and produces a buffer; the CLI wraps that engine in `apply`, `multi-apply`, and `batch-apply` subcommands; both are designed around throughput rather than interactivity. A user with a folder of 500 images and a single preset can render the lot in one command and walk away. That use case is the centre of gravity for every design decision.
+AgX is good at one specific thing: applying a consistent look to many images. The library exposes a render engine that consumes a parameter set and produces a buffer; the CLI wraps that engine in preset-oriented subcommands — `apply`, `multi-apply`, and `batch-apply` — alongside `edit` and `batch-edit` for inline flag-based workflows. All are designed around throughput rather than interactivity. A user with a folder of 500 images and a single preset can render the lot in one command and walk away. That use case is the centre of gravity for every design decision.
 
 What AgX deliberately is not is a pixel-level retouching tool. There is no spot-heal brush and no clone-stamp surface. There is no undo stack — the engine renders from the original image on every call, and the parameter set is the only state. There are no local adjustments yet: every adjustment is global, applied uniformly to every pixel in the image. None of these are oversights. They are coherent omissions that follow from the recipe model.
 
