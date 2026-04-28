@@ -12,6 +12,7 @@ If you want to look up a specific fact (a CLI flag, a preset field, a color-spac
 - [Render pipeline](render-pipeline.md) — why the pipeline runs stages in the order it does.
 - [Preset model](preset-model.md) — the patch-on-baseline mental model behind partial parameters.
 - [Color spaces](color-spaces.md) — why operations live in linear vs sRGB gamma space.
+- [How AgX generates its bundled LUTs](lut-generation.md) — the design choices behind the `agx-lut-gen` crate.
 
 ## See also
 

@@ -42,6 +42,7 @@
   - [Render pipeline](explanation/concepts/render-pipeline.md)
   - [Preset model](explanation/concepts/preset-model.md)
   - [Color spaces](explanation/concepts/color-spaces.md)
+  - [How AgX generates its bundled LUTs](explanation/concepts/lut-generation.md)
 - [Algorithms](explanation/algorithms/index.md)
   - [Basic adjustments](explanation/algorithms/basic.md)
   - [HSL](explanation/algorithms/hsl.md)
