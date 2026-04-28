@@ -72,11 +72,11 @@ The mdbook side at `docs/book/src/explanation/algorithms/grain.md` reads:
 ```markdown
 # Grain
 
-{{#include ../../../../crates/agx/src/adjust/grain.md}}
+{{#include ../../../../../crates/agx/src/adjust/grain.md}}
 
 ## Related
 
-- [Grain API reference](../api/agx/adjust/grain/index.html)
+- [Grain API reference](../../api/agx/adjust/grain/index.html)
 ```
 
 There is no anchor mechanism to maintain. The entire shared `.md` file is the explanation content. Editing it updates both surfaces on the next build with no possibility of drift.
@@ -148,7 +148,7 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
 
 Larger algorithm pages can include a Mermaid pipeline diagram alongside the prose. Mdbook renders the diagram via the `mdbook-mermaid` preprocessor, which is already wired into `book.toml`.
 
-Diagrams live in the **wrapping mdbook page** (`docs/book/src/explanation/<algo>.md`), not in the shared `.md` file. Rustdoc has no Mermaid support, so a fenced `mermaid` block placed in a shared `.md` would render as raw DSL text in the API reference. Keeping diagrams in the wrapper is consistent with the existing rule that surface-specific content lives outside the include.
+Diagrams live in the **wrapping mdbook page** (`docs/book/src/explanation/algorithms/<algo>.md`), not in the shared `.md` file. Rustdoc has no Mermaid support, so a fenced `mermaid` block placed in a shared `.md` would render as raw DSL text in the API reference. Keeping diagrams in the wrapper is consistent with the existing rule that surface-specific content lives outside the include.
 
 The typical structure is:
 
@@ -164,11 +164,11 @@ flowchart TD
 
 One short paragraph summarizing what the diagram shows.
 
-{{#include ../../../../crates/agx/src/adjust/<algo>.md}}
+{{#include ../../../../../crates/agx/src/adjust/<algo>.md}}
 
 ## See also
 
-- [API reference](../api/agx/adjust/<algo>/index.html)
+- [API reference](../../api/agx/adjust/<algo>/index.html)
 ````
 
 Notes for diagram authors:
@@ -250,7 +250,7 @@ The conceptual reference quadrant lives at `docs/book/src/reference/concepts/`. 
 The conceptual reference surface holds together because of four directional rules. The first three are mechanically enforced; the fourth is the contract tutorials and how-to guides can rely on.
 
 - **Concepts → Explanation (always).** Every lexicon page ends with a footer linking to the relevant `explanation/` page(s). Foundation and AgX-specific pages link to relevant explanations where they exist. Code review.
-- **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/*.md` (the page that wraps a sibling `.md` include — not the sibling itself) ends with a `## See also` block listing relevant concept pages, the rustdoc API references, related explanations, and (where applicable) how-to recipes. `scripts/verify.sh back-links` mechanically enforces *presence* of the heading; the *contents* of each block are a code-review concern — the check does not validate that the listed targets exist or are relevant.
+- **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/algorithms/*.md` (the page that wraps a sibling `.md` include — not the sibling itself) ends with a `## See also` block listing relevant concept pages, the rustdoc API references, related explanations, and (where applicable) how-to recipes. The bare `explanation/*.md` glob now matches only `index.md` pages (section indices), which have no `## See also` requirement. `scripts/verify.sh back-links` mechanically enforces *presence* of the heading; the *contents* of each block are a code-review concern — the check does not validate that the listed targets exist or are relevant.
 - **Sibling `.md` cleanliness.** Files at `crates/agx/src/adjust/*.md` (the canonical algorithm-explanation prose included by both rustdoc and mdbook) contain no relative or non-HTTPS markdown links. External `https://` links remain allowed (they render uniformly across rustdoc and mdbook). The convention exists for the cross-surface reasons documented under "The shared `.md` file convention" above; sub-project 5 added `scripts/verify.sh sibling-md-clean` to enforce it.
 - **Tutorials / how-to guides → Concepts (forward-compatible).** Tutorials and how-to guides cite concept anchors directly: `reference/concepts/color.md#white-balance`. Anchors are auto-generated from headings; renaming a heading is a breaking change. The conceptual reference is the stable surface tutorials lean on.
 

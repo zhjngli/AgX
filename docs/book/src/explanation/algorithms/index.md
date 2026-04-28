@@ -5,11 +5,11 @@ This sub-section explains how each editing algorithm works under the hood. Pages
 ## In pipeline order
 
 1. [Basic adjustments](basic.md) — white balance, exposure, tonal sliders.
-2. [HSL](hsl.md)
-3. [Color grading](color-grading.md)
+2. [Dehaze](dehaze.md)
+3. [Noise reduction](denoise.md)
 4. [Tone curves](tone-curves.md)
-5. [Dehaze](dehaze.md)
-6. [Noise reduction](denoise.md)
+5. [HSL](hsl.md)
+6. [Color grading](color-grading.md)
 7. [Detail pass](detail.md) — sharpening, clarity, texture.
 8. [Grain](grain.md)
 9. [Vignette](vignette.md)
