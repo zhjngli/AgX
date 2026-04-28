@@ -2,6 +2,8 @@
 
 Read this file before making structural changes to the codebase.
 
+**How to read this file:** `ARCHITECTURE.md` is the *contract* — the rules that govern the codebase boundaries. The discussion of *why* those rules exist lives in the [architecture explanation](docs/book/src/explanation/concepts/architecture.md) on the published site. Read this file when you need to look up or change a rule. Read the explanation when you want to understand the reasoning.
+
 AgX is an open-source photo editing library and CLI in Rust. The architecture follows an always-re-render-from-original model with declarative presets.
 
 ## Module Dependency Graph
@@ -81,17 +83,13 @@ What does NOT exist in each module -- violations of these constraints indicate a
 
 ## Core Invariants
 
-These invariants must hold across the entire codebase:
+These invariants must hold across the entire codebase. The [architecture explanation](docs/book/src/explanation/concepts/architecture.md) and [design decisions](docs/book/src/explanation/concepts/design-decisions.md) cover *why* each is load-bearing.
 
-1. **Always re-render from original**: The engine holds an immutable original image and mutable parameter state. Every render applies all adjustments from scratch to the original. This makes the system order-independent from the user's perspective and eliminates accumulated rounding errors.
-
-2. **Declarative presets**: Preset files are TOML documents declaring parameter values, not operation sequences. A preset says "exposure = +1.0", not "apply exposure +1.0 after white balance".
-
-3. **sRGB only**: All internal processing uses the sRGB color space. No color management pipeline, no ICC profile handling, no working space conversion.
-
-4. **Fixed render order**: The engine applies adjustments in a fixed, hardcoded order regardless of the order parameters appear in presets or API calls. The render order is an engine implementation detail, not a user-facing concept.
-
-5. **Dual pipeline, same output**: The engine has CPU (Rust + rayon) and GPU (wgpu + WGSL compute shaders) pipelines that execute the same stages in the same order. GPU is selected at runtime when a hardware adapter is available; CPU is the fallback. Both paths must produce near-identical output — verified by `gpu_consistency.rs` cross-path tests.
+1. **Always re-render from original** — the engine holds an immutable original and applies all adjustments from scratch on every render.
+2. **Declarative presets** — preset files declare parameter values, not operation sequences.
+3. **sRGB only** — no working-space conversion, no ICC profile handling.
+4. **Fixed render order** — the engine applies adjustments in a hardcoded order regardless of preset key order.
+5. **Dual pipeline, same output** — CPU and GPU pipelines produce near-identical output; CPU is the canonical path.
 
 ## Per-Module Details
 
