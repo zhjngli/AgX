@@ -67,7 +67,7 @@ The canonical worked example is the grain algorithm. The shared file is `crates/
 // ... rest of the file ...
 ```
 
-The mdbook side at `docs/book/src/explanation/grain.md` reads:
+The mdbook side at `docs/book/src/explanation/algorithms/grain.md` reads:
 
 ```markdown
 # Grain
@@ -123,7 +123,7 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
 - **Rustdoc to mdbook:** use raw HTTPS URLs to the deployed site. Rustdoc has no intra-doc syntax for links to mdbook content.
 
   ```markdown
-  See the [grain explanation](https://zhjngli.github.io/AgX/explanation/grain.html) on the project site.
+  See the [grain explanation](https://zhjngli.github.io/AgX/explanation/algorithms/grain.html) on the project site.
   ```
 
 - **Mdbook to rustdoc:** use relative links into `../api/`. The deploy workflow places rustdoc output at `_site/api/`, so this path is stable on the deployed site.
@@ -232,7 +232,7 @@ mdbook serve docs/book --open
 
 ## Where the deployed site lives
 
-Pushes to `main` trigger `.github/workflows/docs.yml`, which builds and deploys the site to `https://zhjngli.github.io/AgX/`. mdbook content lives at the root (e.g., `https://zhjngli.github.io/AgX/explanation/grain.html`); rustdoc content lives at `/api/` (e.g., `https://zhjngli.github.io/AgX/api/agx/adjust/grain/index.html`).
+Pushes to `main` trigger `.github/workflows/docs.yml`, which builds and deploys the site to `https://zhjngli.github.io/AgX/`. mdbook content lives at the root (e.g., `https://zhjngli.github.io/AgX/explanation/algorithms/grain.html`); rustdoc content lives at `/api/` (e.g., `https://zhjngli.github.io/AgX/api/agx/adjust/grain/index.html`).
 
 ## Conceptual reference principles
 
