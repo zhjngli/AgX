@@ -71,7 +71,7 @@ Adobe RGB print pipelines, log video footage, and Display P3 displays are unreac
 
 ### What we chose
 
-The engine applies adjustments in a fixed, hardcoded order. Exposure and white balance run first in linear space; dehaze and denoise follow, also in linear; the buffer is converted to sRGB gamma; the gamma-space adjustments (contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT) run in one per-pixel pass; detail, grain, and vignette run last. The order fields appear in a preset, in the `Parameters` struct, or in API calls has no effect on output.
+The engine applies adjustments in a fixed, hardcoded order. Exposure and white balance run first in linear space; dehaze and denoise follow, also in linear; the buffer is converted to sRGB gamma; the gamma-space adjustments (contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT) run in one per-pixel pass; detail, grain, and vignette run last. The order in which fields appear in a preset, in the `Parameters` struct, or in API calls has no effect on output.
 
 ### What we considered
 
