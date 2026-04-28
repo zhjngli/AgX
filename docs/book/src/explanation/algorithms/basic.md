@@ -1,6 +1,6 @@
 # Basic adjustments
 
-The Basic-panel sliders below share a mental model (they all sit at the "top of the stack" in Lightroom / Capture One), but their math divides cleanly by color space. White balance and exposure run in linear light before gamma encoding; the tone sliders run in sRGB gamma space after. See [Color spaces](../../reference/concepts/color-spaces.md) for the linear-vs-gamma distinction and the per-stage rationale.
+The Basic-panel sliders below share a mental model (they all sit at the "top of the stack" in Lightroom / Capture One), but their math divides cleanly by color space. White balance and exposure run in linear light before gamma encoding; the tone sliders run in sRGB gamma space after. See [Color spaces](../../explanation/concepts/color-spaces.md) for the linear-vs-gamma distinction and the per-stage rationale.
 
 ## White balance
 
