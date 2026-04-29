@@ -82,7 +82,7 @@ The structural test catches drift early, but interpreting a failure is the contr
 
 ## When the architecture should evolve
 
-The rules are not eternal. When a new feature genuinely needs a boundary change, follow the process in `docs/contributing/evolving-architecture.md` (linked from `ARCHITECTURE.md`): document the new dependency in a design doc, update the rules table and the structural test, and update affected READMEs. The goal is not to prevent change, but to make boundary changes visible and intentional rather than accidental.
+The rules are not eternal. When a new feature genuinely needs a boundary change, AgX evolves the architecture deliberately rather than letting boundaries drift: any new cross-module dependency is justified explicitly, the structural tests that enforce the rules are updated to match, and the change is reviewed under the same scrutiny as any other architectural shift. The goal is not to prevent change, but to make boundary changes visible and intentional rather than accidental.
 
 ## See also
 

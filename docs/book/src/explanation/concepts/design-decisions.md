@@ -25,7 +25,7 @@ The obvious alternative is incremental editing on a working buffer: apply each p
 
 ### Why we chose this
 
-Photo editing operations are not mathematically commutative, so a system that promises order-independent edits has to either hide the order from the user or accept the order-sensitivity. The architecture design doc dated 2026-02-14 takes the first route: every render is a function of `(original, parameters)` evaluated in a fixed engine-defined order, so the user never has to reason about which of their adjustments came first. This sidesteps two failure modes at once — accumulated rounding error from sequential mutation of a working buffer, and the path dependence of "apply X, then Y, then undo X" that an operation log must either model exactly or paper over. Lightroom, darktable, and RawTherapee use the same pattern for the same reasons.
+Photo editing operations are not mathematically commutative, so a system that promises order-independent edits has to either hide the order from the user or accept the order-sensitivity. AgX takes the first route: every render is a function of `(original, parameters)` evaluated in a fixed engine-defined order, so the user never has to reason about which of their adjustments came first. This sidesteps two failure modes at once — accumulated rounding error from sequential mutation of a working buffer, and the path dependence of "apply X, then Y, then undo X" that an operation log must either model exactly or paper over. Lightroom, darktable, and RawTherapee use the same pattern for the same reasons.
 
 ### What this costs
 
@@ -43,7 +43,7 @@ The dominant alternative across the photo-editing world is the operation log: a 
 
 ### Why we chose this
 
-The architecture design doc dated 2026-02-14 frames this as a corollary of the always-re-render-from-original invariant. If the engine renders from `(original, parameters)` without a session buffer, there is no operation history to record, and a preset format that pretends there is one would leak engine internals into every TOML file. A flat parameter dictionary is also what makes presets portable across machines and durable across software versions: the file is a list of name-value pairs, not an executable sequence tied to engine version. The preset composability design doc dated 2026-03-07 builds the `extends` chain on top of this shape — layering presets is a recursive merge of parameter dictionaries, not a replay of two operation logs.
+The choice follows directly from the always-re-render-from-original invariant. If the engine renders from `(original, parameters)` without a session buffer, there is no operation history to record, and a preset format that pretends there is one would leak engine internals into every TOML file. A flat parameter dictionary is also what makes presets portable across machines and durable across software versions: the file is a list of name-value pairs, not an executable sequence tied to engine version. AgX's `extends` chain builds on this shape — layering presets is a recursive merge of parameter dictionaries, not a replay of two operation logs.
 
 ### What this costs
 
@@ -61,7 +61,7 @@ The obvious alternative is a wider working space — Adobe RGB, ProPhoto RGB, or
 
 ### Why we chose this
 
-The architecture design doc dated 2026-02-14 scopes the MVP to sRGB only and frames it as a deliberate omission of the entire color-management subsystem rather than a temporary placeholder. Wide-gamut working spaces require gamut-aware math at every stage, profile embedding on output, cross-profile clipping policies for out-of-gamut values, and ICC parsing on input. Each is its own design space, and adding any one changes how every adjustment has to behave. Most consumer photography is sRGB end-to-end — JPEGs are sRGB, web display is sRGB, the screens most photographers grade on are sRGB — so the cost of the omission is concentrated on the professional print and log-video workflows AgX is not trying to serve.
+AgX scopes its working space to sRGB only and treats this as a deliberate omission of the entire color-management subsystem rather than a temporary placeholder. Wide-gamut working spaces require gamut-aware math at every stage, profile embedding on output, cross-profile clipping policies for out-of-gamut values, and ICC parsing on input. Each is its own design space, and adding any one changes how every adjustment has to behave. Most consumer photography is sRGB end-to-end — JPEGs are sRGB, web display is sRGB, the screens most photographers grade on are sRGB — so the cost of the omission is concentrated on the professional print and log-video workflows AgX is not trying to serve.
 
 ### What this costs
 
@@ -97,7 +97,7 @@ Three alternatives were on the table when GPU support was designed. CPU-only —
 
 ### Why we chose this
 
-The GPU acceleration design doc dated 2026-04-13 frames the decision around what AgX is for. AgX is primarily a batch CLI tool with no interactive preview, and batch throughput is already saturated by cross-image parallelism on consumer cores — GPU's latency advantage does not translate into a proportional batch speedup. Keeping CPU canonical avoids GPU floating-point variance across hardware vendors and driver versions, which would otherwise force per-vendor golden files. It eliminates the CI gap that would arise if golden output depended on a GPU adapter not every CI runner has. The GPU path remains worthwhile because per-pixel and convolution-heavy stages run dramatically faster on capable hardware, and a future interactive-preview feature would benefit directly. GPU becomes the default if and when interactive preview is added.
+The decision follows from what AgX is for. AgX is primarily a batch CLI tool with no interactive preview, and batch throughput is already saturated by cross-image parallelism on consumer cores — GPU's latency advantage does not translate into a proportional batch speedup. Keeping CPU canonical avoids GPU floating-point variance across hardware vendors and driver versions, which would otherwise force per-vendor golden files. It eliminates the CI gap that would arise if golden output depended on a GPU adapter not every CI runner has. The GPU path remains worthwhile because per-pixel and convolution-heavy stages run dramatically faster on capable hardware, and a future interactive-preview feature would benefit directly. GPU becomes the default if and when interactive preview is added.
 
 ### What this costs
 
@@ -115,7 +115,7 @@ The straightforward alternative is full replacement: each preset declares the en
 
 ### Why we chose this
 
-The preset composability design doc dated 2026-03-07 builds the merge around how users actually layer presets: a base look preset, a color-grading overlay, a tint adjustment. The recursion through composite sections is what makes "specify only `red.hue`" work the way users expect — only that one channel changes, the rest of HSL is untouched. Last-write-wins at the leaf is the simplest semantic that keeps the merge associative and predictable. Cycle detection during the recursive `extends` load prevents chains from looping. The materialization step keeps the engine API unchanged: callers still receive a concrete `Parameters`, and the partial form exists only at the preset boundary.
+The merge is built around how users actually layer presets: a base look preset, a color-grading overlay, a tint adjustment. The recursion through composite sections is what makes "specify only `red.hue`" work the way users expect — only that one channel changes, the rest of HSL is untouched. Last-write-wins at the leaf is the simplest semantic that keeps the merge associative and predictable. Cycle detection during the recursive `extends` load prevents chains from looping. The materialization step keeps the engine API unchanged: callers still receive a concrete `Parameters`, and the partial form exists only at the preset boundary.
 
 ### What this costs
 
@@ -133,7 +133,7 @@ The alternative is to apply LUTs in linear sRGB. A pipeline that already runs de
 
 ### Why we chose this
 
-The LUT support design doc dated 2026-02-16 frames LUTs as opaque numeric mappings whose correct input space is determined by how they were authored, not by what the engine prefers. The vast majority of creative `.cube` LUTs — film emulations, color grades, Instagram-style looks — are authored by colorists working on screens that display sRGB. The lattice values in those LUTs correspond to sRGB pixel values, not linear ones. Applying such a LUT to linear values produces incorrect colors. AgX picks the space that works for the largest body of existing LUTs, and applies the LUT after parametric tone adjustments — matching the standard Lightroom and Resolve workflow where the LUT is a creative grade on top of corrected exposure and contrast.
+AgX treats LUTs as opaque numeric mappings whose correct input space is determined by how they were authored, not by what the engine prefers. The vast majority of creative `.cube` LUTs — film emulations, color grades, Instagram-style looks — are authored by colorists working on screens that display sRGB. The lattice values in those LUTs correspond to sRGB pixel values, not linear ones. Applying such a LUT to linear values produces incorrect colors. AgX picks the space that works for the largest body of existing LUTs, and applies the LUT after parametric tone adjustments — matching the standard Lightroom and Resolve workflow where the LUT is a creative grade on top of corrected exposure and contrast.
 
 ### What this costs
 
@@ -151,7 +151,7 @@ The alternatives are all variations on building a UI as a primary surface: a ful
 
 ### Why we chose this
 
-The project's framing — visible in the README and reinforced in every design doc — is that AgX is a preset-first batch editing tool, not a Lightroom replacement. The recipe model is what makes the project coherent: every feature has to fit a portable, declarative, image-independent description, and a UI on the critical path would constantly tempt features that fit a UI better than they fit a recipe. Keeping the surface CLI-and-library-first forces every feature to justify itself as a parameter on the recipe. A future UI is not ruled out, but if added it would be one more way to author a preset, not a session manager that drives the engine through hidden state.
+AgX is a preset-first batch editing tool, not a Lightroom replacement. The recipe model is what makes the project coherent: every feature has to fit a portable, declarative, image-independent description, and a UI on the critical path would constantly tempt features that fit a UI better than they fit a recipe. Keeping the surface CLI-and-library-first forces every feature to justify itself as a parameter on the recipe. A future UI is not ruled out, but if added it would be one more way to author a preset, not a session manager that drives the engine through hidden state.
 
 ### What this costs
 

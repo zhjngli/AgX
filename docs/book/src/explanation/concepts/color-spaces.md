@@ -50,7 +50,7 @@ Future versions may add wider working spaces:
 - **ICC profile handling** — read embedded profiles from input images, embed profiles in output.
 - **Log input LUTs** — support for LUTs designed for video log curves (S-Log3, LogC).
 
-Each of these would require gamut-aware color math at every stage and a policy for handling out-of-gamut values. The decision to defer this work is tracked in the project backlog.
+Each of these would require gamut-aware color math at every stage and a policy for handling out-of-gamut values.
 
 ## See also
 
