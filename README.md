@@ -55,49 +55,49 @@ These before/after pairs are from the e2e test suite — each processed through 
 
 ```bash
 # Apply a preset to an image
-cargo run -p agx-cli -- apply \
+agx apply \
   -i example/images/temple_blossoms.png \
   -p example/presets/golden-hour.toml \
   -o edited.jpg
 
 # Edit with inline parameters
-cargo run -p agx-cli -- edit \
+agx edit \
   -i example/images/sunset_river.png \
   -o edited.jpg \
   --exposure 1.0 --contrast 25 --temperature 30
 
 # Apply a .cube LUT
-cargo run -p agx-cli -- edit \
+agx edit \
   -i example/images/temple_blossoms.png \
   -o graded.jpg \
   --lut film-emulation.cube
 
 # Combine adjustments with a LUT
-cargo run -p agx-cli -- edit \
+agx edit \
   -i example/images/sunset_river.png \
   -o graded.jpg \
   --exposure 0.5 --contrast 10 --lut film-emulation.cube
 
 # Process a raw file (CR2, NEF, ARW, DNG, etc.)
-cargo run -p agx-cli -- edit \
+agx edit \
   -i photo.dng \
   -o edited.jpg \
   --exposure 0.5 --contrast 15
 
 # Batch process a directory
-cargo run -p agx-cli -- batch-edit \
+agx batch-edit \
   --input-dir photos/ \
   --output-dir edited/ \
   --exposure 0.5 --contrast 10
 
 # Set JPEG output quality (default: 92)
-cargo run -p agx-cli -- edit \
+agx edit \
   -i photo.jpg \
   -o output.jpg \
   --quality 95
 
 # Specify output format explicitly
-cargo run -p agx-cli -- edit \
+agx edit \
   -i photo.jpg \
   -o output.tiff \
   --format tiff
