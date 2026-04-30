@@ -416,11 +416,11 @@ fn render_hsl_section(schema: &RootSchema) -> String {
 
 fn add_explanation_links(section: &mut String, explanation_slug: &str, label: &str) {
     let path = repo_root()
-        .join("docs/book/src/explanation")
+        .join("docs/book/src/explanation/algorithms")
         .join(format!("{explanation_slug}.md"));
     if path.exists() {
         section.push_str(&format!(
-            "\nSee [{label}](../explanation/{explanation_slug}.md) for details.\n"
+            "\nSee [{label}](../explanation/algorithms/{explanation_slug}.md) for details.\n"
         ));
     }
 }
@@ -1248,7 +1248,7 @@ mod tests {
         ));
         assert!(markdown.contains("metadata.name"));
         assert!(markdown.contains("lut.path"));
-        assert!(markdown.contains("../explanation/grain.md"));
+        assert!(markdown.contains("../explanation/algorithms/grain.md"));
     }
 
     #[test]

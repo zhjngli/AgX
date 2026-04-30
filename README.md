@@ -8,10 +8,12 @@ An open-source photo editing library and CLI written in Rust, with a portable, h
 
 AgX is a **preset-first** photo editing tool. The goal is not to replace Lightroom or Capture One — it's to make photo editing accessible through composable, shareable, human-readable presets.
 
-- **Presets as recipes**: A preset is a complete editing recipe — tone, white balance, HSL, LUT — in a single TOML file. Presets can extend other presets, override selectively, and compose into layered looks.
-- **Batch-oriented**: Apply a look to an entire shoot in one command. The CLI and library API are designed for processing many images quickly, not pixel-level retouching.
-- **Shareable by design**: Presets are plain text, version-controllable, and portable. The format is meant to be shared, forked, and remixed — the foundation for a preset marketplace.
-- **CLI and API first**: AgX is a library and a command-line tool. UI may come later, but the core value lives in the editing engine and preset format.
+- **Presets as recipes**: a preset is a complete editing recipe in a single TOML file. Presets can extend other presets, override selectively, and compose into layered looks.
+- **Batch-oriented**: apply a look to an entire shoot in one command. The CLI and library API are designed for processing many images quickly, not pixel-level retouching.
+- **Shareable by design**: presets are plain text, version-controllable, and portable.
+- **CLI and API first**: AgX is a library and a command-line tool. The core value lives in the editing engine and preset format.
+
+For the longer discussion of what these mean and what AgX deliberately isn't, see [Preset-first philosophy](https://zhjngli.github.io/AgX/explanation/concepts/philosophy.html).
 
 ## Features
 
@@ -116,40 +118,19 @@ Presets are TOML files with a simple, declarative structure:
 ```toml
 [metadata]
 name = "Golden Hour"
-version = "1.0"
-author = "agx"
 
 [tone]
-exposure = 0.5       # stops, -5.0 to +5.0
-contrast = 15.0      # -100 to +100
-highlights = -30.0   # -100 to +100
-shadows = 25.0       # -100 to +100
-whites = 10.0        # -100 to +100
-blacks = -5.0        # -100 to +100
+exposure = 0.5
+contrast = 15.0
 
 [white_balance]
-temperature = 40.0   # warm (+) / cool (-)
-tint = 5.0           # magenta (+) / green (-)
-
-[hsl.red]
-hue = 10.0           # -180 to +180
-saturation = 15.0    # -100 to +100
-luminance = -5.0     # -100 to +100
+temperature = 40.0
 
 [lut]
-path = "film-emulation.cube"   # resolved relative to the preset file
+path = "film-emulation.cube"
 ```
 
-Presets can extend a base preset with `extends`:
-
-```toml
-extends = "base_cinematic.toml"   # inherit parameters, override selectively
-
-[tone]
-contrast = 30.0   # override base contrast
-```
-
-Missing values default to neutral (no change). See `example/presets/` for more examples.
+For the full schema (every field, type, range, default), see the [preset format reference](https://zhjngli.github.io/AgX/reference/preset.html). For the patch-on-baseline mental model behind the design, see the [preset model explanation](https://zhjngli.github.io/AgX/explanation/concepts/preset-model.html).
 
 ## Library Usage
 
@@ -185,27 +166,22 @@ encode_to_file(&result, "output.jpg".as_ref()).unwrap();
 agx/
 ├── crates/
 │   ├── agx/             # core library
-│   │   └── src/
-│   │       ├── adjust/  # adjustment algorithms (per-pixel)
-│   │       ├── decode/  # image decoding (sRGB → linear) + EXIF orientation
-│   │       ├── encode/  # image encoding (linear → sRGB)
-│   │       ├── engine/  # rendering engine
-│   │       ├── lut/     # 3D LUT parsing and interpolation
-│   │       ├── preset/  # TOML preset serialization + composability
-│   │       └── error.rs # error types
-│   ├── agx-cli/         # CLI wrapper (apply, edit, batch-apply, batch-edit, multi-apply)
-│   ├── agx-e2e/         # e2e test suite (golden file comparison)
-│   └── agx-lut-gen/     # dev tool for generating .cube LUT files
-├── example/             # sample images, presets, and LUTs
-├── scripts/             # verify.sh, e2e.sh
-└── docs/                # design docs, ideas, and contributing guides
+│   ├── agx-cli/         # CLI wrapper
+│   ├── agx-e2e/         # e2e test suite
+│   ├── agx-docgen/      # docs auto-generation
+│   └── agx-lut-gen/     # dev tool for .cube LUTs
+├── example/             # sample images, presets, LUTs
+├── scripts/             # verify.sh, e2e.sh, etc.
+└── docs/                # design docs, contributing guides
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the module dependency graph and rules.
 
 ## Architecture
 
-The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. This makes the system order-independent from the user's perspective — presets are purely declarative parameter values, not operation sequences.
+The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. All processing happens in **sRGB** color space. Adjustments are applied in a fixed pipeline order regardless of the order parameters appear in presets.
 
-All processing happens in **sRGB** color space. Exposure and white balance operate in linear sRGB; contrast, highlights, shadows, whites, blacks, HSL, and LUTs operate in sRGB gamma space. See `docs/book/src/reference/concepts/color-spaces.md` for a detailed explanation.
+For the contract (dependency rules, invariants, structural tests), see [ARCHITECTURE.md](ARCHITECTURE.md). For the discussion of why the architecture is shaped this way, see the [architecture explanation](https://zhjngli.github.io/AgX/explanation/concepts/architecture.html).
 
 ## Testing
 

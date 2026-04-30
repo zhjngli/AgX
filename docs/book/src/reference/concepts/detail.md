@@ -31,4 +31,4 @@ Chroma noise is usually more objectionable and easier to remove without losing d
 
 ---
 
-See: [Detail pass](../../explanation/detail.md) (sharpening + clarity), [Dehaze](../../explanation/dehaze.md), and [Noise reduction](../../explanation/denoise.md) for the algorithm-level math behind these knobs.
+See: [Detail pass](../../explanation/algorithms/detail.md) (sharpening + clarity), [Dehaze](../../explanation/algorithms/dehaze.md), and [Noise reduction](../../explanation/algorithms/denoise.md) for the algorithm-level math behind these knobs.

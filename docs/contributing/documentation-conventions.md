@@ -11,7 +11,33 @@ AgX's documentation is organized using the [Diataxis framework](https://diataxis
 - **Reference** is information-oriented. The reader needs to look something up — a CLI flag, a preset field, a function signature, a color space conversion.
 - **Explanation** is understanding-oriented. The reader wants to know how something works under the hood and why it was designed that way.
 
-Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types via the `agx-docgen` crate); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only.
+### Surface mapping
+
+Tutorials and how-to guides live exclusively in mdbook under `docs/book/src/`. Reference content is split: the library API reference is rendered by rustdoc; the CLI reference and preset format reference are rendered by mdbook (auto-generated from `clap::Command` and serde types via the `agx-docgen` crate); the conceptual reference (color spaces, LUT format, photographic terminology) is hand-written prose under `docs/book/src/reference/concepts/`. Explanation content is split similarly: algorithm explanations live as sibling `.md` files alongside the Rust source and are pulled into both rustdoc and mdbook from the same file; architectural and philosophical explanations live in mdbook only at `docs/book/src/explanation/concepts/`.
+
+### Authoring rules
+
+Five rules govern content placement and page structure. New PRs are reviewed against these rules.
+
+#### Rule 1 — The category test (which quadrant?)
+
+A page belongs in the quadrant that matches its **dominant reader intent**, not its topic. A page about color spaces could live in reference (look up the conversion formulas) or explanation (understand why operations live in different spaces). Apply the test by asking: "what is the reader trying to do *right now*?" — look up a fact (reference), follow a recipe (how-to), learn from scratch (tutorial), or understand the why (explanation). One topic can have multiple pages, one per quadrant where reader demand exists.
+
+#### Rule 2 — One quadrant per page
+
+A reference page must not contain "Why X" sections. An explanation page must not contain exhaustive enumeration of fields and ranges. When a single page would naturally serve both intents, split it: factual lookup material stays in reference; rationale and design discussion move to a paired explanation page. Pages in this kind of pair link to each other via a `See also` block.
+
+#### Rule 3 — Page structure within a section
+
+Every section has an `index.md` landing page that orients the reader: what is here, how to navigate, what to read first. Sibling pages within a section share a consistent skeleton where reasonable. Algorithm explanation pages share one skeleton (mermaid diagram → prose include → `See also`). Conceptual explanation pages share a different skeleton (intro → named subsections → `See also`). Reference concept pages share another (intro → named subsections → `See also`). Consistency within a section, variation across sections.
+
+#### Rule 4 — Section structure within a page
+
+Headings should reflect reader intent, not implementation structure. `## Why pipeline order matters` is a reader-intent heading; `## Implementation` is not. Headings starting with "Why" or "How" usually belong in explanation pages. Headings that are nouns naming an artifact (a CLI flag, a type, a color space, a preset field) usually belong in reference pages. When a heading in a page does not match the page's quadrant, that is a signal to split.
+
+#### Rule 5 — Cross-quadrant linking
+
+Reference pages link out to explanation for the "why" via a `See also` block at the bottom. Explanation pages link to reference for exhaustive lookup. Tutorials link forward to how-to and reference for next steps. How-tos link back to reference for fields and forward to explanation for context. The site's link graph should be navigable: from any quadrant, the reader can reach the others. `mdbook-linkcheck` enforces that the links resolve; the rule itself is about *what* to link, not *how* to express it.
 
 ## Item-level documentation: `///` comments
 
@@ -41,16 +67,16 @@ The canonical worked example is the grain algorithm. The shared file is `crates/
 // ... rest of the file ...
 ```
 
-The mdbook side at `docs/book/src/explanation/grain.md` reads:
+The mdbook side at `docs/book/src/explanation/algorithms/grain.md` reads:
 
 ```markdown
 # Grain
 
-{{#include ../../../../crates/agx/src/adjust/grain.md}}
+{{#include ../../../../../crates/agx/src/adjust/grain.md}}
 
 ## Related
 
-- [Grain API reference](../api/agx/adjust/grain/index.html)
+- [Grain API reference](../../api/agx/adjust/grain/index.html)
 ```
 
 There is no anchor mechanism to maintain. The entire shared `.md` file is the explanation content. Editing it updates both surfaces on the next build with no possibility of drift.
@@ -97,7 +123,7 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
 - **Rustdoc to mdbook:** use raw HTTPS URLs to the deployed site. Rustdoc has no intra-doc syntax for links to mdbook content.
 
   ```markdown
-  See the [grain explanation](https://zhjngli.github.io/AgX/explanation/grain.html) on the project site.
+  See the [grain explanation](https://zhjngli.github.io/AgX/explanation/algorithms/grain.html) on the project site.
   ```
 
 - **Mdbook to rustdoc:** use relative links into `../api/`. The deploy workflow places rustdoc output at `_site/api/`, so this path is stable on the deployed site.
@@ -122,7 +148,7 @@ The header lets maintainers connect each shader to the canonical prose, the CPU 
 
 Larger algorithm pages can include a Mermaid pipeline diagram alongside the prose. Mdbook renders the diagram via the `mdbook-mermaid` preprocessor, which is already wired into `book.toml`.
 
-Diagrams live in the **wrapping mdbook page** (`docs/book/src/explanation/<algo>.md`), not in the shared `.md` file. Rustdoc has no Mermaid support, so a fenced `mermaid` block placed in a shared `.md` would render as raw DSL text in the API reference. Keeping diagrams in the wrapper is consistent with the existing rule that surface-specific content lives outside the include.
+Diagrams live in the **wrapping mdbook page** (`docs/book/src/explanation/algorithms/<algo>.md`), not in the shared `.md` file. Rustdoc has no Mermaid support, so a fenced `mermaid` block placed in a shared `.md` would render as raw DSL text in the API reference. Keeping diagrams in the wrapper is consistent with the existing rule that surface-specific content lives outside the include.
 
 The typical structure is:
 
@@ -138,11 +164,11 @@ flowchart TD
 
 One short paragraph summarizing what the diagram shows.
 
-{{#include ../../../../crates/agx/src/adjust/<algo>.md}}
+{{#include ../../../../../crates/agx/src/adjust/<algo>.md}}
 
-## Related
+## See also
 
-- [API reference](../api/agx/adjust/<algo>/index.html)
+- [API reference](../../api/agx/adjust/<algo>/index.html)
 ````
 
 Notes for diagram authors:
@@ -206,7 +232,7 @@ mdbook serve docs/book --open
 
 ## Where the deployed site lives
 
-Pushes to `main` trigger `.github/workflows/docs.yml`, which builds and deploys the site to `https://zhjngli.github.io/AgX/`. mdbook content lives at the root (e.g., `https://zhjngli.github.io/AgX/explanation/grain.html`); rustdoc content lives at `/api/` (e.g., `https://zhjngli.github.io/AgX/api/agx/adjust/grain/index.html`).
+Pushes to `main` trigger `.github/workflows/docs.yml`, which builds and deploys the site to `https://zhjngli.github.io/AgX/`. mdbook content lives at the root (e.g., `https://zhjngli.github.io/AgX/explanation/algorithms/grain.html`); rustdoc content lives at `/api/` (e.g., `https://zhjngli.github.io/AgX/api/agx/adjust/grain/index.html`).
 
 ## Conceptual reference principles
 
@@ -224,7 +250,11 @@ The conceptual reference quadrant lives at `docs/book/src/reference/concepts/`. 
 The conceptual reference surface holds together because of four directional rules. The first three are mechanically enforced; the fourth is the contract tutorials and how-to guides can rely on.
 
 - **Concepts → Explanation (always).** Every lexicon page ends with a footer linking to the relevant `explanation/` page(s). Foundation and AgX-specific pages link to relevant explanations where they exist. Code review.
-- **Explanation → Concepts (bidirectional).** Every wrapper page in `docs/book/src/explanation/*.md` (the page that wraps a sibling `.md` include — not the sibling itself) ends with a `## See also` block listing relevant concept pages, the rustdoc API references, related explanations, and (where applicable) how-to recipes. `scripts/verify.sh back-links` mechanically enforces *presence* of the heading; the *contents* of each block are a code-review concern — the check does not validate that the listed targets exist or are relevant.
+- **Explanation → Concepts (bidirectional).** Every non-index page under `docs/book/src/explanation/` ends with a `## See also` block. Two link patterns by sub-section:
+  - **Algorithm wrapper pages** (`docs/book/src/explanation/algorithms/*.md`, the page that wraps a sibling `.md` include — not the sibling itself) link to relevant concept pages, the rustdoc API references, related algorithm explanations, and (where applicable) how-to recipes.
+  - **Conceptual explanation pages** (`docs/book/src/explanation/concepts/*.md`) link to their paired reference page (e.g. `explanation/concepts/render-pipeline.md` ↔ `reference/concepts/render-pipeline.md`) and to neighboring conceptual explanations.
+
+  The bare `explanation/*.md` glob matches only `index.md` pages (section indices), which have no `## See also` requirement. `scripts/verify.sh back-links` mechanically enforces *presence* of the heading on every non-index page in either sub-section; the *contents* of each block are a code-review concern — the check does not validate that the listed targets exist or are relevant.
 - **Sibling `.md` cleanliness.** Files at `crates/agx/src/adjust/*.md` (the canonical algorithm-explanation prose included by both rustdoc and mdbook) contain no relative or non-HTTPS markdown links. External `https://` links remain allowed (they render uniformly across rustdoc and mdbook). The convention exists for the cross-surface reasons documented under "The shared `.md` file convention" above; sub-project 5 added `scripts/verify.sh sibling-md-clean` to enforce it.
 - **Tutorials / how-to guides → Concepts (forward-compatible).** Tutorials and how-to guides cite concept anchors directly: `reference/concepts/color.md#white-balance`. Anchors are auto-generated from headings; renaming a heading is a breaking change. The conceptual reference is the stable surface tutorials lean on.
 
@@ -258,3 +288,5 @@ Repo-level entry points (`README.md`, `ARCHITECTURE.md`) are different — they 
 Mechanical enforcement: `scripts/verify.sh book-no-internal-refs` greps `docs/book/src/**/*.md` for markdown links into those three directories and fails the build if any are found.
 
 Prose-form leaks (mentioning "the documentation initiative" or a specific sub-project number in the published prose without linking) escape the mechanical check. They are caught by the reviewer checklist and the principle that published prose should describe AgX as a finished tool, not as a project under construction. When a placeholder page needs to say "this section isn't ready yet," prefer a short "Coming soon" framed in terms of the planned content, not a pointer to internal planning.
+
+When reviewing a doc PR, search the diff under `docs/book/src/` for the substrings `design doc`, `backlog`, `contributing/`, and `docs/plans`. Any hit is a candidate prose-form leak — rewrite to attribute the reasoning to AgX itself ("AgX takes the first route...") rather than citing the planning artifact ("the architecture design doc dated... takes the first route..."). The mechanical check will not flag these because they are not markdown links.

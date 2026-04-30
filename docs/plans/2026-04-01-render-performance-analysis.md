@@ -154,6 +154,6 @@ PNG encoding is consistently 0.6-0.7s (4-5% of total). Not worth optimizing.
 
 - [Profiling design doc](2026-03-31-render-performance-profiling-design.md)
 - [Detail pass implementation](../../crates/agx/src/adjust/detail.rs)
-- [Grain algorithm explanation](../../docs/book/src/explanation/grain.md)
+- [Grain algorithm explanation](../../docs/book/src/explanation/algorithms/grain.md)
 - [Denoise implementation](../../crates/agx/src/adjust/denoise.rs)
 - [Dehaze implementation](../../crates/agx/src/adjust/dehaze.rs)

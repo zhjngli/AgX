@@ -6,7 +6,7 @@ The conceptual reference covers the photographic and AgX-specific ideas the rest
 
 The substrate everything else relies on.
 
-- [Color spaces](color-spaces.md) — Linear vs sRGB, why each pipeline operation runs in its space, and AgX's working-space model.
+- [Color spaces](color-spaces.md) — Linear vs sRGB definitions, conversion formulas, and per-stage assignment.
 - [Color models](color-models.md) — RGB, HSL, and luminance: when AgX uses each.
 
 ## Photography lexicon
@@ -22,6 +22,6 @@ Short entries grouped by photographer-panel mental model. Tutorials and how-to g
 
 Concepts that aren't covered by general photography references because they are AgX inventions or AgX integrations.
 
-- [Preset model](preset-model.md) — How presets compose, override, and extend.
+- [Preset model](preset-model.md) — The three-part structure and the `extends` chain merge semantics.
 - [Render pipeline](render-pipeline.md) — The conceptual journey from decoded image to encoded output.
-- [LUT format](lut-format.md) — `.cube` files, trilinear interpolation, and how AgX generates its bundled LUTs.
+- [LUT format](lut-format.md) — `.cube` syntax, trilinear interpolation, and supported sizes and features.

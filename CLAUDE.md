@@ -26,6 +26,16 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 - Commit messages and PR titles use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`, `chore:`, `build:`. For mixed-scope PRs, use the most representative prefix.
 - Do not use `#N` issue/PR refs in commit messages or PR titles/bodies. GitHub auto-links every `#N` to whatever issue or PR carries that number, so internal numbering schemes (e.g. backlog sub-projects "10", "11") get spuriously linked to unrelated PRs and break the rendered text. Spell the number out (`sub-project 11`) or use a different separator. Plain `#N` is fine in markdown under `docs/`.
 
+## Documentation
+
+The published mdbook site under `docs/book/src/` is end-user content (CLI users, preset authors, photo nerds), organized using the Diataxis framework (tutorials / how-to / reference / explanation). It is governed by [`docs/contributing/documentation-conventions.md`](docs/contributing/documentation-conventions.md) — read that file before editing book content, especially when adding new pages or moving existing prose between quadrants.
+
+Key principles, summarized:
+
+- **Audience separation.** Book content under `docs/book/src/` must not reference `docs/plans/`, `docs/backlog/`, or `docs/contributing/` — neither as markdown links nor as prose mentions ("the architecture design doc...", "tracked in the project backlog"). Published prose should describe AgX as a finished tool, not a project under construction. `README.md` and `ARCHITECTURE.md` are explicitly contributor-facing exceptions and may link freely.
+- **One quadrant per page.** Reference pages don't carry "Why X" sections; explanation pages don't enumerate fields and ranges. Five Diataxis-derived authoring rules are codified in the conventions doc.
+- **Mechanical gates.** `verify.sh` runs `markdown-lint`, `book-linkcheck`, `back-links`, `sibling-md-clean`, `book-no-internal-refs`, `doc-links`. Run before committing doc changes. Note: `book-no-internal-refs` only catches markdown links — prose-form leaks escape it and need manual review.
+
 ## Plan Documents
 
 - **Design docs** → `docs/plans/` (committed to git). These capture *why* — decisions, trade-offs, constraints.

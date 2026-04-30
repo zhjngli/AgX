@@ -29,7 +29,7 @@ luma ≈ 0.2126 R + 0.7152 G + 0.0722 B   (Rec. 709 weights, used in sRGB)
 AgX uses luminance as a weighting signal in places where "how bright is this pixel" matters more than "what color is it":
 
 - The grain weight function fades grain in highlights based on luminance.
-- The luma channel of the [tone curve](../../explanation/tone-curves.md) operates on luminance, applying the same brightness curve regardless of hue.
+- The luma channel of the [tone curve](../../explanation/algorithms/tone-curves.md) operates on luminance, applying the same brightness curve regardless of hue.
 - Tonal-region selectors (highlights, shadows, whites, blacks) define their regions by luminance.
 
 ## When AgX uses each model
@@ -49,5 +49,5 @@ AgX uses luminance as a weighting signal in places where "how bright is this pix
 ## See also
 
 - [Color spaces](color-spaces.md) — the linear-vs-gamma encoding choice that sits underneath the model choice.
-- [HSL](../../explanation/hsl.md) — algorithm explanation for the HSL pass.
-- [Tone curves](../../explanation/tone-curves.md) — algorithm explanation, including the luma channel.
+- [HSL](../../explanation/algorithms/hsl.md) — algorithm explanation for the HSL pass.
+- [Tone curves](../../explanation/algorithms/tone-curves.md) — algorithm explanation, including the luma channel.

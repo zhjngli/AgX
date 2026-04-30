@@ -173,7 +173,7 @@ check_markdown_lint() {
 
 check_back_links() {
     local errors=0
-    for f in docs/book/src/explanation/*.md; do
+    for f in docs/book/src/explanation/algorithms/*.md docs/book/src/explanation/concepts/*.md docs/book/src/explanation/*.md; do
         [ -f "$f" ] || continue
         case "$f" in
             */index.md) continue ;;
@@ -185,11 +185,11 @@ check_back_links() {
     done
 
     if [ "$errors" -gt 0 ]; then
-        echo "$errors explanation wrapper page(s) missing See also block"
+        echo "$errors explanation page(s) missing See also block"
         return 1
     fi
 
-    echo "All explanation wrapper pages have See also blocks"
+    echo "All explanation pages have See also blocks"
     return 0
 }
 

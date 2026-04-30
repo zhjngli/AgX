@@ -112,23 +112,6 @@ Most creative LUTs use size 33, which provides excellent quality with reasonable
 - Non-sRGB input spaces (log curves, linear)
 - `.3dl`, `.csp`, `.icc`, or other LUT formats
 
-## How AgX generates its bundled LUTs
-
-AgX ships a set of generated `.cube` LUTs used by the e2e test pipeline and as starting points for film-emulation looks. The generator lives in the `agx-lut-gen` crate (`crates/agx-lut-gen/`); the bundled outputs live in `crates/agx-e2e/fixtures/looks/luts/`.
-
-The generator is a small Rust binary that, for each named LUT, evaluates a transformation function over a regular 3D grid in input RGB and writes the result as a `.cube` file. The current set splits into two categories:
-
-- **Film stocks:** Portra 400, Kodachrome 64, Cinestill 800T, Tmax 100, Tri-X 400.
-- **Stylistic looks:** Blade Runner, Cinema Warm, Dune, Faded BW, High Contrast BW, Neo Noir.
-
-Why generate LUTs in code rather than authoring them in a colorist tool:
-
-- **Reproducibility.** Each LUT is the deterministic output of a versioned function. Bug fixes or design changes propagate by re-running the generator.
-- **Test stability.** The e2e suite compares rendered output against committed golden images. A regenerated LUT that introduces unintended color shifts shows up as a visual diff in the test suite.
-- **Onboarding.** Contributors can read the generator source to understand how each look is constructed, rather than treating each LUT as an opaque file.
-
-To add a new generated LUT, define the transformation function in `crates/agx-lut-gen/src/`, add an entry to the generator's emit list, and run the generator to produce the `.cube` output. See `crates/agx-lut-gen/src/main.rs` for the generator entry point.
-
 ## Where to Find `.cube` LUTs
 
 Many free LUTs are available online:
@@ -139,3 +122,7 @@ Many free LUTs are available online:
 - Technical conversion LUTs
 
 When using third-party LUTs, verify they expect sRGB gamma input (most creative LUTs do). LUTs designed for video log input (S-Log3, LogC) will produce incorrect results in AgX.
+
+## See also
+
+- [How AgX generates its bundled LUTs](../../explanation/concepts/lut-generation.md) — the design choices behind the `agx-lut-gen` crate.
