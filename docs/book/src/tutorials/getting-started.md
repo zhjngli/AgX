@@ -11,7 +11,7 @@ This tutorial uses a sample image and preset bundled in the AgX repository. If y
 Run:
 
 ```bash
-agx-cli apply \
+agx apply \
   -i example/images/sunset_river.png \
   -p example/presets/golden-hour.toml \
   -o golden-hour.png
@@ -27,7 +27,7 @@ Open `golden-hour.png` in your image viewer. The result should be warmer, with l
 Try a different preset by swapping `-p`:
 
 ```bash
-agx-cli apply \
+agx apply \
   -i example/images/sunset_river.png \
   -p example/presets/moody-dark.toml \
   -o moody-dark.png
@@ -40,7 +40,7 @@ Each `.toml` file in `example/presets/` is a complete editing recipe. Presets ar
 A preset is just a saved bundle of parameters. To see the parameters themselves, use `edit` instead of `apply`:
 
 ```bash
-agx-cli edit \
+agx edit \
   -i example/images/sunset_river.png \
   -o tweaked.png \
   --exposure 0.5 \
@@ -48,7 +48,7 @@ agx-cli edit \
   --highlights -20
 ```
 
-Three flags, three [basic adjustments](../explanation/algorithms/basic.md): brighten the image by half a stop, lift the shadows, pull back the highlights. The `agx-cli edit` command exposes the same internals a preset addresses; the only difference is whether the values come from a `.toml` file or the command line.
+Three flags, three [basic adjustments](../explanation/algorithms/basic.md): brighten the image by half a stop, lift the shadows, pull back the highlights. The `agx edit` command exposes the same internals a preset addresses; the only difference is whether the values come from a `.toml` file or the command line.
 
 ![Original](../assets/tutorials/edit-before.jpg)
 ![After --exposure 0.5 --shadows 30 --highlights -20](../assets/tutorials/edit-after.jpg)

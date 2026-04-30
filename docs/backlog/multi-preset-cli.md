@@ -16,13 +16,13 @@ The e2e test suite spawns a separate CLI subprocess for each preset applied to a
 
 ```bash
 # Apply multiple presets to the same image, one output per preset
-agx-cli multi-apply \
+agx multi-apply \
   -i photo.raf \
   --preset portra_400.toml --output portra.png \
   --preset neo_noir.toml --output noir.png
 
 # Or: directory-based (apply all presets in a directory)
-agx-cli multi-apply \
+agx multi-apply \
   -i photo.raf \
   --preset-dir looks/ \
   --output-dir results/

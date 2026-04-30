@@ -346,7 +346,7 @@ check_wgsl_headers() {
 # Substitutions applied per command line:
 #   - "cargo install agx-cli" lines are skipped (they are publish-time
 #     examples, not runnable in CI).
-#   - "agx-cli " is rewritten to "cargo run --release -p agx-cli -- " so the
+#   - "agx " is rewritten to "cargo run --release -p agx-cli -- " so the
 #     check uses the in-tree binary regardless of PATH state.
 #   - Output paths passed to `-o`, `--output`, and `--output-dir` are
 #     rewritten to per-block tempdirs. File outputs preserve the original
@@ -392,7 +392,7 @@ check_doc_commands() {
             fi
             if [[ "$line" =~ $fence_close_re ]]; then
                 in_block=0
-                if [ "$block_ignored" -eq 0 ] && [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"cargo run -p agx-cli"* || "$block_buf" == *"cargo run -p agx-lut-gen"* ]]; then
+                if [ "$block_ignored" -eq 0 ] && [[ "$block_buf" == *"agx-cli"* || "$block_buf" == *"agx "* || "$block_buf" == *"cargo run -p agx-cli"* || "$block_buf" == *"cargo run -p agx-lut-gen"* ]]; then
                     _run_doc_block "$file" "$block_buf" "$tmp_root" || errors=$((errors + 1))
                 fi
                 block_buf=""
@@ -413,7 +413,7 @@ check_doc_commands() {
         echo "$errors doc-command failure(s)"
         return 1
     fi
-    echo "All embedded agx-cli doc commands ran cleanly"
+    echo "All embedded agx doc commands ran cleanly"
     return 0
 }
 
@@ -432,13 +432,13 @@ _run_doc_block() {
         return 0
     fi
 
-    # Substitute `agx-cli ` (including the trailing space) with the in-tree
+    # Substitute `agx ` (including the trailing space) with the in-tree
     # run cmd. A sentinel guards against double-substitution on lines that
     # already say `cargo run -p agx-cli`.
     local rewritten
     rewritten="$(printf '%s\n' "$block" \
         | sed 's|cargo run -p agx-cli --|__AGX_RUN__|g' \
-        | sed 's|agx-cli |__AGX_RUN__ |g' \
+        | sed 's|agx |__AGX_RUN__ |g' \
         | sed 's|__AGX_RUN__|cargo run --release -p agx-cli --|g')"
 
     # Rewrite output paths to a per-block tempdir. `TMPDIR=...; mktemp -d`

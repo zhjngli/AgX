@@ -28,7 +28,7 @@ Slim API smoke tests (6 tests) covering: noop roundtrip (JPEG + RAW), preset app
 The suite does heavy pixel processing (decode + render + encode for 65 images). Key optimizations:
 
 - **`[profile.test] opt-level = 2`** in workspace `Cargo.toml` — debug builds are ~14x slower for pixel math (37.7s vs 2.6s per JPEG measured). This applies to the test binary and its dependencies.
-- **Release CLI binary** — `scripts/e2e.sh` builds `agx-cli` with `--release`. The test helper `cli_bin()` prefers the release binary at `target/release/agx-cli`, falling back to debug.
+- **Release CLI binary** — `scripts/e2e.sh` builds `agx-cli` with `--release`. The test helper `cli_bin()` prefers the release binary at `target/release/agx`, falling back to debug.
 - **Per-image test functions** — each image is a separate `#[test]` function so Cargo runs them in parallel across available cores (default = CPU count).
 
 ### Known bottleneck

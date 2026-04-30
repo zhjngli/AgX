@@ -8,10 +8,10 @@ AgX can layer multiple presets in a single render. Each preset is applied in ord
 
 ## Steps
 
-Use `--presets` (note the plural) on `agx-cli apply`:
+Use `--presets` (note the plural) on `agx apply`:
 
 ```bash
-agx-cli apply \
+agx apply \
   -i example/images/sunset_river.png \
   --presets example/presets/golden-hour.toml \
             example/presets/high-contrast.toml \

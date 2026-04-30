@@ -42,7 +42,7 @@ When AgX loads `warm-bright.toml`, it resolves `extends` against the same direct
 Apply the variant:
 
 ```bash ignore
-agx-cli apply \
+agx apply \
   -i example/images/sunset_river.png \
   -p looks/warm-bright.toml \
   -o /tmp/warm-bright.png

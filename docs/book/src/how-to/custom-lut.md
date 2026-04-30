@@ -28,7 +28,7 @@ This is a 2×2×2 LUT — the smallest meaningful one. Each line is the RGB outp
 Apply it via `--lut`:
 
 ```bash ignore
-agx-cli edit \
+agx edit \
   -i example/images/sunset_river.png \
   -o /tmp/lifted.png \
   --lut lift-shadows.cube

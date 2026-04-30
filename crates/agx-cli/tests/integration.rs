@@ -1,7 +1,7 @@
 use std::process::Command;
 
 fn cli_bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_agx-cli"))
+    Command::new(env!("CARGO_BIN_EXE_agx"))
 }
 
 fn create_test_png(path: &std::path::Path) {
