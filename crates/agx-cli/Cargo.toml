@@ -1,6 +1,6 @@
 [package]
 name = "agx-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "CLI for the agx-photo photo editing library"
 license = "MIT OR Apache-2.0"
@@ -10,6 +10,10 @@ documentation = "https://docs.rs/agx-cli"
 readme = "../../README.md"
 keywords = ["photo", "image", "editing", "preset", "cli"]
 categories = ["multimedia::images", "command-line-utilities"]
+
+[[bin]]
+name = "agx"
+path = "src/main.rs"
 
 [dependencies]
 agx = { package = "agx-photo", path = "../agx", version = "0.1.0", features = ["raw"] }

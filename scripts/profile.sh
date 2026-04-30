@@ -16,7 +16,7 @@ trap 'rm -rf "$TMPDIR"' EXIT
 echo "=== Building agx-cli with profiling ==="
 cargo build --release --features profiling -p agx-cli
 
-BIN="./target/release/agx-cli"
+BIN="./target/release/agx"
 FIXTURES="crates/agx-e2e/fixtures"
 
 # Test images — mix of RAW and JPEG at different sizes

@@ -24,7 +24,7 @@ const BW_LOOKS: &[&str] = &["tri_x_400", "tmax_100", "high_contrast_bw", "faded_
 // --- Helpers ---
 
 fn cli_bin() -> Command {
-    // agx-cli is a pure binary crate (no lib target), so CARGO_BIN_EXE is
+    // The agx binary (package agx-cli) has no lib target, so CARGO_BIN_EXE is
     // unavailable. Locate it by walking up from the test binary directory.
     let target_dir = std::env::current_exe()
         .unwrap()
@@ -37,17 +37,17 @@ fn cli_bin() -> Command {
         .to_path_buf();
 
     // Prefer release binary (much faster for image processing)
-    let release = target_dir.join("release").join("agx-cli");
-    let debug = target_dir.join("debug").join("agx-cli");
+    let release = target_dir.join("release").join("agx");
+    let debug = target_dir.join("debug").join("agx");
     let path = if release.exists() {
         release
     } else if debug.exists() {
         debug
     } else {
         panic!(
-            "agx-cli binary not found. Checked:\n  {}\n  {}\nRun `cargo build --release -p agx-cli` first.",
-            target_dir.join("release/agx-cli").display(),
-            target_dir.join("debug/agx-cli").display(),
+            "agx binary not found. Checked:\n  {}\n  {}\nRun `cargo build --release -p agx-cli` first.",
+            target_dir.join("release/agx").display(),
+            target_dir.join("debug/agx").display(),
         )
     };
     Command::new(path)
