@@ -112,10 +112,6 @@ Most creative LUTs use size 33, which provides excellent quality with reasonable
 - Non-sRGB input spaces (log curves, linear)
 - `.3dl`, `.csp`, `.icc`, or other LUT formats
 
-## See also
-
-- [How AgX generates its bundled LUTs](../../explanation/concepts/lut-generation.md) — the design choices behind the `agx-lut-gen` crate.
-
 ## Where to Find `.cube` LUTs
 
 Many free LUTs are available online:
@@ -126,3 +122,7 @@ Many free LUTs are available online:
 - Technical conversion LUTs
 
 When using third-party LUTs, verify they expect sRGB gamma input (most creative LUTs do). LUTs designed for video log input (S-Log3, LogC) will produce incorrect results in AgX.
+
+## See also
+
+- [How AgX generates its bundled LUTs](../../explanation/concepts/lut-generation.md) — the design choices behind the `agx-lut-gen` crate.

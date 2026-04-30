@@ -185,11 +185,11 @@ check_back_links() {
     done
 
     if [ "$errors" -gt 0 ]; then
-        echo "$errors explanation wrapper page(s) missing See also block"
+        echo "$errors explanation page(s) missing See also block"
         return 1
     fi
 
-    echo "All explanation wrapper pages have See also blocks"
+    echo "All explanation pages have See also blocks"
     return 0
 }
 

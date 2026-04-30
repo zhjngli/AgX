@@ -15,8 +15,6 @@ Why generate LUTs in code rather than authoring them in a colorist tool:
 - **Test stability.** The e2e suite compares rendered output against committed golden images. A regenerated LUT that introduces unintended color shifts shows up as a visual diff in the test suite.
 - **Onboarding.** Contributors can read the generator source to understand how each look is constructed, rather than treating each LUT as an opaque file.
 
-To add a new generated LUT, define the transformation function in `crates/agx-lut-gen/src/`, add an entry to the generator's emit list, and run the generator to produce the `.cube` output. See `crates/agx-lut-gen/src/main.rs` for the generator entry point.
-
 ## See also
 
 - [LUT format](../../reference/concepts/lut-format.md) — the `.cube` file format reference.
