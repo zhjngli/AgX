@@ -10,7 +10,7 @@ Render one image through several presets in a single command. Useful when you're
 ## Steps
 
 ```bash
-agx-cli multi-apply \
+agx multi-apply \
   -i example/images/sunset_river.png \
   -p example/presets/golden-hour.toml \
      example/presets/moody-dark.toml \
@@ -27,7 +27,7 @@ AgX decodes the image once and renders it through each preset. The output direct
 Include an unprocessed reference render alongside the preset results:
 
 ```bash
-agx-cli multi-apply \
+agx multi-apply \
   -i example/images/sunset_river.png \
   -p example/presets/golden-hour.toml \
      example/presets/moody-dark.toml \
@@ -40,7 +40,7 @@ The `--noop` flag adds a no-preset render so you can compare each preset against
 Run preset renders in parallel (default is `1`, since each render is already internally parallelised across pixels):
 
 ```bash
-agx-cli multi-apply \
+agx multi-apply \
   -i example/images/sunset_river.png \
   -p example/presets/golden-hour.toml \
      example/presets/moody-dark.toml \

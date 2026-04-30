@@ -10,7 +10,7 @@ Render every image in a directory through one preset, in parallel.
 ## Steps
 
 ```bash
-agx-cli batch-apply \
+agx batch-apply \
   --preset example/presets/golden-hour.toml \
   --input-dir example/images \
   --output-dir /tmp/golden-hour-out
@@ -25,7 +25,7 @@ AgX walks the input directory, decodes each image, applies the preset, and write
 Recurse into sub-directories:
 
 ```bash
-agx-cli batch-apply \
+agx batch-apply \
   --preset example/presets/golden-hour.toml \
   --input-dir example/images \
   --output-dir /tmp/golden-hour-out \
@@ -35,7 +35,7 @@ agx-cli batch-apply \
 Append a suffix to the output filenames so they don't collide if you ever decide to write outputs back into the input directory:
 
 ```bash
-agx-cli batch-apply \
+agx batch-apply \
   --preset example/presets/golden-hour.toml \
   --input-dir example/images \
   --output-dir /tmp/golden-hour-out \
@@ -45,7 +45,7 @@ agx-cli batch-apply \
 Cap the number of parallel workers (default uses every core):
 
 ```bash
-agx-cli batch-apply \
+agx batch-apply \
   --preset example/presets/golden-hour.toml \
   --input-dir example/images \
   --output-dir /tmp/golden-hour-out \
@@ -55,7 +55,7 @@ agx-cli batch-apply \
 Skip files that fail to decode instead of aborting the whole run:
 
 ```bash
-agx-cli batch-apply \
+agx batch-apply \
   --preset example/presets/golden-hour.toml \
   --input-dir example/images \
   --output-dir /tmp/golden-hour-out \

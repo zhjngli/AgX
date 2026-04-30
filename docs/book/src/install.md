@@ -8,19 +8,19 @@ AgX is published on [crates.io](https://crates.io/crates/agx-cli) and installs w
 cargo install agx-cli
 ```
 
-This builds the CLI and its dependencies (including the GPU render path via `wgpu`) and places the `agx-cli` binary in `~/.cargo/bin/`. Make sure that directory is on your `PATH` — Cargo prints a one-line warning if it is not.
+This builds the CLI and its dependencies (including the GPU render path via `wgpu`) and places the `agx` binary in `~/.cargo/bin/`. Make sure that directory is on your `PATH` — Cargo prints a one-line warning if it is not.
 
 The first build can take a few minutes because the GPU stack is large. Build caches help on subsequent installs.
 
 ## Verify the install
 
 ```bash
-agx-cli --help
+agx --help
 ```
 
 Expected output: a usage banner that lists the `apply`, `edit`, `batch-apply`, `batch-edit`, and `multi-apply` subcommands.
 
-If `cargo install` succeeds but `agx-cli --help` says "command not found", your shell hasn't picked up `~/.cargo/bin/`. Add it to your `PATH` (in `~/.bashrc` or `~/.zshrc`) and start a new shell.
+If `cargo install` succeeds but `agx --help` says "command not found", your shell hasn't picked up `~/.cargo/bin/`. Add it to your `PATH` (in `~/.bashrc` or `~/.zshrc`) and start a new shell.
 
 ## Use as a Rust library
 

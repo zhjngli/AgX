@@ -35,7 +35,7 @@ Pre-rendered sample outputs live under `outputs/`. They were generated from the 
 Apply a preset to one image:
 
 ```bash
-agx-cli apply \
+agx apply \
   -i example/images/sunset_river.png \
   -p example/presets/golden-hour.toml \
   -o /tmp/out.png

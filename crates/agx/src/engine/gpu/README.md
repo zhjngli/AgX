@@ -10,7 +10,7 @@ The CPU adjustment path in `../../adjust/` remains the canonical source of
 truth for output correctness. The CPU pipeline in `../pipeline.rs` and
 `../stages/` orchestrates that math in the fixed render order. GPU rendering is
 an opt-in acceleration path via `Engine::new_gpu_auto()`, `Engine::new_gpu()`,
-or `agx-cli --gpu`; it is not the default pipeline. Any GPU result that differs
+or `agx --gpu`; it is not the default pipeline. Any GPU result that differs
 materially from the CPU result is a GPU bug unless the CPU behavior is
 deliberately changed first.
 
@@ -175,7 +175,7 @@ llvmpipe and CI gotchas:
   [performance backlog](../../../../../docs/backlog/performance.md).
 - The GPU path is not the default pipeline. `Engine::new()` uses CPU rendering
   for deterministic output; callers must opt in with `Engine::new_gpu_auto()`,
-  `Engine::new_gpu()`, or `agx-cli --gpu`.
+  `Engine::new_gpu()`, or `agx --gpu`.
 - Some stages still use CPU readbacks for intermediate reductions. These are
   correctness-oriented synchronization points, not proof that the GPU path is
   fully GPU-resident.
