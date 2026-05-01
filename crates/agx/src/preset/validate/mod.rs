@@ -73,12 +73,22 @@ impl Preset {
                 })
                 .unwrap_or((1, 1));
 
+            // toml::de::Error::message() can be empty (e.g. `key = ` with no
+            // value) or multi-line. Sanitize so the human and JSON output
+            // stay single-line and never end with a dangling colon.
+            let raw = parse_err.message().replace('\n', "; ");
+            let message = if raw.is_empty() {
+                "TOML syntax error".to_string()
+            } else {
+                format!("TOML syntax error: {}", raw)
+            };
+
             return FileReport::new(
                 path.to_string_lossy(),
                 vec![Diagnostic {
                     severity: Severity::Error,
                     code: DiagnosticCode::SyntaxError,
-                    message: format!("TOML syntax error: {}", parse_err.message()),
+                    message,
                     location: Location {
                         line,
                         column,
