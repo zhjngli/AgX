@@ -19,9 +19,14 @@ Add explicit `drop()` calls to release four intermediate buffers as soon as thei
 
 No algorithmic change. No reordering of computation. Pixel values and floating-point evaluation order are identical to the current implementation.
 
-## Why explicit drops, not refactor
+## Why explicit drops, not refactor or block scoping
 
-An alternative is to break `guided_filter` into helper functions so the buffers go out of scope naturally. This produces the same memory profile but adds new function boundaries that aren't otherwise warranted — `guided_filter` is already a coherent ~60-line algorithm and the helpers would only exist for lifetime management. Explicit `drop()` is one line per buffer, signals intent at the drop site, and matches existing patterns elsewhere in the crate.
+Two alternatives to explicit `drop()` were considered:
+
+- **Helper functions.** Break `guided_filter` into helpers so the buffers go out of scope naturally. This produces the same memory profile but adds new function boundaries that aren't otherwise warranted — `guided_filter` is already a coherent ~60-line algorithm and the helpers would only exist for lifetime management.
+- **Block scoping.** Wrap each producer-and-mean pair in `let mean_x = { let x = ...; box_filter_2d(&x, ...) };` so `x` drops at the closing brace. Same MIR-level outcome as explicit `drop()`. The reason it loses here is the structure of `guided_filter`: `gp` and `gg` are produced sequentially before either mean is computed (both closures read `guide`), and the same pattern holds for `a`/`b`. Putting each into its own block would force reordering the producer/mean interleaving away from the algorithm's natural reading order, or duplicating computations across blocks.
+
+Explicit `drop()` is one line per buffer, signals intent at the drop site, preserves the algorithm's natural ordering, and matches the existing precedent for memory-tradeoff comments at point of use elsewhere in this file (see the `UnsafeSlicePtr` doc comment).
 
 ## Memory expectation
 
