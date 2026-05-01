@@ -56,14 +56,12 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
         .map_err(AgxError::Image)?;
     let orientation = orientation::read_orientation(path);
     let img = orientation.apply(img);
-    let srgb_f32 = img.into_rgb32f();
-    let (w, h) = srgb_f32.dimensions();
-    let linear = Rgb32FImage::from_fn(w, h, |x, y| {
-        let p = srgb_f32.get_pixel(x, y);
-        let lin: LinSrgb<f32> = Srgb::new(p.0[0], p.0[1], p.0[2]).into_linear();
-        Rgb([lin.red, lin.green, lin.blue])
-    });
-    Ok(linear)
+    let mut buf = img.into_rgb32f();
+    for px in buf.pixels_mut() {
+        let lin: LinSrgb<f32> = Srgb::new(px.0[0], px.0[1], px.0[2]).into_linear();
+        px.0 = [lin.red, lin.green, lin.blue];
+    }
+    Ok(buf)
 }
 
 #[cfg(test)]
