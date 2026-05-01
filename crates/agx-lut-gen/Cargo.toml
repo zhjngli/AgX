@@ -3,3 +3,8 @@ name = "agx-lut-gen"
 version = "0.1.0"
 edition = "2021"
 publish = false
+
+# Dev-only crate — opt out of cargo-release's version bumps, replacements, and
+# tag operations. `publish = false` only stops the upload, not the rest.
+[package.metadata.release]
+release = false

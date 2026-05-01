@@ -1,0 +1,38 @@
+# cargo-release configuration. Applies to all packages in the workspace
+# unless overridden in [package.metadata.release] of an individual Cargo.toml.
+#
+# Documented in docs/contributing/release-process.md.
+
+# Signing is off — solo dev, single laptop. Revisit if supply chain
+# provenance becomes a concern.
+sign-commit = false
+sign-tag = false
+
+# Tag scheme for this multi-crate workspace: agx-photo-v0.1.0, agx-cli-v0.2.0.
+# git-cliff uses these tags to determine "since last release" ranges.
+tag-name = "{{crate_name}}-v{{version}}"
+
+# When agx-photo bumps, automatically rewrite agx-cli's dep pin so the next
+# agx-cli release picks up the new lib version on crates.io.
+dependent-version = "upgrade"
+
+# Don't push the tag automatically — review locally first, then push the
+# specific tag (`git push origin <crate>-vX.Y.Z`). Avoid `git push --tags`
+# in a multi-crate workspace since it pushes every local tag.
+push = false
+
+# Releases must run from `main`. Without this, cargo-release defaults to
+# allowing any branch except detached HEAD, so a stray `cargo release
+# --execute` from a feature branch would publish to crates.io. Crates.io
+# is yank-only, so the gate matters.
+allow-branch = ["main"]
+
+# At release time, rewrite the [Unreleased] heading in CHANGELOG.md to
+# [Unreleased] (empty) + [version] - date (the just-released entry).
+# `file` is relative to each package root, so this works for both crates.
+pre-release-replacements = [
+  { file = "CHANGELOG.md",
+    search = "## \\[Unreleased\\]",
+    replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}",
+    exactly = 1 },
+]

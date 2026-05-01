@@ -7,6 +7,11 @@ publish = false
 # This is a test-only crate — it has no library consumers.
 # src/lib.rs provides comparison utilities used by the integration tests.
 
+# Dev-only crate — opt out of cargo-release's version bumps, replacements, and
+# tag operations. `publish = false` only stops the upload, not the rest.
+[package.metadata.release]
+release = false
+
 [dependencies]
 image = "0.25"
 

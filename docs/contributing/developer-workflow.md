@@ -117,8 +117,10 @@ Update documentation alongside code. The rule: if someone reads the docs after y
 | Added a new module | ARCHITECTURE.md: dependency graph, rules table, per-module table. Create module README. |
 | Changed module dependencies | ARCHITECTURE.md: dependency graph, rules table. Affected module READMEs. `architecture.rs` structural test. |
 | Changed a core invariant | ARCHITECTURE.md: Core Invariants section |
-| Wrote a design doc | ARCHITECTURE.md: Design Docs table |
+| Wrote a design doc | Save to `docs/plans/YYYY-MM-DD-<topic>-design.md`. No separate index — design docs are discovered by browsing the directory. |
 | Changed how to extend a module | Module README: Extension Guide section |
+
+Per-crate `CHANGELOG.md` files exist for both publishable crates (`crates/agx/`, `crates/agx-cli/`) but are **not updated per-PR**. Changelog entries are scaffolded from conventional commit messages by `git-cliff` and curated at release time. Use accurate `feat:` / `fix:` / `refactor:` / `perf:` prefixes — they map directly to changelog sections (Added / Fixed / Changed). `docs:`, `chore:`, `style:`, `test:`, `build:`, `ci:` are skipped from changelogs.
 
 For style guidance on `///` comments, `//!` comments, the shared `.md` file convention for cross-surface explanations, and the active rustdoc lints, see [documentation-conventions.md](documentation-conventions.md).
 
@@ -142,3 +144,17 @@ Before declaring done, re-read your diff and ask:
 - **Naming**: Are function/type/variable names clear? Do they describe what, not how?
 - **Contracts**: Does my code respect the module's negative constraints (Does NOT section in README)?
 - **Architecture**: Did I introduce any cross-module dependencies? If so, are they allowed by the rules in ARCHITECTURE.md?
+
+## 6. Release (when applicable)
+
+Most PRs do not trigger a release on merge — releases happen periodically when user-visible changes have accumulated. After a notable merge, decide whether to ship by dry-running the changelog scaffold for the relevant crate. For example, for `agx-cli`:
+
+```bash
+git cliff --include-path 'crates/agx-cli/**' --tag-pattern 'agx-cli-v.*' --unreleased
+```
+
+For `agx-photo`, swap path to `crates/agx/**` and tag pattern to `agx-photo-v.*` (the package name is `agx-photo` even though the directory is `agx`). The on-disk `[Unreleased]` section in `CHANGELOG.md` stays empty between releases — entries are scaffolded and curated at release time, not appended per-PR. See [release-process.md](release-process.md) for the full operational flow.
+
+If your work is user-visible (new feature, bug fix, breaking change), it will surface in the next release's changelog scaffolded from your conventional commit messages. Use accurate prefixes (`feat:` → Added, `fix:` → Fixed, `refactor:` / `perf:` → Changed) — `docs:`, `chore:`, `style:`, `test:`, `build:`, `ci:` are skipped.
+
+When releasing, follow [release-process.md](release-process.md) for the operational detail: install tooling, scaffold changelog, curate, run `cargo-release`, push tags.
