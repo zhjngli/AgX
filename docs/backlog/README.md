@@ -45,11 +45,11 @@ Larger efforts that expand AgX's capabilities or improve code quality.
 
 | Priority | Idea | Why next |
 |----------|------|----------|
-| 6 | [Documentation Initiative](documentation-initiative.md) | Coherent docs system (mdbook site, rustdoc, auto-gen CLI/preset ref, algorithm explanations) |
-| 7 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
-| 8 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
-| 9 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
-| 10 | [Color Management](color-management.md) | Wide gamut and ICC profiles are the gap between consumer and professional |
+| 5 | [Documentation Initiative](documentation-initiative.md) | Coherent docs system (mdbook site, rustdoc, auto-gen CLI/preset ref, algorithm explanations) |
+| 6 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
+| 7 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
+| 8 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
+| 9 | [Color Management](color-management.md) | Wide gamut and ICC profiles are the gap between consumer and professional |
 
 ### Long-term
 
@@ -57,11 +57,11 @@ Major features that require significant design work or change the project's scop
 
 | Priority | Idea | Notes |
 |----------|------|-------|
-| 11 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
-| 12 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
-| 13 | [Platform and Distribution](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
-| 14 | [UI](ui.md) | Desktop and web interfaces |
-| 15 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
+| 10 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
+| 11 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
+| 12 | [Platform and Distribution](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
+| 13 | [UI](ui.md) | Desktop and web interfaces |
+| 14 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
 
 ## By Category
 
