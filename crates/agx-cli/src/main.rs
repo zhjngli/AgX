@@ -21,6 +21,13 @@ fn main() {
     let use_gpu = cli.gpu;
 
     let result = match cli.command {
+        Commands::Validate {
+            paths,
+            quiet,
+            format,
+        } => {
+            process::exit(agx_cli::validate::run_validate(&paths, quiet, format));
+        }
         Commands::Apply {
             input,
             preset,

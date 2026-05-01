@@ -11,6 +11,9 @@ use std::sync::Arc;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 
+pub mod output;
+pub mod validate;
+
 /// Create an engine with the appropriate pipeline based on the `--gpu` flag.
 pub fn create_engine(image: image::Rgb32FImage, use_gpu: bool) -> agx::Engine {
     if use_gpu {
@@ -618,6 +621,15 @@ pub struct BatchOpts {
     pub output: OutputOpts,
 }
 
+/// Output format for commands that support both human-readable and machine-readable output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum OutputFormat {
+    /// Human-readable text output (default).
+    Human,
+    /// Machine-readable JSON output.
+    Json,
+}
+
 /// Supported CLI subcommands.
 #[derive(Subcommand)]
 pub enum Commands {
@@ -693,6 +705,24 @@ pub enum Commands {
         /// Number of preset renders to run concurrently (default: 1)
         #[arg(short, long, default_value_t = 1)]
         jobs: usize,
+    },
+    /// Validate one or more preset files for correctness without rendering.
+    ///
+    /// Reports unknown fields, type mismatches, out-of-range values, missing
+    /// LUT files, and extends chain problems. Exits 0 if all clean, 1 if any
+    /// file has errors.
+    Validate {
+        /// Paths to preset TOML files. Use shell glob to validate many at once.
+        #[arg(required = true)]
+        paths: Vec<std::path::PathBuf>,
+
+        /// Suppress "ok" lines for clean files; only show files with errors.
+        #[arg(short, long)]
+        quiet: bool,
+
+        /// Output format.
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
     },
 }
 
