@@ -74,6 +74,29 @@ Numbers exclude format-specific encoder working memory and the encoded byte buff
 
 The exact figures depend on the `image` crate's allocation strategy — measurement below is ground truth.
 
+**Measured (2026-05-01, macOS, release build, 6240×4160 ≈ 26MP fixture, three runs each):**
+
+| Fixture | Path | Preset | Before peak RSS | After peak RSS | Saved |
+|---------|------|--------|-----------------|-----------------|-------|
+| `temple_blossoms.jpg` | standard decode + apply + encode | `portra_400.toml` (heavy) | ~3,388 MB | ~3,388 MB | ~0 MB |
+| `sunset_river.raf` | raw decode + apply + encode | `portra_400.toml` (heavy) | ~3,871 MB | ~3,870 MB | ~0 MB |
+| `temple_blossoms.jpg` | standard decode + apply + encode | minimal (exposure-only) | ~1,015 MB | ~1,015 MB | ~0 MB |
+
+The savings on peak RSS are essentially zero — the change does not move the global peak for `apply` workflows at 26MP.
+
+Why: the `apply` pipeline materializes ~300MB intermediate buffers between every stage (see `docs/backlog/performance.md` "Batch memory pressure" note), so the global peak is set by simultaneous mid-pipeline stage buffers, not by the decode/encode internals this change touches. Even with a minimal exposure-only preset the pipeline still materializes ~3 stages of 300MB plus pluggable-pipeline overhead, putting the floor near 1GB.
+
+The savings *are real per call* — the eliminated allocations no longer happen — but they're absorbed into reuse of pages already touched by other pipeline stages, so the OS-reported peak doesn't drop.
+
+When this change *would* show up:
+
+- A pipeline that does only decode + encode (no intermediate stages) — the decode internal peak (~600MB → ~300MB) and encode internal peak (~675MB → ~375MB) would dominate.
+- Lighter pipelines (e.g. a future zero-copy stage chain) — once the per-stage materialization is eliminated, the decode/encode internals become load-bearing again.
+- Allocator pressure / GC behavior — fewer allocations regardless of peak RSS.
+- Batch workflows with high concurrency — at `--jobs N`, every concurrent decode used to peak at ~600MB; now it peaks at ~300MB. This compounds across N workers even when single-worker peak is unchanged.
+
+So the change is correct and useful even though peak RSS for single-image `apply` doesn't budge. A separate effort (per `docs/backlog/performance.md`) is needed to address the pipeline-materialization peak.
+
 ## Verification
 
 1. `./scripts/verify.sh` — fmt, clippy, unit, architecture, doc-links.
