@@ -281,7 +281,9 @@ fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> V
             }
         });
     let mean_gp = box_filter_2d(&gp, width, height, r);
+    drop(gp);
     let mean_gg = box_filter_2d(&gg, width, height, r);
+    drop(gg);
 
     let mut a = vec![0.0_f32; n];
     let mut b = vec![0.0_f32; n];
@@ -300,7 +302,9 @@ fn guided_filter(guide: &[f32], input: &[f32], width: usize, height: usize) -> V
         });
 
     let mean_a = box_filter_2d(&a, width, height, r);
+    drop(a);
     let mean_b = box_filter_2d(&b, width, height, r);
+    drop(b);
     let mut result = vec![0.0_f32; n];
     result
         .par_chunks_mut(1024)
