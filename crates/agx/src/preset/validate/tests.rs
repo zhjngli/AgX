@@ -246,6 +246,48 @@ weird_channel = { hue = 0 }
     }
 
     #[test]
+    fn unknown_field_in_deeply_nested_table_uses_correct_parent_and_line() {
+        // `hsl.red.weird_red` is a depth-3 unknown. The walker must report
+        // `[hsl.red]` as the parent section (not `[hsl]`), and find_position_by_path
+        // must match `[hsl.red]` in the source so the line number is not the
+        // fallback (1, 1).
+        let toml_str = fixture("unknown_deep_nested.toml");
+        let diags = find_unknown_fields(&toml_str);
+
+        let target: Vec<_> = diags
+            .iter()
+            .filter(|d| d.location.field == "hsl.red.weird_red")
+            .collect();
+        assert_eq!(
+            target.len(),
+            1,
+            "expected exactly one diagnostic for hsl.red.weird_red, got: {:?}",
+            diags
+        );
+
+        let diag = target[0];
+        // Parent should be `[hsl.red]`, not `[hsl]`
+        assert!(
+            diag.message.contains("[hsl.red]"),
+            "message should reference parent [hsl.red], got: {}",
+            diag.message,
+        );
+        assert!(
+            !diag.message.contains("in section `[hsl]`"),
+            "message should NOT reference root [hsl] for a depth-3 field, got: {}",
+            diag.message,
+        );
+
+        // Line number should point at the `weird_red` line (line 7 in the fixture),
+        // not the fallback line 1.
+        assert!(
+            diag.location.line >= 6,
+            "expected line >= 6 (weird_red is on line 7 in the fixture), got: {}",
+            diag.location.line,
+        );
+    }
+
+    #[test]
     fn no_duplicate_diagnostics_for_nested_unknowns() {
         // check_schema must NOT produce UnknownField/UnknownTable diagnostics —
         // those belong exclusively to find_unknown_fields.

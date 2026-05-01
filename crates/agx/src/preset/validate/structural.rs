@@ -91,10 +91,13 @@ pub(super) fn find_position_by_path(source: &str, path: &str) -> (usize, usize) 
         [single] => find_key_position(source, single, None),
         [parent, child] => find_key_position(source, child, Some(parent)),
         _ => {
-            // Deeper paths: best-effort — find the last segment within the second-to-last
-            let parent = parts[parts.len() - 2];
+            // For depth ≥ 3, build the full dotted parent path so we match
+            // headings like `[hsl.red]` or `[color_grading.shadows]` in the TOML
+            // source. Using only the immediate parent segment (e.g. "red") would
+            // never match `[hsl.red]` and cause the position to fall back to (1, 1).
+            let full_parent = parts[..parts.len() - 1].join(".");
             let child = parts[parts.len() - 1];
-            find_key_position(source, child, Some(parent))
+            find_key_position(source, child, Some(&full_parent))
         }
     }
 }

@@ -157,7 +157,10 @@ fn walk_unknown_fields(
             }
             None if !is_top_level => {
                 // Unknown nested field — emit a diagnostic.
-                let parent = path_prefix.split('.').next().unwrap_or("");
+                // `path_prefix` is already the full dotted path to the immediate parent
+                // (e.g. "hsl.red" for a field like "hsl.red.weird_red"). Using only the
+                // first segment would report the wrong section for depth ≥ 3.
+                let parent = path_prefix;
                 let (line, column) =
                     super::structural::find_position_by_path(toml_str, &field_path);
                 let is_table = field_value.is_object();
