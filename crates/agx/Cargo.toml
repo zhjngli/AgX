@@ -26,8 +26,10 @@ img-parts = "0.4"
 little_exif = "0.6"
 exif = { package = "kamadak-exif", version = "0.5" }
 rand = "0.8"
+jsonschema = { version = "0.30", default-features = false, optional = true }
 serde_json = { version = "1", optional = true }
 schemars = { version = "0.8", optional = true }
+toml_edit = { version = "0.22", optional = true }
 wgpu = { version = "24", optional = true }
 naga_oil = { version = "0.16", optional = true }
 naga = { version = "23", features = ["wgsl-in", "wgsl-out"], optional = true }
@@ -44,6 +46,7 @@ cc = "1"
 [features]
 default = ["gpu"]
 raw = []
-profiling = ["serde_json"]
-docgen = ["schemars", "serde_json"]
+profiling = ["dep:serde_json"]
+docgen = ["dep:schemars", "dep:serde_json"]
+validate = ["dep:schemars", "dep:serde_json", "dep:jsonschema", "dep:toml_edit"]
 gpu = ["dep:wgpu", "dep:naga_oil", "dep:naga", "dep:bytemuck", "dep:pollster", "dep:half"]
