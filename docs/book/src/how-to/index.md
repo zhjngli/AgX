@@ -10,5 +10,6 @@ Common tasks:
 - [Extend a preset](extend-preset.md) — build a variant on top of a base preset using `extends`.
 - [Author a custom `.cube` LUT](custom-lut.md) — hand-write or generate a 3D LUT.
 - [Compose layered looks](compose-looks.md) — stack presets at apply time using `--presets`.
+- [Validate a preset before distributing](validate-preset.md) — catch errors before sharing a preset.
 
 If your task isn't here, check the [CLI reference](../reference/cli.md), the [preset reference](../reference/preset.md), or the [explanation pages](../explanation/index.md) for background.

@@ -16,6 +16,7 @@
 - [Extend a preset](how-to/extend-preset.md)
 - [Author a custom .cube LUT](how-to/custom-lut.md)
 - [Compose layered looks](how-to/compose-looks.md)
+- [Validate a preset before distributing](how-to/validate-preset.md)
 
 # Reference
 
