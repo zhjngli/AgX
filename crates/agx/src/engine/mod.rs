@@ -215,6 +215,14 @@ pub const HSL_SL_MAX: f32 = 100.0;
 pub const VIGNETTE_AMOUNT_MIN: f32 = -100.0;
 /// Maximum supported vignette amount.
 pub const VIGNETTE_AMOUNT_MAX: f32 = 100.0;
+/// Minimum supported white balance temperature shift.
+pub const WB_TEMPERATURE_MIN: f32 = -100.0;
+/// Maximum supported white balance temperature shift.
+pub const WB_TEMPERATURE_MAX: f32 = 100.0;
+/// Minimum supported white balance tint shift.
+pub const WB_TINT_MIN: f32 = -100.0;
+/// Maximum supported white balance tint shift.
+pub const WB_TINT_MAX: f32 = 100.0;
 /// Minimum supported color grading balance value.
 pub const CG_BALANCE_MIN: f32 = -100.0;
 /// Maximum supported color grading balance value.
@@ -278,9 +286,11 @@ pub struct Parameters {
     /// Blacks, range -100 to +100
     #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub blacks: f32,
-    /// White balance temperature shift
+    /// White balance temperature shift (range: -100 to +100, default: 0)
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub temperature: f32,
-    /// White balance tint shift (green/magenta)
+    /// White balance tint shift, green/magenta (range: -100 to +100, default: 0)
+    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
     pub tint: f32,
     /// Per-channel HSL adjustments
     #[serde(default)]
@@ -2631,6 +2641,13 @@ mod docgen_tests {
                 TONE_SLIDER_MAX,
             );
         }
+        assert_range(
+            &parameters_schema,
+            &["temperature"],
+            WB_TEMPERATURE_MIN,
+            WB_TEMPERATURE_MAX,
+        );
+        assert_range(&parameters_schema, &["tint"], WB_TINT_MIN, WB_TINT_MAX);
 
         let hsl_channel_schema = schemars::schema_for!(HslChannel);
         assert_range(&hsl_channel_schema, &["hue"], HSL_HUE_MIN, HSL_HUE_MAX);
