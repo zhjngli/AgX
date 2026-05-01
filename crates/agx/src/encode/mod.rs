@@ -147,8 +147,7 @@ pub fn encode_to_file_with_options(
 ) -> Result<PathBuf> {
     let (final_path, format) = resolve_output(path, options.format);
 
-    let dynamic = linear_to_srgb_dynamic(linear);
-    let rgb8 = dynamic.to_rgb8();
+    let rgb8 = linear_to_srgb_rgb8(linear);
 
     // Encode to in-memory buffer with format-specific encoder
     let buf = match format {
