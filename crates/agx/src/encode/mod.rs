@@ -102,8 +102,8 @@ pub fn resolve_output(
 ///
 /// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
 /// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round
-/// to nearest. NaN inputs collapse to 0 (consistent with `clamp` behavior on
-/// NaN, which returns the lower bound).
+/// to nearest. NaN inputs produce 0 because Rust's float-to-int cast saturates
+/// NaN to 0; `clamp` itself propagates NaN.
 #[inline]
 fn quantize_u8(x: f32) -> u8 {
     (x.clamp(0.0, 1.0) * 255.0).round() as u8
@@ -328,6 +328,17 @@ mod tests {
                 a
             );
         }
+    }
+
+    #[test]
+    fn quantize_u8_handles_edge_values() {
+        assert_eq!(quantize_u8(f32::NAN), 0);
+        assert_eq!(quantize_u8(f32::INFINITY), 255);
+        assert_eq!(quantize_u8(f32::NEG_INFINITY), 0);
+        assert_eq!(quantize_u8(0.0), 0);
+        assert_eq!(quantize_u8(1.0), 255);
+        assert_eq!(quantize_u8(-1.0), 0);
+        assert_eq!(quantize_u8(2.0), 255);
     }
 
     #[test]
