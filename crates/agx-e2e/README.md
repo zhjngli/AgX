@@ -31,9 +31,9 @@ The suite does heavy pixel processing (decode + render + encode for 65 images). 
 - **Release CLI binary** — `scripts/e2e.sh` builds `agx-cli` with `--release`. The test helper `cli_bin()` prefers the release binary at `target/release/agx`, falling back to debug.
 - **Per-image test functions** — each image is a separate `#[test]` function so Cargo runs them in parallel across available cores (default = CPU count).
 
-### Known bottleneck
+### Decode amortization
 
-Each CLI subprocess call independently decodes the image, even when the same image is processed with multiple presets. For a RAW file, this means 12 separate LibRaw decode operations per image. A `--multi-preset` CLI flag (see `docs/backlog/multi-preset-cli.md`) would decode once and apply N presets per invocation, reducing RAW decode calls from 48 to 4.
+The harness uses the `multi-apply` subcommand so each image is decoded once and rendered against all presets in a single CLI invocation. For a RAW file this turns 12 separate LibRaw decode operations into 1 per test function.
 
 ## Running
 
