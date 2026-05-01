@@ -110,3 +110,49 @@ fn validate_quiet_still_shows_errors_for_broken_files() {
     assert!(stdout.contains("unknown_table.toml"));
     assert!(stdout.contains("unknown table"));
 }
+
+#[test]
+fn apply_with_unknown_field_prints_warning_to_stderr() {
+    use std::path::PathBuf;
+    let tmp = tempfile::tempdir().unwrap();
+    let img_path = tmp.path().join("test.png");
+    // Create a minimal image fixture by copying from example/images
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("example/images/sunset_river.png");
+    if !example.exists() {
+        // Skip the test if the example image isn't available
+        eprintln!("skipping: example image not found at {}", example.display());
+        return;
+    }
+    std::fs::copy(&example, &img_path).unwrap();
+
+    let out_path = tmp.path().join("out.png");
+    let preset_path = fixture_path("unknown_table.toml");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_agx"))
+        .arg("apply")
+        .arg("-p")
+        .arg(&preset_path)
+        .arg("-i")
+        .arg(&img_path)
+        .arg("-o")
+        .arg(&out_path)
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unknown table") && stderr.contains("tone_curves"),
+        "expected warning about unknown table in stderr, got: {}",
+        stderr
+    );
+    // Apply should still succeed
+    assert!(
+        output.status.success(),
+        "apply should still succeed despite unknowns"
+    );
+}
