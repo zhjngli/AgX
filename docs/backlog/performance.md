@@ -34,8 +34,8 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 - [ ] **Batch memory pressure with stage-based pipeline** — the pluggable pipeline always materializes intermediate buffers between stages (~300MB per buffer at 26MP). For batch workflows processing many large images in parallel, peak memory could become a bottleneck. Profile memory usage under batch load and consider strategies: buffer pooling, limiting concurrent large-image renders, or lazy buffer allocation. **Note:** P3 parallel channel denoising triples peak memory during wavelet decomposition (~1.8GB vs ~600MB sequential at 26MP). **Note:** `batch-apply --jobs N` clones the decoded image per concurrent render (~300MB/clone at 26MP); `--jobs 11` peaks at ~3.6GB. See [Batch Apply design](../plans/2026-04-05-multi-apply-e2e-speed-design.md). Both should be included in batch memory profiling. **Note:** P5 dehaze parallelization allocates a per-thread `col_buf` for vertical passes (~100KB each at 26MP, negligible) — no meaningful peak memory increase.
 - [ ] **Dehaze guided filter intermediate buffers** — `guided_filter` allocates 11 single-channel buffers (~1.1GB at 26MP) that all live until function return. Several (`gp`, `gg`, `a`, `b`) could be explicitly `drop()`-ed after their means are computed, reducing peak from ~2.2GB to ~1.4GB per dehaze render. Worth doing as part of a holistic memory pass.
-- [ ] Decode buffer reduction — convert sRGB-to-linear in-place instead of allocating an intermediate buffer (~1 buffer saved)
-- [ ] Encode buffer reduction — go directly from linear f32 to u8 sRGB in a single pass (~1-2 buffers saved)
+- [x] Decode buffer reduction — convert sRGB-to-linear in-place instead of allocating an intermediate buffer (~1 buffer saved)
+- [x] Encode buffer reduction — go directly from linear f32 to u8 sRGB in a single pass (~1-2 buffers saved)
 
 ### CI and testing
 
