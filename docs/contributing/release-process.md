@@ -158,6 +158,8 @@ When `agx-photo` ships changes that `agx-cli` consumes, both crates ship. The or
 
 - **"dependency not found in registry"** during `agx-cli` publish — `agx-photo` either hasn't been released yet or the index hasn't caught up. Confirm with `cargo search agx-photo`. If it's there, retry.
 
-- **Pre-release replacement fails** ("expected exactly 1 match for `## \[Unreleased\]`") — the changelog file is missing the `## [Unreleased]` heading, or has it more than once. Add or normalize before retrying.
+- **Pre-release replacement fails** ("expected exactly 1 match for `## \[Unreleased\]`") — the changelog file is missing the `## [Unreleased]` heading, or has it more than once. Add or normalize before retrying. Casing matters: the regex matches `Unreleased` exactly, not `unreleased` or `UNRELEASED`.
+
+- **"uncommitted changes detected"** — `cargo-release` refuses to run with any untracked or modified files in the working tree, not just modified-tracked changes. Run `git status`; commit, stash, or `.gitignore` the offender before retrying. Common culprits: editor swap files, local agent/tool directories (`.claude/`, etc.), `.DS_Store`.
 
 - **Forgot to push the tag** — run `git push origin <crate>-vX.Y.Z` after the fact. The crates.io publish is independent of git push state, so the package is fine regardless.
