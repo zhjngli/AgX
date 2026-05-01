@@ -1,0 +1,62 @@
+# Real-world preset exercising HSL, color_grading, vignette, detail, grain,
+# noise_reduction, and dehaze — used to catch regressions where the structural
+# pass incorrectly flags every sub-field of these sections as "unknown".
+[metadata]
+name = "Real World Clean"
+author = "agx"
+
+[tone]
+exposure = -0.35
+contrast = 32.0
+highlights = -22.0
+shadows = -18.0
+blacks = -24.0
+
+[white_balance]
+temperature = -8.0
+tint = 2.0
+
+[hsl.blue]
+saturation = 12.0
+luminance = -8.0
+
+[hsl.aqua]
+saturation = 10.0
+
+[color_grading]
+balance = 6.0
+
+[color_grading.shadows]
+hue = 215.0
+saturation = 15.0
+luminance = -4.0
+
+[color_grading.midtones]
+hue = 220.0
+saturation = 6.0
+
+[vignette]
+amount = -10.0
+
+[detail]
+clarity = 10.0
+
+[detail.sharpening]
+amount = 38.0
+radius = 1.0
+threshold = 50.0
+masking = 45.0
+
+[grain]
+type = "harsh"
+amount = 20.0
+size = 50.0
+seed = 42
+
+[noise_reduction]
+luminance = 15.0
+color = 10.0
+detail = 60.0
+
+[dehaze]
+amount = 20.0

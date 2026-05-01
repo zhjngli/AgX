@@ -9,25 +9,37 @@ use serde::{Deserialize, Serialize};
 ///
 /// Used for shadows, midtones, highlights, and global wheels in color grading.
 /// Hue: 0-360 degrees, Saturation: 0-100, Luminance: -100 to +100.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ColorWheel {
     /// Hue angle in degrees (0–360).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 360.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 360.0))
+    )]
     pub hue: f32,
     /// Saturation amount (0–100, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 100.0))
+    )]
     pub saturation: f32,
     /// Luminance shift (range: -100 to +100, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub luminance: f32,
 }
 
 /// 3-way color grading parameters (shadows, midtones, highlights, global + balance).
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct ColorGradingParams {
     /// Shadow tones color wheel.
@@ -44,7 +56,7 @@ pub struct ColorGradingParams {
     pub global: ColorWheel,
     /// Shadow/highlight balance point (range: -100 to +100, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub balance: f32,
 }
 

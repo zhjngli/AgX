@@ -34,9 +34,9 @@ Practical improvements to existing functionality — small scope, clear value.
 
 | Priority | Idea | Why now |
 |----------|------|---------|
-| 1 | [Preset Tooling](preset-tooling.md) | `agx validate` catches preset typos and out-of-range values before they silently no-op at apply time |
-| 2 | [Performance](performance.md) | P1-P5 parallelization + GPU shipped; remaining work is memory passes (dehaze guided filter buffers, decode/encode), P6 SIMD, and a GPU CI runner |
-| 3 | [Parallel CI E2E](parallel-ci-e2e.md) | Matrix fan-out shipped; build-artifact sharing across matrix jobs is the remaining win |
+| 1 | [Performance](performance.md) | P1-P5 parallelization + GPU shipped; remaining work is memory passes (dehaze guided filter buffers, decode/encode), P6 SIMD, and a GPU CI runner |
+| 2 | [Parallel CI E2E](parallel-ci-e2e.md) | Matrix fan-out shipped; build-artifact sharing across matrix jobs is the remaining win |
+| 3 | [Preset Tooling](preset-tooling.md) | `agx validate` and apply-time unknown-field warnings shipped; remaining sub-tasks (schema versioning, variables) are lower urgency until the schema changes meaningfully |
 | 4 | [Processing Parity](processing-parity.md) | Per-feature algorithm verification against darktable/RawTherapee — long arc, ship one algo at a time |
 
 ### Mid-term

@@ -16,16 +16,16 @@ name = "agx"
 path = "src/main.rs"
 
 [dependencies]
-agx = { package = "agx-photo", path = "../agx", version = "0.1.0", features = ["raw"] }
+agx = { package = "agx-photo", path = "../agx", version = "0.1.0", features = ["raw", "validate"] }
 clap = { version = "4", features = ["derive"] }
 image = "0.25"
 rayon = "1"
-serde_json = { version = "1", optional = true }
+serde_json = "1"
 
 [features]
 default = ["gpu"]
 gpu = ["agx/gpu"]
-profiling = ["agx/profiling", "serde_json"]
+profiling = ["agx/profiling"]
 
 [dev-dependencies]
 tempfile = "3"

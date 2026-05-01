@@ -11,7 +11,10 @@ use super::{smoothstep, LUMA_B, LUMA_G, LUMA_R};
 ///
 /// Each type maps to a set of internal parameters: contrast, luminance falloff,
 /// chromatic intensity, and amount curve exponent.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GrainType {
@@ -54,7 +57,10 @@ impl std::str::FromStr for GrainType {
 /// - `amount`: 0–100, intensity of grain effect (0 = no grain)
 /// - `size`: 0–100, fine to coarse grain (default: 50)
 /// - `seed`: optional fixed seed for deterministic grain (None = random each render)
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrainParams {
     /// Grain character preset. Default: Silver.
@@ -62,11 +68,17 @@ pub struct GrainParams {
     pub grain_type: GrainType,
     /// Grain intensity, 0–100. Default 0 (no grain).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 100.0))
+    )]
     pub amount: f32,
     /// Grain particle size, 0 (fine) to 100 (coarse). Default 50.
     #[serde(default = "default_size")]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 100.0))
+    )]
     pub size: f32,
     /// Optional fixed seed for deterministic grain. When None, the engine
     /// generates a random seed each render. Set in e2e test presets.

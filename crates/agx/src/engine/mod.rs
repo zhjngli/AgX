@@ -96,20 +96,23 @@ pub trait Stage: Send + Sync {
 /// Per-channel HSL adjustment (hue shift, saturation, luminance).
 ///
 /// Ranges: hue -180.0 to +180.0 (degrees), saturation/luminance -100.0 to +100.0.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannel {
     /// Hue shift in degrees (range: -180 to +180, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -180.0, max = 180.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -180.0, max = 180.0)))]
     pub hue: f32,
     /// Saturation adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub saturation: f32,
     /// Luminance adjustment (range: -100 to +100, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub luminance: f32,
 }
 
@@ -117,7 +120,10 @@ pub struct HslChannel {
 ///
 /// Channel order: Red (0deg), Orange (30deg), Yellow (60deg), Green (120deg),
 /// Aqua (180deg), Blue (240deg), Purple (270deg), Magenta (330deg).
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct HslChannels {
     /// HSL adjustment for the red channel (~0°).
@@ -215,6 +221,14 @@ pub const HSL_SL_MAX: f32 = 100.0;
 pub const VIGNETTE_AMOUNT_MIN: f32 = -100.0;
 /// Maximum supported vignette amount.
 pub const VIGNETTE_AMOUNT_MAX: f32 = 100.0;
+/// Minimum supported white balance temperature shift.
+pub const WB_TEMPERATURE_MIN: f32 = -100.0;
+/// Maximum supported white balance temperature shift.
+pub const WB_TEMPERATURE_MAX: f32 = 100.0;
+/// Minimum supported white balance tint shift.
+pub const WB_TINT_MIN: f32 = -100.0;
+/// Maximum supported white balance tint shift.
+pub const WB_TINT_MAX: f32 = 100.0;
 /// Minimum supported color grading balance value.
 pub const CG_BALANCE_MIN: f32 = -100.0;
 /// Maximum supported color grading balance value.
@@ -235,12 +249,15 @@ pub const CW_LUMINANCE_MAX: f32 = 100.0;
 /// Vignette adjustment parameters.
 ///
 /// Darkens or brightens image edges. Amount range: -100 to +100. 0 = no effect.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VignetteParams {
     /// Vignette darkening (negative) or brightening (positive) amount (range: -100 to +100, default: 0).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub amount: f32,
     /// Vignette shape (circle, oval, or rectangle).
     #[serde(default)]
@@ -257,30 +274,35 @@ impl VignetteParams {
 /// All adjustment parameters for the rendering engine.
 ///
 /// Defaults to neutral (no change) for all values.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Parameters {
     /// Exposure in stops, range -5.0 to +5.0
-    #[cfg_attr(feature = "docgen", schemars(range(min = -5.0, max = 5.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -5.0, max = 5.0)))]
     pub exposure: f32,
     /// Contrast, range -100 to +100
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub contrast: f32,
     /// Highlights, range -100 to +100
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub highlights: f32,
     /// Shadows, range -100 to +100
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub shadows: f32,
     /// Whites, range -100 to +100
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub whites: f32,
     /// Blacks, range -100 to +100
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub blacks: f32,
-    /// White balance temperature shift
+    /// White balance temperature shift (range: -100 to +100, default: 0)
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub temperature: f32,
-    /// White balance tint shift (green/magenta)
+    /// White balance tint shift, green/magenta (range: -100 to +100, default: 0)
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub tint: f32,
     /// Per-channel HSL adjustments
     #[serde(default)]
@@ -334,6 +356,10 @@ impl Default for Parameters {
 /// Optional, mergeable form of [`HslChannel`] used during preset deserialization.
 ///
 /// See [`HslChannel`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialHslChannel {
     /// See [`HslChannel::hue`].
@@ -380,6 +406,10 @@ impl From<&HslChannel> for PartialHslChannel {
 /// Optional, mergeable form of [`HslChannels`] used during preset deserialization.
 ///
 /// See [`HslChannels`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialHslChannels {
     /// See [`HslChannels::red`].
@@ -500,6 +530,10 @@ impl From<&HslChannels> for PartialHslChannels {
 /// Optional, mergeable form of [`VignetteParams`] used during preset deserialization.
 ///
 /// See [`VignetteParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialVignetteParams {
     /// See [`VignetteParams::amount`].
@@ -540,6 +574,10 @@ impl From<&VignetteParams> for PartialVignetteParams {
 /// Optional, mergeable form of [`crate::adjust::ColorWheel`] used during preset deserialization.
 ///
 /// See [`crate::adjust::ColorWheel`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialColorWheel {
     /// See [`ColorWheel::hue`](crate::adjust::ColorWheel::hue).
@@ -586,6 +624,10 @@ impl From<&crate::adjust::ColorWheel> for PartialColorWheel {
 /// Optional, mergeable form of [`crate::adjust::ColorGradingParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::ColorGradingParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialColorGradingParams {
     /// See [`ColorGradingParams::shadows`](crate::adjust::ColorGradingParams::shadows).
@@ -674,6 +716,10 @@ impl From<&crate::adjust::ColorGradingParams> for PartialColorGradingParams {
 /// Optional, mergeable form of [`crate::adjust::ToneCurve`] used during preset deserialization.
 ///
 /// See [`crate::adjust::ToneCurve`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialToneCurve {
     /// See [`ToneCurve::points`](crate::adjust::ToneCurve::points).
@@ -710,6 +756,10 @@ impl From<&crate::adjust::ToneCurve> for PartialToneCurve {
 /// Optional, mergeable form of [`crate::adjust::ToneCurveParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::ToneCurveParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialToneCurveParams {
     /// See [`ToneCurveParams::rgb`](crate::adjust::ToneCurveParams::rgb).
@@ -800,6 +850,10 @@ impl From<&crate::adjust::ToneCurveParams> for PartialToneCurveParams {
 /// Optional, mergeable form of [`crate::adjust::SharpeningParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::SharpeningParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialSharpeningParams {
     /// See [`SharpeningParams::amount`](crate::adjust::SharpeningParams::amount).
@@ -853,6 +907,10 @@ impl From<&crate::adjust::SharpeningParams> for PartialSharpeningParams {
 /// Optional, mergeable form of [`crate::adjust::DetailParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::DetailParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialDetailParams {
     /// See [`DetailParams::sharpening`](crate::adjust::DetailParams::sharpening).
@@ -915,6 +973,10 @@ impl From<&crate::adjust::DetailParams> for PartialDetailParams {
 /// Optional, mergeable form of [`crate::adjust::DehazeParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::DehazeParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialDehazeParams {
     /// See [`DehazeParams::amount`](crate::adjust::DehazeParams::amount).
@@ -949,6 +1011,10 @@ impl From<&crate::adjust::DehazeParams> for PartialDehazeParams {
 /// Optional, mergeable form of [`crate::adjust::NoiseReductionParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::NoiseReductionParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialNoiseReductionParams {
     /// See [`NoiseReductionParams::luminance`](crate::adjust::NoiseReductionParams::luminance).
@@ -995,6 +1061,10 @@ impl From<&crate::adjust::NoiseReductionParams> for PartialNoiseReductionParams 
 /// Optional, mergeable form of [`crate::adjust::GrainParams`] used during preset deserialization.
 ///
 /// See [`crate::adjust::GrainParams`] for field semantics.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PartialGrainParams {
     /// See [`GrainParams::grain_type`](crate::adjust::GrainParams::grain_type).
@@ -2631,6 +2701,13 @@ mod docgen_tests {
                 TONE_SLIDER_MAX,
             );
         }
+        assert_range(
+            &parameters_schema,
+            &["temperature"],
+            WB_TEMPERATURE_MIN,
+            WB_TEMPERATURE_MAX,
+        );
+        assert_range(&parameters_schema, &["tint"], WB_TINT_MIN, WB_TINT_MAX);
 
         let hsl_channel_schema = schemars::schema_for!(HslChannel);
         assert_range(&hsl_channel_schema, &["hue"], HSL_HUE_MIN, HSL_HUE_MAX);

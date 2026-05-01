@@ -16,11 +16,41 @@ use agx_cli::{create_engine, BatchOpts, Cli, Commands, EditArgs, OutputOpts};
 
 mod batch;
 
+/// Print preset unknown-field warnings to stderr. Apply-time variant of the
+/// validate command's unknown-field detection — warns rather than errors so
+/// apply continues with what it understood.
+///
+/// Runs both the structural top-level pass and the semantic nested-unknowns
+/// walk so that all 12 preset tables are covered.
+fn warn_unknown_preset_fields(preset_path: &std::path::Path) {
+    let toml_str = match std::fs::read_to_string(preset_path) {
+        Ok(s) => s,
+        Err(_) => return, // Apply path will surface the read error
+    };
+    let mut diags = agx::preset::validate::detect_unknown_fields(&toml_str);
+    diags.extend(agx::preset::validate::find_unknown_fields(&toml_str));
+    for diag in &diags {
+        eprintln!(
+            "warning: {}:{}: {}",
+            preset_path.display(),
+            diag.location.line,
+            diag.message,
+        );
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
     let use_gpu = cli.gpu;
 
     let result = match cli.command {
+        Commands::Validate {
+            paths,
+            quiet,
+            format,
+        } => {
+            process::exit(agx_cli::validate::run_validate(&paths, quiet, format));
+        }
         Commands::Apply {
             input,
             preset,
@@ -142,10 +172,12 @@ fn run_apply(
 
     if !presets.is_empty() {
         for path in presets {
+            warn_unknown_preset_fields(path);
             let preset = Preset::load_from_file(path)?;
             engine.layer_preset(&preset);
         }
     } else if let Some(path) = preset_path {
+        warn_unknown_preset_fields(path);
         let preset = Preset::load_from_file(path)?;
         engine.apply_preset(&preset);
     }
@@ -246,6 +278,7 @@ fn run_batch_apply(
     batch: &BatchOpts,
     use_gpu: bool,
 ) -> agx::Result<()> {
+    warn_unknown_preset_fields(preset_path);
     let fmt = batch.output.parse_format()?;
     let summary = batch::run_batch_apply(
         &batch.input_dir,
@@ -329,6 +362,10 @@ fn run_multi_apply(
 
     let metadata = agx::metadata::extract_metadata(input);
     let decoded = agx::decode::decode(input)?;
+
+    for path in presets {
+        warn_unknown_preset_fields(path);
+    }
 
     let loaded: Vec<(String, agx::Preset)> = presets
         .iter()

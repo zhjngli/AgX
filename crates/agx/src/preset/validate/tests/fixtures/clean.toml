@@ -1,0 +1,10 @@
+[metadata]
+name = "Clean Preset"
+version = "1.0.0"
+
+[tone]
+exposure = 0.5
+contrast = 10.0
+
+[white_balance]
+temperature = 30.0

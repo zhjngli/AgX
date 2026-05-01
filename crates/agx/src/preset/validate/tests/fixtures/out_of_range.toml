@@ -1,0 +1,3 @@
+[tone]
+exposure = 99.0  # Outside [-5.0, 5.0]. Line 2.
+contrast = 10.0  # In range, no diagnostic.

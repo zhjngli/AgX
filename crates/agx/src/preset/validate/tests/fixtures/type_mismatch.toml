@@ -1,0 +1,2 @@
+[tone]
+exposure = "high"  # Should be a number, not a string. Line 2.

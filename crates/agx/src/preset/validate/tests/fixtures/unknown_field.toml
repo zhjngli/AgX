@@ -1,0 +1,6 @@
+[metadata]
+name = "Has Unknown Field"
+
+[lut]
+path = "looks/portra.cube"
+amount = 0.8  # No such field. Should be reported on line 6 with field path "lut.amount".

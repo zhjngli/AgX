@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 // --- Vignette (sRGB gamma space, position-dependent) ---
 
 /// Vignette falloff geometry.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VignetteShape {

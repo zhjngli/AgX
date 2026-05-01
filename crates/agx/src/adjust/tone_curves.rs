@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 /// A single tone curve defined by control points.
 /// Points are (input, output) pairs in [0.0, 1.0], sorted by input.
 /// First point must have x=0.0, last must have x=1.0.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToneCurve {
     /// Control points as (input, output) pairs in [0.0, 1.0], sorted by input.
@@ -64,7 +67,10 @@ impl ToneCurve {
 }
 
 /// Parameters for 5-channel tone curves.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ToneCurveParams {
     /// Master RGB curve applied to all channels.

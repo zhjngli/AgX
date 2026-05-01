@@ -4,11 +4,11 @@ Schema versioning, validation, and authoring shortcuts for AgX presets.
 
 ## Sub-tasks
 
-- [ ] **CLI validation command** — `agx validate preset.toml` to check a preset against the current schema: report unknown fields, out-of-range values, missing required fields
-- [ ] **`#[serde(deny_unknown_fields)]` on preset structs** — fail preset loading loudly on unknown table or field names so typos like `[tone_curves]` (vs the real `[tone_curve]`) or `lut.amount` (no such field) surface as errors rather than being silently ignored. Surfaced by the 2026-04-27 adversarial review. Behaviour change: any preset in the wild with forward-compatible unknown fields breaks. Needs a migration story — when do we want strict-by-default vs. add `#[serde(deny_unknown_fields)]` only after `agx validate` lands and warns first?
-- [ ] **Schema versioning** — add a schema version field to presets for forward/backward compatibility. Not urgent while all changes are additive (`#[serde(default)]` handles missing fields). Becomes necessary on first breaking change
-- [ ] **Migration tooling** — automatic preset migration between schema versions when breaking changes occur
-- [ ] **Variables / shortcuts** — named shortcuts for common parameter combinations (e.g., `$warm-tone` expands to temperature + tint values). Could use TOML's native table references or a simple variable substitution layer
+- [x] **CLI validation command** — `agx validate preset.toml` ships with structural / semantic / filesystem passes covering unknown fields/tables, type mismatches, missing required fields, out-of-range values, LUT existence, `extends` chain validity, and TOML syntax errors. Human + JSON output. Design: [`docs/plans/2026-04-30-agx-validate-design.md`](../plans/2026-04-30-agx-validate-design.md).
+- [x] **Apply-time warnings on unknown fields** — `agx apply` / `multi-apply` / `batch-apply` now emit stderr warnings for unknown fields/tables (top-level and nested) before loading the preset. Apply continues — output is still produced. Resolves the "silent ignore on typos" gap from the 2026-04-27 adversarial review without flipping `#[serde(deny_unknown_fields)]` globally; lenient apply + strict validate covers the same surface without breaking existing presets.
+- [ ] **Schema versioning** — add a schema version field to presets for forward/backward compatibility. Not urgent while all changes are additive (`#[serde(default)]` handles missing fields). Becomes necessary on first breaking change.
+- [ ] **Migration tooling** — automatic preset migration between schema versions when breaking changes occur.
+- [ ] **Variables / shortcuts** — named shortcuts for common parameter combinations (e.g., `$warm-tone` expands to temperature + tint values). Could use TOML's native table references or a simple variable substitution layer.
 
 ## Considerations
 

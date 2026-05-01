@@ -1,0 +1,8 @@
+[metadata]
+name = "Has Unknown Array of Tables"
+
+[[unknown_array]]
+foo = "bar"
+
+[[unknown_array]]
+foo = "baz"
