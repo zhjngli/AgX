@@ -1,0 +1,3 @@
+[metadata]
+name = "Child that extends parent"
+extends = "parent.toml"

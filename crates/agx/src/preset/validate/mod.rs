@@ -7,11 +7,13 @@
 //! - [`Diagnostic`], [`DiagnosticCode`], [`Location`], [`Severity`] — diagnostic types
 //! - [`ValidationReport`] — per-file or per-batch validation result
 //! - [`Preset::validate`] — run all three passes and return a [`FileReport`]
-//! - [`detect_unknown_fields`] — structural pass, re-exported for the CLI apply path
+//! - [`detect_unknown_fields`] — structural pass (top-level only), re-exported for the CLI apply path
+//! - [`find_unknown_fields`] — semantic pass (nested unknowns), re-exported for the CLI apply path
 //!
-//! Implemented passes:
-//! - `structural::detect_unknown_fields` — unknown-field detection with line numbers
-//! - `semantic::check_schema` — type/required/range checks via jsonschema
+//! Pass responsibilities (non-overlapping):
+//! - `structural::detect_unknown_fields` — unknown TOP-LEVEL tables/keys only, with line numbers
+//! - `semantic::find_unknown_fields` — unknown NESTED fields (inside known tables), via custom walk
+//! - `semantic::check_schema` — type/required/range checks via jsonschema (no unknown-field detection)
 //! - `filesystem::check_filesystem` — LUT existence and extends chain
 
 mod diagnostic;
@@ -23,6 +25,7 @@ pub use diagnostic::{
     Diagnostic, DiagnosticCode, FileReport, FileStatus, Location, Severity, Summary,
     ValidationReport,
 };
+pub use semantic::find_unknown_fields;
 pub use structural::detect_unknown_fields;
 
 use crate::preset::Preset;
@@ -58,6 +61,7 @@ impl Preset {
         let mut diagnostics = Vec::new();
         diagnostics.extend(structural::detect_unknown_fields(&toml_str));
         diagnostics.extend(semantic::check_schema(&toml_str));
+        diagnostics.extend(semantic::find_unknown_fields(&toml_str));
         diagnostics.extend(filesystem::check_filesystem(path));
 
         FileReport::new(path.to_string_lossy(), diagnostics)

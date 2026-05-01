@@ -62,6 +62,7 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
         .unwrap_or_else(|_| start_path.to_path_buf());
     visited.insert(canonical);
 
+    let mut current_path = start_path.to_path_buf();
     let mut current_dir = start_dir.to_path_buf();
     let mut current_toml = start_toml.to_string();
 
@@ -78,13 +79,16 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
         if !next_path.exists() {
             let (line, column) =
                 super::structural::find_position_by_path(&current_toml, "metadata.extends");
+            // Disambiguate when the file containing the bad extends is not the entry file.
+            let via_suffix = via_suffix(&current_path, start_path);
             diagnostics.push(Diagnostic {
                 severity: Severity::Error,
                 code: DiagnosticCode::ExtendsNotFound,
                 message: format!(
-                    "extends references missing file: `{}` (resolved to {})",
+                    "extends references missing file: `{}` (resolved to {}){}",
                     extends,
-                    next_path.display()
+                    next_path.display(),
+                    via_suffix,
                 ),
                 location: Location {
                     line,
@@ -101,12 +105,14 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
         if !visited.insert(canonical) {
             let (line, column) =
                 super::structural::find_position_by_path(&current_toml, "metadata.extends");
+            let via_suffix = via_suffix(&current_path, start_path);
             diagnostics.push(Diagnostic {
                 severity: Severity::Error,
                 code: DiagnosticCode::ExtendsCycle,
                 message: format!(
-                    "extends chain has a cycle: `{}` already visited",
-                    next_path.display()
+                    "extends chain has a cycle: `{}` already visited{}",
+                    next_path.display(),
+                    via_suffix,
                 ),
                 location: Location {
                     line,
@@ -124,14 +130,19 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
         };
 
         // Check that the next file is parseable before moving on.
-        // If it isn't, emit a diagnostic referring to the current file's extends field.
+        // If it isn't, emit a diagnostic with a "(via X.toml)" suffix to indicate
+        // which ancestor's `extends` field is the source of the problem.
         if let Err(e) = toml::from_str::<crate::preset::PresetRaw>(&next_toml) {
             let (line, column) =
                 super::structural::find_position_by_path(&current_toml, "metadata.extends");
+            let via_suffix = via_suffix(&current_path, start_path);
             diagnostics.push(Diagnostic {
                 severity: Severity::Error,
                 code: DiagnosticCode::ExtendsNotFound,
-                message: format!("extends references unparseable file: `{}` ({})", extends, e),
+                message: format!(
+                    "extends references unparseable file: `{}` ({}){}",
+                    extends, e, via_suffix
+                ),
                 location: Location {
                     line,
                     column,
@@ -146,7 +157,30 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
             .parent()
             .unwrap_or_else(|| Path::new("."))
             .to_path_buf();
+        current_path = next_path;
     }
 
     diagnostics
+}
+
+/// Return a " (via X.toml)" disambiguation suffix when `current_path` is not
+/// the same file as `start_path`. Returns an empty string when validation is
+/// already on the entry file (no disambiguation needed).
+fn via_suffix(current_path: &Path, start_path: &Path) -> String {
+    // Compare canonical paths so relative vs absolute doesn't cause false positives.
+    let current_canon = current_path
+        .canonicalize()
+        .unwrap_or_else(|_| current_path.to_path_buf());
+    let start_canon = start_path
+        .canonicalize()
+        .unwrap_or_else(|_| start_path.to_path_buf());
+    if current_canon == start_canon {
+        String::new()
+    } else {
+        let name = current_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("?");
+        format!(" (via {})", name)
+    }
 }

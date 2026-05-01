@@ -17,14 +17,18 @@ use agx_cli::{create_engine, BatchOpts, Cli, Commands, EditArgs, OutputOpts};
 mod batch;
 
 /// Print preset unknown-field warnings to stderr. Apply-time variant of the
-/// validate command's structural pass — warns rather than errors so apply
-/// continues with what it understood.
+/// validate command's unknown-field detection — warns rather than errors so
+/// apply continues with what it understood.
+///
+/// Runs both the structural top-level pass and the semantic nested-unknowns
+/// walk so that all 12 preset tables are covered.
 fn warn_unknown_preset_fields(preset_path: &std::path::Path) {
     let toml_str = match std::fs::read_to_string(preset_path) {
         Ok(s) => s,
         Err(_) => return, // Apply path will surface the read error
     };
-    let diags = agx::preset::validate::detect_unknown_fields(&toml_str);
+    let mut diags = agx::preset::validate::detect_unknown_fields(&toml_str);
+    diags.extend(agx::preset::validate::find_unknown_fields(&toml_str));
     for diag in &diags {
         eprintln!(
             "warning: {}:{}: {}",

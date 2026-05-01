@@ -1,5 +1,9 @@
 //! Structural pass: parse TOML to a position-preserving representation and
-//! detect fields/tables that are not in the known preset schema.
+//! detect top-level tables/fields that are not in the known preset schema.
+//!
+//! This pass handles ONLY top-level unknown tables/keys. Nested unknown fields
+//! (inside a known table like `[hsl]`, `[grain]`, etc.) are detected by the
+//! semantic pass via a custom JSON walk — see `semantic::find_unknown_fields`.
 //!
 //! This pass is shared between `agx validate` (where unknown fields are errors)
 //! and `agx apply`'s warning path (where they're surfaced as warnings).
@@ -7,10 +11,11 @@
 use super::diagnostic::{Diagnostic, DiagnosticCode, Location, Severity};
 use std::collections::HashSet;
 
-/// Detect unknown fields and tables in a preset TOML source.
+/// Detect unknown TOP-LEVEL tables and fields in a preset TOML source.
 ///
-/// Returns one [`Diagnostic`] per unknown table or field, with line numbers
-/// derived from the source.
+/// Returns one [`Diagnostic`] per unknown top-level table or field, with line
+/// numbers derived from the source. Does NOT recurse into known tables — nested
+/// unknown fields are the responsibility of `semantic::find_unknown_fields`.
 ///
 /// # Severity
 ///
@@ -51,46 +56,6 @@ pub fn detect_unknown_fields(toml_str: &str) -> Vec<Diagnostic> {
                     field: key.to_string(),
                 },
             });
-            continue;
-        }
-
-        // Known top-level table — recurse to check its fields ONLY if we have an explicit
-        // known-fields set for it. For tables without one (hsl, vignette, color_grading,
-        // tone_curve, detail, dehaze, noise_reduction, grain), the semantic pass handles
-        // deeper validation via the JSON Schema with `additionalProperties: false`.
-        if let Some(table) = item.as_table() {
-            let known_fields = known_fields_for(key);
-            if known_fields.is_empty() {
-                continue;
-            }
-            for (sub_key, sub_item) in table.iter() {
-                if !known_fields.contains(sub_key) {
-                    let (line, column) = position_for_subkey(&doc, key, sub_key);
-                    let code = if sub_item.is_table()
-                        || sub_item.is_inline_table()
-                        || sub_item.is_array_of_tables()
-                    {
-                        DiagnosticCode::UnknownTable
-                    } else {
-                        DiagnosticCode::UnknownField
-                    };
-                    let kind = if sub_item.is_table() || sub_item.is_array_of_tables() {
-                        "table"
-                    } else {
-                        "field"
-                    };
-                    diagnostics.push(Diagnostic {
-                        severity: Severity::Error,
-                        code,
-                        message: format!("unknown {} `{}` in section `[{}]`", kind, sub_key, key),
-                        location: Location {
-                            line,
-                            column,
-                            field: format!("{}.{}", key, sub_key),
-                        },
-                    });
-                }
-            }
         }
     }
 
@@ -117,29 +82,6 @@ fn known_top_level_tables() -> HashSet<&'static str> {
     .collect()
 }
 
-/// The set of known fields for a given top-level table.
-fn known_fields_for(table: &str) -> HashSet<&'static str> {
-    let fields: &[&str] = match table {
-        "metadata" => &["name", "version", "author", "extends"],
-        "tone" => &[
-            "exposure",
-            "contrast",
-            "highlights",
-            "shadows",
-            "whites",
-            "blacks",
-        ],
-        "white_balance" => &["temperature", "tint"],
-        "lut" => &["path"],
-        // Other tables: their fields come from the engine structs (HslChannels,
-        // VignetteParams, etc.). For sub-table awareness, the semantic pass
-        // (Task 5) catches these via the JSON Schema. The structural pass only
-        // covers the flat fields directly on PresetRaw.
-        _ => &[],
-    };
-    fields.iter().copied().collect()
-}
-
 /// Find the (line, column) for a dotted field path like "tone.exposure" or "lut.path".
 ///
 /// Used by the semantic pass to enrich jsonschema errors with source positions.
@@ -161,12 +103,6 @@ pub(super) fn find_position_by_path(source: &str, path: &str) -> (usize, usize) 
 fn position_for_key(doc: &toml_edit::DocumentMut, key: &str) -> (usize, usize) {
     let source = doc.to_string();
     find_key_position(&source, key, None)
-}
-
-/// Compute (line, column) for a sub-key within a parent table.
-fn position_for_subkey(doc: &toml_edit::DocumentMut, parent: &str, key: &str) -> (usize, usize) {
-    let source = doc.to_string();
-    find_key_position(&source, key, Some(parent))
 }
 
 /// Scan the source for a key, optionally constrained to be after a parent
