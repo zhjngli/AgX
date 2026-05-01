@@ -1,0 +1,126 @@
+# Release Process
+
+This document describes how to ship a release of `agx-photo` or `agx-cli` to crates.io. Releases are local-only — execution runs from the maintainer's laptop, no CI involvement. Per-crate independent versioning: each publishable crate has its own version timeline.
+
+The high-level summary lives in [`developer-workflow.md`](developer-workflow.md) Step 6. This document has the operational detail.
+
+## When to release
+
+**Soft trigger:** glance at the crate's `[Unreleased]` section in `CHANGELOG.md` after PR merges. If user-visible changes have accumulated, ship within a week. There is no fixed schedule.
+
+**Independent versions:** `agx-photo` and `agx-cli` ship on separate timelines. Bumping one does not require bumping the other — except as noted under [Multi-crate releases](#multi-crate-releases) below.
+
+## One-time setup
+
+Install the release tools:
+
+```bash
+cargo install cargo-release git-cliff
+```
+
+(Or use `cargo binstall` if installed — downloads prebuilt binaries instead of compiling from source.)
+
+Verify your crates.io token is in `~/.cargo/credentials.toml`:
+
+```bash
+test -f ~/.cargo/credentials.toml && echo OK || cargo login
+```
+
+## Versioning rules
+
+Pre-1.0, Cargo treats `0.x.y` as compatible within `0.x` and incompatible across minors, so the minor axis is the breaking-change axis until a 1.0 cut.
+
+| Change | Bump |
+|---|---|
+| Public API addition (lib) | minor (0.x.0) |
+| Public API breaking change (lib) | minor pre-1.0 (Cargo treats 0.x as the breakage axis) |
+| Bug fix (lib or CLI) | patch (0.0.x) |
+| New CLI subcommand or flag | minor |
+| CLI breaking flag/binary change | minor pre-1.0 |
+
+## Release steps (single crate)
+
+The two publishable crates have different filesystem paths and Cargo package names:
+
+| Crate dir              | Cargo package name | Tag scheme            |
+|------------------------|--------------------|-----------------------|
+| `crates/agx/`          | `agx-photo`        | `agx-photo-vX.Y.Z`    |
+| `crates/agx-cli/`      | `agx-cli`          | `agx-cli-vX.Y.Z`      |
+
+The path fragment goes into `git cliff --include-path` and the `git add` / commit subject. The package name goes into `cargo release -p`. Don't conflate them.
+
+For a release of `agx-cli`:
+
+1. **Confirm main is green.** On the `main` branch, run `./scripts/verify.sh` and `./scripts/e2e.sh`. Both should pass.
+
+2. **Scaffold the changelog draft.** Use `--tag-pattern` so `git-cliff` only considers tags from this crate when computing the "since last release" range:
+
+   ```bash
+   git cliff --include-path 'crates/agx-cli/**' --tag-pattern 'agx-cli-v.*' --unreleased > /tmp/draft.md
+   cat /tmp/draft.md
+   ```
+
+   The output is a Keep-a-Changelog-formatted entry of all `feat:`/`fix:`/`refactor:`/`perf:` commits scoped to `crates/agx-cli/` since the last `agx-cli-v*` tag.
+
+3. **Curate the draft.** Open `/tmp/draft.md`. Condense bullets into narrative, drop noise, group related changes. The output should read as a short summary of the release, not a commit log dump — see existing entries in `crates/agx/CHANGELOG.md` and `crates/agx-cli/CHANGELOG.md` for the voice to match.
+
+4. **Paste curated entry into the changelog.** Open `crates/agx-cli/CHANGELOG.md` and paste the curated content under `## [Unreleased]`. The `[Unreleased]` heading itself stays — `cargo-release` rewrites it in the next step.
+
+5. **Commit the changelog edit:**
+
+   ```bash
+   git add crates/agx-cli/CHANGELOG.md
+   git commit -m "docs(agx-cli): changelog for vX.Y.Z"
+   ```
+
+6. **Run cargo-release.** This bumps `Cargo.toml`, rewrites `[Unreleased]` to a dated section in `CHANGELOG.md`, commits the version bump, tags as `agx-cli-vX.Y.Z`, and publishes to crates.io:
+
+   ```bash
+   # Dry run first — prints planned actions without bumping or publishing:
+   cargo release <patch|minor|major> -p agx-cli
+
+   # Then commit to it:
+   cargo release <patch|minor|major> -p agx-cli --execute
+   ```
+
+   Without `--execute`, cargo-release runs in dry-run mode and shows what it would do. With `--execute`, it prompts before each side-effecting step. Once `cargo publish` runs (the last prompt), the version is on crates.io permanently — yank-only, not deletable. Read each prompt before confirming.
+
+7. **Push the tag.** `release.toml` has `push = false`, so the tag is local only after `cargo-release`. Push the specific tag and the bumped main commit:
+
+   ```bash
+   git push origin agx-cli-vX.Y.Z
+   git push origin main
+   ```
+
+   Don't use `git push --tags` here — it pushes all local tags, including any in-progress or unvetted ones from a multi-crate workspace.
+
+For a release of `agx-photo`, the same flow applies with substitutions:
+
+| Token in steps above | `agx-photo` substitute |
+|---|---|
+| `crates/agx-cli/**`  | `crates/agx/**`        |
+| `agx-cli-v.*`        | `agx-photo-v.*`        |
+| `crates/agx-cli/`    | `crates/agx/`          |
+| `docs(agx-cli):`     | `docs(agx):`           |
+| `-p agx-cli`         | `-p agx-photo`         |
+| `agx-cli-vX.Y.Z`     | `agx-photo-vX.Y.Z`     |
+
+## Multi-crate releases
+
+When `agx-photo` ships changes that `agx-cli` consumes, both crates ship. The order matters because `agx-cli`'s dep pin must resolve on crates.io.
+
+1. **Release `agx-photo` first.** Follow the single-crate steps above for `agx-photo`. After `cargo publish` succeeds, the new lib version is on crates.io.
+
+2. **Wait for the index.** crates.io's sparse index updates within seconds; the legacy git index can take up to a minute. `cargo-release` for `agx-cli` will retry automatically.
+
+3. **Release `agx-cli`.** `release.toml` sets `dependent-version = "upgrade"`, so `cargo-release` automatically rewrites `agx-cli/Cargo.toml`'s `agx-photo` dep pin to the new lib version before publishing. Even if `agx-cli`'s own source did not change, ship a patch bump so users running `cargo install agx-cli` pick up the new lib transitively.
+
+## Troubleshooting
+
+- **"version X.Y.Z is already published"** — that version is on crates.io (live or yanked). Don't republish; bump again to a fresh version.
+
+- **"dependency not found in registry"** during `agx-cli` publish — `agx-photo` either hasn't been released yet or the index hasn't caught up. Confirm with `cargo search agx-photo`. If it's there, retry.
+
+- **Pre-release replacement fails** ("expected exactly 1 match for `## \[Unreleased\]`") — the changelog file is missing the `## [Unreleased]` heading, or has it more than once. Add or normalize before retrying.
+
+- **Forgot to push the tag** — run `git push origin <crate>-vX.Y.Z` after the fact. The crates.io publish is independent of git push state, so the package is fine regardless.

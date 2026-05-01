@@ -23,7 +23,7 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module dependency graph, dependency
 - `serde` for all serializable types
 - Tests live alongside source in standard Rust `#[cfg(test)]` modules
 - Structural tests in `crates/agx/tests/architecture.rs` enforce module dependency rules; see "When a Structural Test Fails" in `ARCHITECTURE.md`
-- Commit messages and PR titles use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`, `chore:`, `build:`. For mixed-scope PRs, use the most representative prefix.
+- Commit messages and PR titles use conventional commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `style:`, `chore:`, `build:`. For mixed-scope PRs, use the most representative prefix. Prefixes determine changelog grouping at release time — see [`docs/contributing/release-process.md`](docs/contributing/release-process.md).
 - Do not use `#N` issue/PR refs in commit messages or PR titles/bodies. GitHub auto-links every `#N` to whatever issue or PR carries that number, so internal numbering schemes (e.g. backlog sub-projects "10", "11") get spuriously linked to unrelated PRs and break the rendered text. Spell the number out (`sub-project 11`) or use a different separator. Plain `#N` is fine in markdown under `docs/`.
 
 ## Documentation

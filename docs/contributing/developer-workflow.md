@@ -120,6 +120,8 @@ Update documentation alongside code. The rule: if someone reads the docs after y
 | Wrote a design doc | ARCHITECTURE.md: Design Docs table |
 | Changed how to extend a module | Module README: Extension Guide section |
 
+Per-crate `CHANGELOG.md` files exist for both publishable crates (`crates/agx/`, `crates/agx-cli/`) but are **not updated per-PR**. Changelog entries are scaffolded from conventional commit messages by `git-cliff` and curated at release time. Use accurate `feat:` / `fix:` / `refactor:` / `perf:` prefixes — they map directly to changelog sections (Added / Fixed / Changed). `docs:`, `chore:`, `style:`, `test:`, `build:`, `ci:` are skipped from changelogs.
+
 For style guidance on `///` comments, `//!` comments, the shared `.md` file convention for cross-surface explanations, and the active rustdoc lints, see [documentation-conventions.md](documentation-conventions.md).
 
 ### New adjustment-bearing modules
@@ -142,3 +144,11 @@ Before declaring done, re-read your diff and ask:
 - **Naming**: Are function/type/variable names clear? Do they describe what, not how?
 - **Contracts**: Does my code respect the module's negative constraints (Does NOT section in README)?
 - **Architecture**: Did I introduce any cross-module dependencies? If so, are they allowed by the rules in ARCHITECTURE.md?
+
+## 6. Release (when applicable)
+
+Most PRs do not trigger a release on merge — releases happen periodically when user-visible changes have accumulated. Check `crates/<crate>/CHANGELOG.md` `[Unreleased]` section after merging.
+
+If your work is user-visible (new feature, bug fix, breaking change), it will surface in the next release's changelog scaffolded from your conventional commit messages. Use accurate prefixes (`feat:` → Added, `fix:` → Fixed, `refactor:` / `perf:` → Changed) — `docs:`, `chore:`, `style:`, `test:`, `build:`, `ci:` are skipped.
+
+When releasing, follow [release-process.md](release-process.md) for the operational detail: install tooling, scaffold changelog, curate, run `cargo-release`, push tags.

@@ -16,7 +16,9 @@ tag-name = "{{crate_name}}-v{{version}}"
 # agx-cli release picks up the new lib version on crates.io.
 dependent-version = "upgrade"
 
-# Don't push the tag automatically — review locally first, then `git push --tags`.
+# Don't push the tag automatically — review locally first, then push the
+# specific tag (`git push origin <crate>-vX.Y.Z`). Avoid `git push --tags`
+# in a multi-crate workspace since it pushes every local tag.
 push = false
 
 # At release time, rewrite the [Unreleased] heading in CHANGELOG.md to
