@@ -1,0 +1,47 @@
+# git-cliff configuration. Generates changelog drafts from conventional
+# commits scoped to a per-crate path filter at invocation time.
+#
+# Documented in docs/contributing/release-process.md.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this crate are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+"""
+
+# Per-release entry template. Groups commits by conventional-commit type
+# into Keep-a-Changelog sections. Includes commit SHA links to GitHub.
+body = """
+{% if version %}\
+## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/zhjngli/AgX/commit/{{ commit.id }}))
+{%- endfor %}
+{% endfor %}
+"""
+
+footer = ""
+
+[git]
+# Surface non-conventional commits in scaffolds so the curator can decide
+# whether to retag, hand-write an entry, or skip. Default is true (silently drop).
+filter_unconventional = false
+
+# Require commit messages to follow the conventional spec.
+conventional_commits = true
+
+# Map conventional commit types to changelog sections. docs/chore/style/test/build/ci
+# are skipped — not user-facing for changelog purposes.
+commit_parsers = [
+  { message = "^feat",                                group = "Added"   },
+  { message = "^fix",                                 group = "Fixed"   },
+  { message = "^refactor|^perf",                      group = "Changed" },
+  { message = "^docs|^chore|^style|^test|^build|^ci", skip  = true      },
+]
