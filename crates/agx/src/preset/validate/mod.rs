@@ -43,11 +43,11 @@ impl Preset {
                     path.to_string_lossy(),
                     vec![Diagnostic {
                         severity: Severity::Error,
-                        code: DiagnosticCode::UnknownField, // Generic file-read error
+                        code: DiagnosticCode::FileNotReadable,
                         message: format!("failed to read file: {}", e),
                         location: Location {
-                            line: 0,
-                            column: 0,
+                            line: 1,
+                            column: 1,
                             field: String::new(),
                         },
                     }],

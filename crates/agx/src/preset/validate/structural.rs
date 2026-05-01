@@ -54,9 +54,15 @@ pub fn detect_unknown_fields(toml_str: &str) -> Vec<Diagnostic> {
             continue;
         }
 
-        // Known top-level table — recurse to check its fields
+        // Known top-level table — recurse to check its fields ONLY if we have an explicit
+        // known-fields set for it. For tables without one (hsl, vignette, color_grading,
+        // tone_curve, detail, dehaze, noise_reduction, grain), the semantic pass handles
+        // deeper validation via the JSON Schema with `additionalProperties: false`.
         if let Some(table) = item.as_table() {
             let known_fields = known_fields_for(key);
+            if known_fields.is_empty() {
+                continue;
+            }
             for (sub_key, sub_item) in table.iter() {
                 if !known_fields.contains(sub_key) {
                     let (line, column) = position_for_subkey(&doc, key, sub_key);

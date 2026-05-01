@@ -344,6 +344,20 @@ mod filesystem_pass {
             missing_errors[0].message,
         );
     }
+
+    #[test]
+    fn extends_malformed_target_is_detected() {
+        let path = fixture_path("extends_malformed/parent.toml");
+        let diags = check_filesystem(&path);
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.code == DiagnosticCode::ExtendsNotFound
+                    && d.message.contains("unparseable")),
+            "expected ExtendsNotFound with 'unparseable' message; got: {:?}",
+            diags
+        );
+    }
 }
 
 mod top_level_api {
@@ -386,6 +400,19 @@ mod top_level_api {
             .diagnostics
             .iter()
             .any(|d| d.code == DiagnosticCode::OutOfRange));
+    }
+
+    #[test]
+    fn validate_real_world_preset_with_full_features_returns_ok() {
+        let path = fixture_path("real_world_clean.toml");
+        let report = Preset::validate(&path);
+        assert_eq!(
+            report.status,
+            FileStatus::Ok,
+            "real-world preset using HSL, grain, vignette, detail, noise_reduction, \
+             color_grading, dehaze should validate clean. Diagnostics: {:?}",
+            report.diagnostics
+        );
     }
 }
 

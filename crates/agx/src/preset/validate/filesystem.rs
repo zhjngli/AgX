@@ -65,6 +65,9 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
     let mut current_dir = start_dir.to_path_buf();
     let mut current_toml = start_toml.to_string();
 
+    // Parse failure on the start file: the semantic pass will report it.
+    // Parse failure on a chain file: we already emitted the diagnostic before
+    // updating current_toml (see the unparseable check below), so just stop.
     while let Ok(raw) = toml::from_str::<crate::preset::PresetRaw>(&current_toml) {
         let extends = match raw.metadata.extends.as_ref() {
             Some(e) => e.clone(),
@@ -114,11 +117,31 @@ fn check_extends_chain(start_path: &Path, start_dir: &Path, start_toml: &str) ->
             break;
         }
 
-        // Move to the next file in the chain
-        current_toml = match std::fs::read_to_string(&next_path) {
+        // Read the next file in the chain
+        let next_toml = match std::fs::read_to_string(&next_path) {
             Ok(s) => s,
             Err(_) => break,
         };
+
+        // Check that the next file is parseable before moving on.
+        // If it isn't, emit a diagnostic referring to the current file's extends field.
+        if let Err(e) = toml::from_str::<crate::preset::PresetRaw>(&next_toml) {
+            let (line, column) =
+                super::structural::find_position_by_path(&current_toml, "metadata.extends");
+            diagnostics.push(Diagnostic {
+                severity: Severity::Error,
+                code: DiagnosticCode::ExtendsNotFound,
+                message: format!("extends references unparseable file: `{}` ({})", extends, e),
+                location: Location {
+                    line,
+                    column,
+                    field: "metadata.extends".to_string(),
+                },
+            });
+            break;
+        }
+
+        current_toml = next_toml;
         current_dir = next_path
             .parent()
             .unwrap_or_else(|| Path::new("."))

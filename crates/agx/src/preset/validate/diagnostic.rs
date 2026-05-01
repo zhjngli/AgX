@@ -37,6 +37,8 @@ pub enum DiagnosticCode {
     ExtendsNotFound,
     /// The `extends` chain forms a cycle.
     ExtendsCycle,
+    /// The preset file could not be read (e.g., file missing or permission denied).
+    FileNotReadable,
 }
 
 /// Location of a diagnostic within a source file.
