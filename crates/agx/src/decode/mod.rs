@@ -5,7 +5,7 @@ mod orientation;
 #[cfg(feature = "raw")]
 pub mod raw;
 
-use image::{Rgb, Rgb32FImage};
+use image::Rgb32FImage;
 use palette::{LinSrgb, Srgb};
 
 use crate::error::{AgxError, Result};
@@ -56,20 +56,18 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
         .map_err(AgxError::Image)?;
     let orientation = orientation::read_orientation(path);
     let img = orientation.apply(img);
-    let srgb_f32 = img.into_rgb32f();
-    let (w, h) = srgb_f32.dimensions();
-    let linear = Rgb32FImage::from_fn(w, h, |x, y| {
-        let p = srgb_f32.get_pixel(x, y);
-        let lin: LinSrgb<f32> = Srgb::new(p.0[0], p.0[1], p.0[2]).into_linear();
-        Rgb([lin.red, lin.green, lin.blue])
-    });
-    Ok(linear)
+    let mut buf = img.into_rgb32f();
+    for px in buf.pixels_mut() {
+        let lin: LinSrgb<f32> = Srgb::new(px.0[0], px.0[1], px.0[2]).into_linear();
+        px.0 = [lin.red, lin.green, lin.blue];
+    }
+    Ok(buf)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::ImageBuffer;
+    use image::{ImageBuffer, Rgb};
 
     #[test]
     fn decode_png_to_linear_f32() {
@@ -88,6 +86,46 @@ mod tests {
             (pixel.0[0] - 0.2159).abs() < 0.01,
             "Expected ~0.2159, got {}",
             pixel.0[0]
+        );
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn decode_preserves_per_pixel_channels() {
+        // Asymmetric per-pixel and per-channel values catch in-place loop bugs
+        // (channel swap, off-by-one indexing) that decode_png_to_linear_f32's
+        // uniform-color image would not.
+        let temp_path = std::env::temp_dir().join("agx_test_decode_asymmetric.png");
+        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(2, 2);
+        img.put_pixel(0, 0, Rgb([255, 0, 0])); // red
+        img.put_pixel(1, 0, Rgb([0, 255, 0])); // green
+        img.put_pixel(0, 1, Rgb([0, 0, 255])); // blue
+        img.put_pixel(1, 1, Rgb([0, 0, 0])); // black
+        img.save(&temp_path).unwrap();
+
+        let result = decode_standard(&temp_path).unwrap();
+        let p00 = result.get_pixel(0, 0).0;
+        let p10 = result.get_pixel(1, 0).0;
+        let p01 = result.get_pixel(0, 1).0;
+        let p11 = result.get_pixel(1, 1).0;
+
+        // sRGB 255 → linear 1.0; sRGB 0 → linear 0.0
+        assert!(
+            (p00[0] - 1.0).abs() < 0.001 && p00[1] < 0.001 && p00[2] < 0.001,
+            "red pixel: {p00:?}"
+        );
+        assert!(
+            p10[0] < 0.001 && (p10[1] - 1.0).abs() < 0.001 && p10[2] < 0.001,
+            "green pixel: {p10:?}"
+        );
+        assert!(
+            p01[0] < 0.001 && p01[1] < 0.001 && (p01[2] - 1.0).abs() < 0.001,
+            "blue pixel: {p01:?}"
+        );
+        assert!(
+            p11[0] < 0.001 && p11[1] < 0.001 && p11[2] < 0.001,
+            "black pixel: {p11:?}"
         );
 
         let _ = std::fs::remove_file(&temp_path);

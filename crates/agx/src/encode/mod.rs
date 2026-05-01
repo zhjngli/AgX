@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::codecs::tiff::TiffEncoder;
-use image::{DynamicImage, Rgb, Rgb32FImage};
+use image::{Rgb, Rgb32FImage, RgbImage};
 use palette::{LinSrgb, Srgb};
 
 use crate::error::Result;
@@ -98,15 +98,42 @@ pub fn resolve_output(
     }
 }
 
-/// Convert a linear sRGB f32 image buffer to a DynamicImage in sRGB gamma space.
-pub fn linear_to_srgb_dynamic(linear: &Rgb32FImage) -> DynamicImage {
+/// Convert a single linear sRGB f32 channel value to a u8 sRGB-encoded byte.
+///
+/// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
+/// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round
+/// to nearest. NaN inputs produce 255 — matching the image crate's
+/// `normalize_float`, which collapses NaN to the upper bound. This is
+/// deliberate: it keeps output byte-identical to the prior
+/// `linear_to_srgb_dynamic + to_rgb8` path even on out-of-range floats.
+#[inline]
+fn quantize_u8(x: f32) -> u8 {
+    // NaN and values >= 1.0 all map to 255, matching `image`'s `normalize_float`.
+    // `is_nan()` is required because NaN does not compare >= 1.0.
+    let normalized = if x.is_nan() || x >= 1.0 {
+        1.0
+    } else {
+        x.max(0.0)
+    };
+    (normalized * 255.0).round() as u8
+}
+
+/// Convert a linear sRGB f32 image to an 8-bit sRGB-encoded RGB image in a single pass.
+///
+/// Combines the gamma encoding (linear → sRGB) and the f32 → u8 quantization
+/// in one traversal. A two-step conversion via an intermediate f32 sRGB image
+/// would allocate a ~300MB extra buffer at 26MP; this avoids that.
+pub fn linear_to_srgb_rgb8(linear: &Rgb32FImage) -> RgbImage {
     let (w, h) = linear.dimensions();
-    let srgb = Rgb32FImage::from_fn(w, h, |x, y| {
+    RgbImage::from_fn(w, h, |x, y| {
         let p = linear.get_pixel(x, y);
-        let srgb: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
-        Rgb([srgb.red, srgb.green, srgb.blue])
-    });
-    DynamicImage::ImageRgb32F(srgb)
+        let s: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
+        Rgb([
+            quantize_u8(s.red),
+            quantize_u8(s.green),
+            quantize_u8(s.blue),
+        ])
+    })
 }
 
 /// Encode a linear sRGB f32 image to a file with full options.
@@ -122,8 +149,7 @@ pub fn encode_to_file_with_options(
 ) -> Result<PathBuf> {
     let (final_path, format) = resolve_output(path, options.format);
 
-    let dynamic = linear_to_srgb_dynamic(linear);
-    let rgb8 = dynamic.to_rgb8();
+    let rgb8 = linear_to_srgb_rgb8(linear);
 
     // Encode to in-memory buffer with format-specific encoder
     let buf = match format {
@@ -242,14 +268,61 @@ mod tests {
     fn roundtrip_linear_to_srgb_pixel_values() {
         // linear 0.2159 should round-trip to sRGB ~128
         let linear: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([0.2159f32, 0.2159, 0.2159]));
-        let dynamic = linear_to_srgb_dynamic(&linear);
-        let rgb8 = dynamic.to_rgb8();
+        let rgb8 = linear_to_srgb_rgb8(&linear);
         let pixel = rgb8.get_pixel(0, 0);
         assert!(
             (pixel.0[0] as i32 - 128).unsigned_abs() <= 1,
             "Expected ~128, got {}",
             pixel.0[0]
         );
+    }
+
+    #[test]
+    fn quantize_u8_handles_edge_values() {
+        // NaN, +∞, and values >= 1.0 all collapse to 255 — matching `image`
+        // crate's `normalize_float` (and therefore the prior `to_rgb8` path).
+        assert_eq!(quantize_u8(f32::NAN), 255);
+        assert_eq!(quantize_u8(f32::INFINITY), 255);
+        assert_eq!(quantize_u8(f32::NEG_INFINITY), 0);
+        assert_eq!(quantize_u8(0.0), 0);
+        assert_eq!(quantize_u8(1.0), 255);
+        assert_eq!(quantize_u8(-1.0), 0);
+        assert_eq!(quantize_u8(2.0), 255);
+    }
+
+    #[test]
+    fn linear_to_srgb_rgb8_quantization_table() {
+        // Hardcoded expected values pin the linear→sRGB→u8 conversion behavior
+        // against future drift in palette or quantize_u8. Computed from the
+        // pre-refactor `linear_to_srgb_dynamic + to_rgb8` path; updates here must
+        // be deliberate decisions, not accidental regressions.
+        let table: &[(f32, u8)] = &[
+            (0.0, 0),
+            (0.0001, 0),
+            (0.0031308, 10),
+            (0.04, 56),
+            (0.18, 118),
+            (0.2159, 128),
+            (0.5, 188),
+            (0.9, 243),
+            (0.999, 255),
+            (1.0, 255),
+            (1.0001, 255),
+            (2.0, 255),
+            (-0.001, 0),
+            (-1.0, 0),
+            (f32::NAN, 255),
+        ];
+
+        for &(linear, expected) in table {
+            let img: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([linear, linear, linear]));
+            let rgb8 = linear_to_srgb_rgb8(&img);
+            let actual = rgb8.get_pixel(0, 0).0[0];
+            assert_eq!(
+                actual, expected,
+                "linear {linear} should encode to u8 {expected}, got {actual}"
+            );
+        }
     }
 
     #[test]
