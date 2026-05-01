@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::codecs::tiff::TiffEncoder;
-use image::{DynamicImage, Rgb, Rgb32FImage};
+use image::{DynamicImage, Rgb, Rgb32FImage, RgbImage};
 use palette::{LinSrgb, Srgb};
 
 use crate::error::Result;
@@ -96,6 +96,31 @@ pub fn resolve_output(
             (std::path::PathBuf::from(new_path), OutputFormat::Jpeg)
         }
     }
+}
+
+/// Convert a single linear sRGB f32 channel value to a u8 sRGB-encoded byte.
+///
+/// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
+/// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round
+/// to nearest. NaN inputs collapse to 0 (consistent with `clamp` behavior on
+/// NaN, which returns the lower bound).
+#[inline]
+fn quantize_u8(x: f32) -> u8 {
+    (x.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+/// Convert a linear sRGB f32 image to an 8-bit sRGB-encoded RGB image in a single pass.
+///
+/// Combines the gamma encoding (linear → sRGB) and the f32 → u8 quantization,
+/// avoiding the intermediate ~300MB f32 sRGB buffer that `linear_to_srgb_dynamic`
+/// followed by `DynamicImage::to_rgb8()` would allocate.
+pub fn linear_to_srgb_rgb8(linear: &Rgb32FImage) -> RgbImage {
+    let (w, h) = linear.dimensions();
+    RgbImage::from_fn(w, h, |x, y| {
+        let p = linear.get_pixel(x, y);
+        let s: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
+        Rgb([quantize_u8(s.red), quantize_u8(s.green), quantize_u8(s.blue)])
+    })
 }
 
 /// Convert a linear sRGB f32 image buffer to a DynamicImage in sRGB gamma space.
