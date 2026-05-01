@@ -273,6 +273,79 @@ mod structural_pass {
     }
 }
 
+mod filesystem_pass {
+    use super::super::filesystem::check_filesystem;
+    use super::super::*;
+    use std::path::Path;
+
+    fn fixture_path(name: &str) -> std::path::PathBuf {
+        Path::new("src/preset/validate/tests/fixtures").join(name)
+    }
+
+    #[test]
+    fn clean_preset_with_no_lut_or_extends_passes() {
+        // The clean.toml fixture has neither a LUT nor an extends.
+        let path = fixture_path("clean.toml");
+        let diags = check_filesystem(&path);
+        assert_eq!(diags, vec![]);
+    }
+
+    #[test]
+    fn missing_lut_is_detected() {
+        let path = fixture_path("missing_lut.toml");
+        let diags = check_filesystem(&path);
+
+        let lut_errors: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == DiagnosticCode::LutNotFound)
+            .collect();
+        assert_eq!(lut_errors.len(), 1);
+        assert_eq!(lut_errors[0].location.field, "lut.path");
+        assert!(
+            lut_errors[0].message.contains("nonexistent/portra.cube"),
+            "message should reference the missing path, got: {}",
+            lut_errors[0].message,
+        );
+    }
+
+    #[test]
+    fn extends_cycle_is_detected() {
+        let path = fixture_path("extends_cycle/a.toml");
+        let diags = check_filesystem(&path);
+
+        let cycle_errors: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == DiagnosticCode::ExtendsCycle)
+            .collect();
+        assert!(
+            !cycle_errors.is_empty(),
+            "expected at least one cycle diagnostic"
+        );
+    }
+
+    #[test]
+    fn extends_missing_file_is_detected() {
+        let path = fixture_path("extends_missing.toml");
+        let diags = check_filesystem(&path);
+
+        let missing_errors: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == DiagnosticCode::ExtendsNotFound)
+            .collect();
+        assert_eq!(
+            missing_errors.len(),
+            1,
+            "expected exactly one ExtendsNotFound diagnostic"
+        );
+        assert_eq!(missing_errors[0].location.field, "metadata.extends");
+        assert!(
+            missing_errors[0].message.contains("nonexistent_base.toml"),
+            "message should reference the missing file, got: {}",
+            missing_errors[0].message,
+        );
+    }
+}
+
 mod missing_required {
     use super::*;
 

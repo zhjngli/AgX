@@ -120,13 +120,13 @@ pub(crate) struct LutSection {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct PresetRaw {
     #[serde(default)]
-    metadata: PresetMetadata,
+    pub(crate) metadata: PresetMetadata,
     #[serde(default)]
     tone: ToneSection,
     #[serde(default)]
     white_balance: WhiteBalanceSection,
     #[serde(default)]
-    lut: LutSection,
+    pub(crate) lut: LutSection,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     hsl: Option<PartialHslChannels>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -10,12 +10,13 @@
 //! Implemented passes:
 //! - `structural::detect_unknown_fields` — unknown-field detection with line numbers
 //! - `semantic::check_schema` — type/required/range checks via jsonschema
+//! - `filesystem::check_filesystem` — LUT existence and extends chain
 //!
 //! Future tasks (not yet implemented):
-//! - `filesystem::check_filesystem` — LUT existence and extends chain
 //! - `Preset::validate` — public top-level API tying all three passes together
 
 mod diagnostic;
+pub(crate) mod filesystem;
 pub(crate) mod semantic;
 pub(crate) mod structural;
 
