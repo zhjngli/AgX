@@ -1,0 +1,9 @@
+[metadata]
+name = "Has Unknown Table"
+
+[tone]
+exposure = 0.5
+
+[tone_curves]
+# Typo: should be [tone_curve]. Should be reported on line 7.
+points = [[0.0, 0.0], [1.0, 1.0]]

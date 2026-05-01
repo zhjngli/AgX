@@ -14,6 +14,7 @@
 //! - `Preset::validate` — public top-level API tying all three passes together
 
 mod diagnostic;
+pub(crate) mod structural;
 
 pub use diagnostic::{
     Diagnostic, DiagnosticCode, FileReport, FileStatus, Location, Severity, Summary,
