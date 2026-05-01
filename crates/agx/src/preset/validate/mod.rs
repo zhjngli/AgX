@@ -58,6 +58,36 @@ impl Preset {
             }
         };
 
+        // Early TOML parse check — short-circuit on syntax errors so they don't
+        // silently pass through (each pass returns vec![] on parse failure).
+        if let Err(parse_err) = toml::from_str::<toml::Value>(&toml_str) {
+            let (line, column) = parse_err
+                .span()
+                .map(|s| {
+                    // toml::de::Error spans are byte ranges; convert to 1-based line/col.
+                    let prefix = &toml_str[..s.start];
+                    let line = prefix.matches('\n').count() + 1;
+                    let last_newline = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let column = s.start - last_newline + 1;
+                    (line, column)
+                })
+                .unwrap_or((1, 1));
+
+            return FileReport::new(
+                path.to_string_lossy(),
+                vec![Diagnostic {
+                    severity: Severity::Error,
+                    code: DiagnosticCode::SyntaxError,
+                    message: format!("TOML syntax error: {}", parse_err.message()),
+                    location: Location {
+                        line,
+                        column,
+                        field: String::new(),
+                    },
+                }],
+            );
+        }
+
         let mut diagnostics = Vec::new();
         diagnostics.extend(structural::detect_unknown_fields(&toml_str));
         diagnostics.extend(semantic::check_schema(&toml_str));

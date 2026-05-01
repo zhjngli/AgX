@@ -122,6 +122,24 @@ fn find_key_position(source: &str, key: &str, parent: Option<&str>) -> (usize, u
         let line_num = idx + 1;
         let trimmed = line.trim_start();
 
+        // Check the full dotted heading form `[parent.key]` BEFORE the parent-state
+        // reset below. This handles cases like `[hsl.bogus]` (depth-2) and
+        // `[hsl.red.weird_table]` (depth-3 with a dotted parent path), where the
+        // line starts with `[` and would otherwise trigger the bail-out before the
+        // heading match runs.
+        if let Some(p) = parent {
+            let dotted_heading = format!("[{}.{}]", p, key);
+            let dotted_heading_with_dot = format!("[{}.{}.", p, key);
+            let dotted_array = format!("[[{}.{}]]", p, key);
+            if trimmed.starts_with(dotted_heading.as_str())
+                || trimmed.starts_with(dotted_heading_with_dot.as_str())
+                || trimmed.starts_with(dotted_array.as_str())
+            {
+                let column = line.len() - line.trim_start().len() + 1;
+                return (line_num, column);
+            }
+        }
+
         if let Some(ref heading) = parent_heading {
             if trimmed.starts_with(heading.as_str()) {
                 in_parent = true;

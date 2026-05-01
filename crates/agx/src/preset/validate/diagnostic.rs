@@ -39,6 +39,8 @@ pub enum DiagnosticCode {
     ExtendsCycle,
     /// The preset file could not be read (e.g., file missing or permission denied).
     FileNotReadable,
+    /// The preset file is not valid TOML (syntax error).
+    SyntaxError,
 }
 
 /// Location of a diagnostic within a source file.

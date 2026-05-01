@@ -566,6 +566,44 @@ mod top_level_api {
             report.diagnostics
         );
     }
+
+    #[test]
+    fn syntax_error_in_toml_is_reported_as_error() {
+        let path = fixture_path("syntax_error.toml");
+        let report = Preset::validate(&path);
+        assert_eq!(
+            report.status,
+            FileStatus::Error,
+            "syntax error must be Error, not Ok. Diagnostics: {:?}",
+            report.diagnostics
+        );
+        assert_eq!(
+            report.diagnostics.len(),
+            1,
+            "expected exactly one diagnostic for syntax error"
+        );
+        assert_eq!(report.diagnostics[0].code, DiagnosticCode::SyntaxError);
+        assert!(
+            report.diagnostics[0]
+                .message
+                .to_lowercase()
+                .contains("syntax")
+                || report.diagnostics[0]
+                    .message
+                    .to_lowercase()
+                    .contains("toml")
+                || report.diagnostics[0]
+                    .message
+                    .to_lowercase()
+                    .contains("invalid")
+                || report.diagnostics[0]
+                    .message
+                    .to_lowercase()
+                    .contains("expected"),
+            "message should describe the syntax error, got: {}",
+            report.diagnostics[0].message,
+        );
+    }
 }
 
 mod missing_required {
