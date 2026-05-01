@@ -5,7 +5,7 @@ mod orientation;
 #[cfg(feature = "raw")]
 pub mod raw;
 
-use image::{Rgb, Rgb32FImage};
+use image::Rgb32FImage;
 use palette::{LinSrgb, Srgb};
 
 use crate::error::{AgxError, Result};
@@ -67,7 +67,7 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::ImageBuffer;
+    use image::{ImageBuffer, Rgb};
 
     #[test]
     fn decode_png_to_linear_f32() {

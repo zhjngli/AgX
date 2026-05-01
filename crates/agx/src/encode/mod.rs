@@ -119,7 +119,11 @@ pub fn linear_to_srgb_rgb8(linear: &Rgb32FImage) -> RgbImage {
     RgbImage::from_fn(w, h, |x, y| {
         let p = linear.get_pixel(x, y);
         let s: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
-        Rgb([quantize_u8(s.red), quantize_u8(s.green), quantize_u8(s.blue)])
+        Rgb([
+            quantize_u8(s.red),
+            quantize_u8(s.green),
+            quantize_u8(s.blue),
+        ])
     })
 }
 
