@@ -92,6 +92,46 @@ mod tests {
     }
 
     #[test]
+    fn decode_preserves_per_pixel_channels() {
+        // Asymmetric per-pixel and per-channel values catch in-place loop bugs
+        // (channel swap, off-by-one indexing) that decode_png_to_linear_f32's
+        // uniform-color image would not.
+        let temp_path = std::env::temp_dir().join("agx_test_decode_asymmetric.png");
+        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(2, 2);
+        img.put_pixel(0, 0, Rgb([255, 0, 0])); // red
+        img.put_pixel(1, 0, Rgb([0, 255, 0])); // green
+        img.put_pixel(0, 1, Rgb([0, 0, 255])); // blue
+        img.put_pixel(1, 1, Rgb([0, 0, 0])); // black
+        img.save(&temp_path).unwrap();
+
+        let result = decode_standard(&temp_path).unwrap();
+        let p00 = result.get_pixel(0, 0).0;
+        let p10 = result.get_pixel(1, 0).0;
+        let p01 = result.get_pixel(0, 1).0;
+        let p11 = result.get_pixel(1, 1).0;
+
+        // sRGB 255 → linear 1.0; sRGB 0 → linear 0.0
+        assert!(
+            (p00[0] - 1.0).abs() < 0.001 && p00[1] < 0.001 && p00[2] < 0.001,
+            "red pixel: {p00:?}"
+        );
+        assert!(
+            p10[0] < 0.001 && (p10[1] - 1.0).abs() < 0.001 && p10[2] < 0.001,
+            "green pixel: {p10:?}"
+        );
+        assert!(
+            p01[0] < 0.001 && p01[1] < 0.001 && (p01[2] - 1.0).abs() < 0.001,
+            "blue pixel: {p01:?}"
+        );
+        assert!(
+            p11[0] < 0.001 && p11[1] < 0.001 && p11[2] < 0.001,
+            "black pixel: {p11:?}"
+        );
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
     fn decode_nonexistent_file_returns_error() {
         let result = decode_standard(std::path::Path::new("/nonexistent/file.png"));
         assert!(result.is_err());

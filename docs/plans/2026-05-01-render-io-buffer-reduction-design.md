@@ -88,19 +88,19 @@ Why: the `apply` pipeline materializes ~300MB intermediate buffers between every
 
 The savings *are real per call* — the eliminated allocations no longer happen — but they're absorbed into reuse of pages already touched by other pipeline stages, so the OS-reported peak doesn't drop.
 
-When this change *would* show up:
+When this change *should* show up (not yet measured):
 
-- A pipeline that does only decode + encode (no intermediate stages) — the decode internal peak (~600MB → ~300MB) and encode internal peak (~675MB → ~375MB) would dominate.
+- A pipeline that does only decode + encode (no intermediate stages) — the decode internal peak (~600MB → ~300MB) and encode internal peak (~675MB → ~375MB) would dominate. AgX has no such mode today; the closest measurement (exposure-only preset, still going through one full pipeline stage) shows ~0 MB peak RSS change.
 - Lighter pipelines (e.g. a future zero-copy stage chain) — once the per-stage materialization is eliminated, the decode/encode internals become load-bearing again.
 - Allocator pressure / GC behavior — fewer allocations regardless of peak RSS.
-- Batch workflows with high concurrency — at `--jobs N`, every concurrent decode used to peak at ~600MB; now it peaks at ~300MB. This compounds across N workers even when single-worker peak is unchanged.
+- Batch workflows with high concurrency — at `--jobs N`, every concurrent decode used to peak at ~600MB; now it peaks at ~300MB. This compounds across N workers even when single-worker peak is unchanged. Not measured here.
 
 So the change is correct and useful even though peak RSS for single-image `apply` doesn't budge. A separate effort (per `docs/backlog/performance.md`) is needed to address the pipeline-materialization peak.
 
 ## Verification
 
 1. `./scripts/verify.sh` — fmt, clippy, unit, architecture, doc-links.
-2. **Unit test for encode quantization parity.** New test in `encode/mod.rs` builds a small `Rgb32FImage` covering edge values (0.0, near 0.5, 1.0, slightly out of range, NaN if applicable) and asserts `linear_to_srgb_rgb8(&img)` produces the same bytes as the current `dynamic.to_rgb8()` path. This test must pass before the old path is removed.
+2. **Unit test for encode quantization parity.** New test in `encode/mod.rs` builds a small `Rgb32FImage` covering edge values (0.0, near 0.5, 1.0, slightly out of range, NaN if applicable) and asserts `linear_to_srgb_rgb8(&img)` produces the same bytes as the current `dynamic.to_rgb8()` path. This test must pass before the old path is removed. (After removal, the parity test was deleted because its reference path was gone; the post-merge defenses are `quantize_u8_handles_edge_values` and `linear_to_srgb_rgb8_quantization_table` in `encode/mod.rs`.)
 3. `./scripts/e2e.sh` — full golden matrix must remain byte-identical. Decode and encode are universal stages, so any byte drift would surface across the matrix.
 4. **Memory measurement** using `/usr/bin/time -l` on macOS (or `/usr/bin/time -v` on Linux) on a 26MP fixture:
 

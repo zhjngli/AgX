@@ -102,11 +102,20 @@ pub fn resolve_output(
 ///
 /// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
 /// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round
-/// to nearest. NaN inputs produce 0 because Rust's float-to-int cast saturates
-/// NaN to 0; `clamp` itself propagates NaN.
+/// to nearest. NaN inputs produce 255 — matching the image crate's
+/// `normalize_float`, which collapses NaN to the upper bound. This is
+/// deliberate: it keeps output byte-identical to the prior
+/// `linear_to_srgb_dynamic + to_rgb8` path even on out-of-range floats.
 #[inline]
 fn quantize_u8(x: f32) -> u8 {
-    (x.clamp(0.0, 1.0) * 255.0).round() as u8
+    // NaN and values >= 1.0 all map to 255, matching `image`'s `normalize_float`.
+    // `is_nan()` is required because NaN does not compare >= 1.0.
+    let normalized = if x.is_nan() || x >= 1.0 {
+        1.0
+    } else {
+        x.max(0.0)
+    };
+    (normalized * 255.0).round() as u8
 }
 
 /// Convert a linear sRGB f32 image to an 8-bit sRGB-encoded RGB image in a single pass.
@@ -270,13 +279,50 @@ mod tests {
 
     #[test]
     fn quantize_u8_handles_edge_values() {
-        assert_eq!(quantize_u8(f32::NAN), 0);
+        // NaN, +∞, and values >= 1.0 all collapse to 255 — matching `image`
+        // crate's `normalize_float` (and therefore the prior `to_rgb8` path).
+        assert_eq!(quantize_u8(f32::NAN), 255);
         assert_eq!(quantize_u8(f32::INFINITY), 255);
         assert_eq!(quantize_u8(f32::NEG_INFINITY), 0);
         assert_eq!(quantize_u8(0.0), 0);
         assert_eq!(quantize_u8(1.0), 255);
         assert_eq!(quantize_u8(-1.0), 0);
         assert_eq!(quantize_u8(2.0), 255);
+    }
+
+    #[test]
+    fn linear_to_srgb_rgb8_quantization_table() {
+        // Hardcoded expected values pin the linear→sRGB→u8 conversion behavior
+        // against future drift in palette or quantize_u8. Computed from the
+        // pre-refactor `linear_to_srgb_dynamic + to_rgb8` path; updates here must
+        // be deliberate decisions, not accidental regressions.
+        let table: &[(f32, u8)] = &[
+            (0.0, 0),
+            (0.0001, 0),
+            (0.0031308, 10),
+            (0.04, 56),
+            (0.18, 118),
+            (0.2159, 128),
+            (0.5, 188),
+            (0.9, 243),
+            (0.999, 255),
+            (1.0, 255),
+            (1.0001, 255),
+            (2.0, 255),
+            (-0.001, 0),
+            (-1.0, 0),
+            (f32::NAN, 255),
+        ];
+
+        for &(linear, expected) in table {
+            let img: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([linear, linear, linear]));
+            let rgb8 = linear_to_srgb_rgb8(&img);
+            let actual = rgb8.get_pixel(0, 0).0[0];
+            assert_eq!(
+                actual, expected,
+                "linear {linear} should encode to u8 {expected}, got {actual}"
+            );
+        }
     }
 
     #[test]
