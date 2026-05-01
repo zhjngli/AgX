@@ -12,7 +12,7 @@ Encode rendered linear sRGB images to output files (JPEG, PNG, TIFF) with option
 - `encode_to_file(linear, path)` -- simple encode with defaults (format inferred from extension)
 - `encode_to_file_with_options(linear, path, options, metadata)` -- full-control encode with quality, format, and metadata injection; returns the final output path
 - `resolve_output(path, format)` -- determine final path and format from extension and optional override
-- `linear_to_srgb_dynamic(linear)` -- convert linear f32 buffer to sRGB gamma `DynamicImage`
+- `linear_to_srgb_rgb8(linear)` -- convert linear f32 buffer to 8-bit sRGB `RgbImage` in a single pass
 
 ## Extension Guide
 

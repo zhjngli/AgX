@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::codecs::tiff::TiffEncoder;
-use image::{DynamicImage, Rgb, Rgb32FImage, RgbImage};
+use image::{Rgb, Rgb32FImage, RgbImage};
 use palette::{LinSrgb, Srgb};
 
 use crate::error::Result;
@@ -111,9 +111,9 @@ fn quantize_u8(x: f32) -> u8 {
 
 /// Convert a linear sRGB f32 image to an 8-bit sRGB-encoded RGB image in a single pass.
 ///
-/// Combines the gamma encoding (linear → sRGB) and the f32 → u8 quantization,
-/// avoiding the intermediate ~300MB f32 sRGB buffer that `linear_to_srgb_dynamic`
-/// followed by `DynamicImage::to_rgb8()` would allocate.
+/// Combines the gamma encoding (linear → sRGB) and the f32 → u8 quantization
+/// in one traversal. A two-step conversion via an intermediate f32 sRGB image
+/// would allocate a ~300MB extra buffer at 26MP; this avoids that.
 pub fn linear_to_srgb_rgb8(linear: &Rgb32FImage) -> RgbImage {
     let (w, h) = linear.dimensions();
     RgbImage::from_fn(w, h, |x, y| {
@@ -121,17 +121,6 @@ pub fn linear_to_srgb_rgb8(linear: &Rgb32FImage) -> RgbImage {
         let s: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
         Rgb([quantize_u8(s.red), quantize_u8(s.green), quantize_u8(s.blue)])
     })
-}
-
-/// Convert a linear sRGB f32 image buffer to a DynamicImage in sRGB gamma space.
-pub fn linear_to_srgb_dynamic(linear: &Rgb32FImage) -> DynamicImage {
-    let (w, h) = linear.dimensions();
-    let srgb = Rgb32FImage::from_fn(w, h, |x, y| {
-        let p = linear.get_pixel(x, y);
-        let srgb: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
-        Rgb([srgb.red, srgb.green, srgb.blue])
-    });
-    DynamicImage::ImageRgb32F(srgb)
 }
 
 /// Encode a linear sRGB f32 image to a file with full options.
@@ -266,67 +255,13 @@ mod tests {
     fn roundtrip_linear_to_srgb_pixel_values() {
         // linear 0.2159 should round-trip to sRGB ~128
         let linear: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([0.2159f32, 0.2159, 0.2159]));
-        let dynamic = linear_to_srgb_dynamic(&linear);
-        let rgb8 = dynamic.to_rgb8();
+        let rgb8 = linear_to_srgb_rgb8(&linear);
         let pixel = rgb8.get_pixel(0, 0);
         assert!(
             (pixel.0[0] as i32 - 128).unsigned_abs() <= 1,
             "Expected ~128, got {}",
             pixel.0[0]
         );
-    }
-
-    #[test]
-    fn linear_to_srgb_rgb8_matches_dynamic_to_rgb8() {
-        // Edge values, in-range mid-tones, and out-of-range values to verify clamp behavior.
-        // Each f32 here will be tested in every channel independently.
-        let test_values: &[f32] = &[
-            0.0,
-            0.0001,
-            0.04,    // around the sRGB linear/gamma kneepoint (0.0031308)
-            0.0031308,
-            0.18,    // 18% gray
-            0.2159,  // ~ sRGB 128
-            0.5,
-            0.9,
-            0.999,
-            1.0,
-            1.0001,  // slightly over-range
-            2.0,     // well over-range (clamp behavior)
-            -0.001,  // slightly under-range
-            -1.0,    // well under-range
-        ];
-
-        // Build a 1-row image where each pixel uses a triple of values from the list,
-        // shifted per channel so we exercise mixed-channel cases.
-        let n = test_values.len() as u32;
-        let mut img: Rgb32FImage = ImageBuffer::new(n, 1);
-        for (i, &v) in test_values.iter().enumerate() {
-            let r = v;
-            let g = test_values[(i + 1) % test_values.len()];
-            let b = test_values[(i + 2) % test_values.len()];
-            img.put_pixel(i as u32, 0, Rgb([r, g, b]));
-        }
-
-        let expected = linear_to_srgb_dynamic(&img).to_rgb8();
-        let actual = linear_to_srgb_rgb8(&img);
-
-        assert_eq!(
-            expected.dimensions(),
-            actual.dimensions(),
-            "dimensions differ"
-        );
-        for x in 0..n {
-            let e = expected.get_pixel(x, 0).0;
-            let a = actual.get_pixel(x, 0).0;
-            assert_eq!(
-                e, a,
-                "pixel {x} (linear input {:?}): expected {:?}, got {:?}",
-                img.get_pixel(x, 0).0,
-                e,
-                a
-            );
-        }
     }
 
     #[test]
