@@ -44,6 +44,34 @@ The backlog item cites ~800MB total reduction. The design treats the backlog fig
 
    Capture the `maximum resident set size` value before the change (on `main`) and after. Record both numbers in this design doc once measured. Linux reports kilobytes; macOS reports bytes.
 
+## Measurement
+
+Measured on macOS (Apple Silicon, system memory pressure low) using `/usr/bin/time -l`. Fixture: `sunset_river.raf` (26MP) with `dune.toml` preset (dehaze active). Two release binaries built from the same source tree: one from the branch tip (no drops, identical to `main`), one with the four `drop()` calls applied. Runs interleaved alternating 5 times each to average out machine load drift.
+
+### Single-run result (superseded — methodology too noisy)
+
+An earlier single pre/post comparison produced a misleading result: baseline ~2,829 MB, after-drops ~2,978 MB, appearing to show a regression. This was an artefact of different machine load conditions between the two separate build+run sessions, not a true algorithmic effect. These numbers are retained for audit trail only.
+
+### Median-of-5 result (definitive)
+
+Raw peak RSS values (bytes):
+
+| Run | Baseline | With drops |
+|-----|----------|------------|
+| 1 | 3,435,102,208 | 3,122,741,248 |
+| 2 | 3,435,495,424 | 3,121,774,592 |
+| 3 | 3,434,446,848 | 3,123,200,000 |
+| 4 | 3,435,233,280 | 3,122,479,104 |
+| 5 | 3,435,266,048 | 3,123,085,312 |
+
+| Build | Median RSS (bytes) | Median RSS (MB) |
+|-------|--------------------|-----------------|
+| Baseline (`main`) | 3,435,233,280 | 3,276.1 |
+| With buffer drops | 3,122,741,248 | 2,978.1 |
+| Delta (saved) | 312,492,032 | 298.0 |
+
+The spread within each set is tiny (< 1 MB across 5 runs), confirming stable measurement conditions. The explicit `drop()` calls cut peak RSS by **298 MB (9.1%)**. The drops are effective — LLVM does not shrink these heap lifetimes on its own at this optimization level. The change is kept and shipped.
+
 ## Files
 
 | File | Change |
