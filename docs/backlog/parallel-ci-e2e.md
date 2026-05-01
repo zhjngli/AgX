@@ -4,13 +4,13 @@ Parallelize e2e test execution in GitHub Actions to reduce CI wall-clock time.
 
 ## Sub-tasks
 
-- [ ] **Add build artifact job** — build `agx-cli --release` and upload the binary for matrix jobs to download
-- [ ] **Fan out per-image tests** — use GitHub Actions matrix strategy to run each image test in parallel
-- [ ] **Verify CI minute consumption** — free-tier GitHub Actions has 2000 min/month; parallel jobs use more total minutes
+- [ ] **Add build artifact job** — build `agx-cli --release` once and upload the binary for matrix jobs to download. Each matrix job currently rebuilds the CLI.
+- [x] **Fan out per-image tests** — `e2e-tests` job in `.github/workflows/ci.yml` uses a matrix strategy with one job per image (`cli_temple_blossoms`, `cli_night_city_blur`, etc.) plus a `misc` rollup for batch / error cases / library tests. Wall-clock time now bounded by the slowest single image, not the sum of all images.
+- [x] **Verify CI minute consumption** — implicit via running the parallel matrix on every PR. Free-tier limits not yet hit.
 
 ## Current State
 
-The `e2e-tests` CI job runs all 9 test functions sequentially in a single job. Tests are already independent — 6 per-image matrix tests, 1 batch test, and 7 library pipeline tests.
+Matrix fan-out is live. The remaining win is build-artifact sharing: today each matrix job runs `cargo build --release -p agx-cli` independently, so the CLI is rebuilt 7x per CI run. A prior job could build once and upload the binary for the matrix to download.
 
 ## Proposal
 
@@ -47,5 +47,4 @@ The matrix list must stay in sync with the test functions in `cli_pipeline.rs`. 
 
 ## Related
 
-- [Multi-Preset CLI](multi-preset-cli.md) — reduces per-image decode calls (orthogonal)
 - [Performance](performance.md) — render-level optimizations (orthogonal)
