@@ -11,6 +11,9 @@ use crate::engine::{
 };
 use crate::error::{AgxError, Result};
 
+#[cfg(feature = "validate")]
+pub mod validate;
+
 /// Preset metadata (name, version, author).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PresetMetadata {
