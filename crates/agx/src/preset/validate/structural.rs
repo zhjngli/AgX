@@ -4,10 +4,6 @@
 //! This pass is shared between `agx validate` (where unknown fields are errors)
 //! and `agx apply`'s warning path (where they're surfaced as warnings).
 
-// The public function and helpers are used via the test module now; future tasks
-// will wire them into the validate/apply command paths.
-#![allow(dead_code)]
-
 use super::diagnostic::{Diagnostic, DiagnosticCode, Location, Severity};
 use std::collections::HashSet;
 

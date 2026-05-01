@@ -4,10 +4,6 @@
 //! values. Each diagnostic is enriched with a line number from the structural
 //! pass via the field path.
 
-// The public function and helpers are used via the test module now; future tasks
-// will wire them into the validate/apply command paths.
-#![allow(dead_code)]
-
 use super::diagnostic::{Diagnostic, DiagnosticCode, Location, Severity};
 use crate::preset::PresetRaw;
 

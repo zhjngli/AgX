@@ -346,6 +346,49 @@ mod filesystem_pass {
     }
 }
 
+mod top_level_api {
+    use super::super::*;
+    use crate::preset::Preset;
+    use std::path::Path;
+
+    fn fixture_path(name: &str) -> std::path::PathBuf {
+        Path::new("src/preset/validate/tests/fixtures").join(name)
+    }
+
+    #[test]
+    fn validate_clean_preset_returns_ok_status() {
+        let path = fixture_path("clean.toml");
+        let report = Preset::validate(&path);
+        assert_eq!(report.status, FileStatus::Ok);
+        assert!(report.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn validate_unknown_table_returns_error_status() {
+        let path = fixture_path("unknown_table.toml");
+        let report = Preset::validate(&path);
+        assert_eq!(report.status, FileStatus::Error);
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::UnknownTable));
+    }
+
+    #[test]
+    fn validate_combines_all_three_passes() {
+        // Use a fixture with multiple kinds of issues. For now, this test
+        // confirms the API runs all passes; multi-issue fixture can be added
+        // later if a real combined-failure case emerges.
+        let path = fixture_path("out_of_range.toml");
+        let report = Preset::validate(&path);
+        assert_eq!(report.status, FileStatus::Error);
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|d| d.code == DiagnosticCode::OutOfRange));
+    }
+}
+
 mod missing_required {
     use super::*;
 

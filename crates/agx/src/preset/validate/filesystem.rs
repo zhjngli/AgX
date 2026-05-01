@@ -3,8 +3,6 @@
 //! Unlike the structural and semantic passes (which only need the TOML
 //! source), this pass needs the file path to resolve relative paths.
 
-#![allow(dead_code)] // Wired into Preset::validate in Task 7
-
 use super::diagnostic::{Diagnostic, DiagnosticCode, Location, Severity};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
