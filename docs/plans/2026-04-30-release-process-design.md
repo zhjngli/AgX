@@ -13,7 +13,7 @@ ship without re-deriving the steps each time.
 
 Both crates are live on crates.io. `agx-photo` 0.1.0 and `agx-cli` 0.1.0
 shipped together via the publish-prep PR (#36, commit `84f6dbb`, 2026-04-26).
-`agx-cli` 0.2.0 just shipped manually (commit `fc9ef64`, 2026-04-29) renaming
+`agx-cli` 0.2.0 just shipped manually (commit `0bf1649`, 2026-04-29) renaming
 the installed binary from `agx-cli` to `agx`.
 
 Pain points the manual process exposed:
@@ -183,7 +183,7 @@ Same range, scoped to `crates/agx-cli/**`. Curate into a summary covering
 subcommands (`edit`, `apply`, `multi-apply`, `batch-apply`, `batch-edit`),
 output formats, GPU opt-in, parallel batch.
 
-#### `agx-cli` 0.2.0 (commit `fc9ef64`, 2026-04-29)
+#### `agx-cli` 0.2.0 (commit `0bf1649`, 2026-04-29)
 
 Hand-write directly — small scope:
 
@@ -199,7 +199,7 @@ push:
 ```sh
 git tag agx-photo-v0.1.0 84f6dbb
 git tag agx-cli-v0.1.0   84f6dbb
-git tag agx-cli-v0.2.0   fc9ef64
+git tag agx-cli-v0.2.0   0bf1649
 git push --tags
 ```
 
@@ -263,7 +263,7 @@ Single PR. Files are tightly coupled (config + changelogs + docs all
 establish the same workflow); splitting would force ordering games.
 
 Tag commits happen after PR merges to main, against the existing published
-commits (`84f6dbb`, `fc9ef64`).
+commits (`84f6dbb`, `0bf1649`).
 
 ## Verification
 
