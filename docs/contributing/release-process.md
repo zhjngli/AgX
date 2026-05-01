@@ -64,6 +64,8 @@ For a release of `agx-cli`:
 
 3. **Curate the draft.** Open `/tmp/draft.md`. Condense bullets into narrative, drop noise, group related changes. The output should read as a short summary of the release, not a commit log dump — see existing entries in `crates/agx/CHANGELOG.md` and `crates/agx-cli/CHANGELOG.md` for the voice to match.
 
+   Watch for **scope-mismatched entries.** A scaffold scoped to `crates/agx/**` may include a commit that touched a `crates/agx/` doc file as a side effect but is really about the other crate (e.g., `refactor(cli): ...` that updated a GPU README cross-reference). Drop those rather than fold them in.
+
 4. **Paste curated entry into the changelog.** Open `crates/agx-cli/CHANGELOG.md` and paste the curated content under `## [Unreleased]`. The `[Unreleased]` heading itself stays — `cargo-release` rewrites it in the next step.
 
 5. **Commit the changelog edit:**

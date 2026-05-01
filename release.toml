@@ -21,6 +21,12 @@ dependent-version = "upgrade"
 # in a multi-crate workspace since it pushes every local tag.
 push = false
 
+# Releases must run from `main`. Without this, cargo-release defaults to
+# allowing any branch except detached HEAD, so a stray `cargo release
+# --execute` from a feature branch would publish to crates.io. Crates.io
+# is yank-only, so the gate matters.
+allow-branch = ["main"]
+
 # At release time, rewrite the [Unreleased] heading in CHANGELOG.md to
 # [Unreleased] (empty) + [version] - date (the just-released entry).
 # `file` is relative to each package root, so this works for both crates.

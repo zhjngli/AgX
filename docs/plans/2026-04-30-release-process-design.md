@@ -200,8 +200,13 @@ push:
 git tag agx-photo-v0.1.0 84f6dbb
 git tag agx-cli-v0.1.0   84f6dbb
 git tag agx-cli-v0.2.0   0bf1649
-git push --tags
+git push origin agx-photo-v0.1.0 agx-cli-v0.1.0 agx-cli-v0.2.0
 ```
+
+Use the per-tag push form rather than `git push --tags`. The `--tags` form
+pushes every local tag, including any in-progress or unvetted ones, which
+becomes a real footgun in a multi-crate workspace once steady-state release
+work begins. Per-tag push is the convention this project uses going forward.
 
 Tags are essential for `git-cliff` going forward — without them, the next
 release's scaffold would re-include 0.1.0 commits.
@@ -218,14 +223,12 @@ The "when to release" trigger: glance at the crate's `[Unreleased]` section
 after PR merges; if user-visible changes have accumulated, ship within a
 week. Soft heuristic, no schedule.
 
-The release steps are roughly:
-
-1. Confirm `verify.sh` and `e2e.sh` pass on main.
-2. Scaffold draft: `git cliff --include-path "crates/<crate>/**" --unreleased`.
-3. Curate, paste into `crates/<crate>/CHANGELOG.md` under `[Unreleased]`.
-4. Commit: `git commit -m "docs(<crate>): changelog for vX.Y.Z"`.
-5. `cargo release <patch|minor|major> -p <crate> --execute`.
-6. `git push origin <crate>-vX.Y.Z`.
+The detailed step list lives in `release-process.md` itself; this design doc
+does not duplicate the commands. At a high level: scaffold a draft from
+conventional commits with `git cliff` (using `--tag-pattern` so the
+"since last release" range stays scoped to one crate's tag history), curate
+into the crate's `CHANGELOG.md` under `[Unreleased]`, then run
+`cargo release <bump> -p <package> --execute`, then push the specific tag.
 
 Multi-crate ordering: release `agx-photo` first (CLI dep pin must resolve on
 crates.io); `cargo-release` handles the dep pin rewrite via
