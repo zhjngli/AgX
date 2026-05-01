@@ -253,6 +253,59 @@ mod tests {
     }
 
     #[test]
+    fn linear_to_srgb_rgb8_matches_dynamic_to_rgb8() {
+        // Edge values, in-range mid-tones, and out-of-range values to verify clamp behavior.
+        // Each f32 here will be tested in every channel independently.
+        let test_values: &[f32] = &[
+            0.0,
+            0.0001,
+            0.04,    // around the sRGB linear/gamma kneepoint (0.0031308)
+            0.0031308,
+            0.18,    // 18% gray
+            0.2159,  // ~ sRGB 128
+            0.5,
+            0.9,
+            0.999,
+            1.0,
+            1.0001,  // slightly over-range
+            2.0,     // well over-range (clamp behavior)
+            -0.001,  // slightly under-range
+            -1.0,    // well under-range
+        ];
+
+        // Build a 1-row image where each pixel uses a triple of values from the list,
+        // shifted per channel so we exercise mixed-channel cases.
+        let n = test_values.len() as u32;
+        let mut img: Rgb32FImage = ImageBuffer::new(n, 1);
+        for (i, &v) in test_values.iter().enumerate() {
+            let r = v;
+            let g = test_values[(i + 1) % test_values.len()];
+            let b = test_values[(i + 2) % test_values.len()];
+            img.put_pixel(i as u32, 0, Rgb([r, g, b]));
+        }
+
+        let expected = linear_to_srgb_dynamic(&img).to_rgb8();
+        let actual = linear_to_srgb_rgb8(&img);
+
+        assert_eq!(
+            expected.dimensions(),
+            actual.dimensions(),
+            "dimensions differ"
+        );
+        for x in 0..n {
+            let e = expected.get_pixel(x, 0).0;
+            let a = actual.get_pixel(x, 0).0;
+            assert_eq!(
+                e, a,
+                "pixel {x} (linear input {:?}): expected {:?}, got {:?}",
+                img.get_pixel(x, 0).0,
+                e,
+                a
+            );
+        }
+    }
+
+    #[test]
     fn encode_saves_file() {
         let temp_path = std::env::temp_dir().join("agx_test_encode.png");
         let linear: Rgb32FImage = ImageBuffer::from_pixel(2, 2, Rgb([0.5f32, 0.5, 0.5]));
