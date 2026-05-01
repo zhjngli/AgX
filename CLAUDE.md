@@ -59,7 +59,7 @@ Run `./scripts/verify.sh` for fast checks (format, clippy, unit tests, architect
 
 ### 4. Document
 
-Update `ARCHITECTURE.md` if modules, dependencies, or invariants changed. Update affected module READMEs (public API, extension guide). Cross-link any new design docs.
+Update `ARCHITECTURE.md` if modules, dependencies, or invariants changed. Update affected module READMEs (public API, extension guide). New design docs land in `docs/plans/` (no separate index — the directory itself is the index).
 
 ### 5. Self-review
 
@@ -78,7 +78,7 @@ Before merging, verify:
 3. `./scripts/e2e.sh` passes in CI (full matrix)
 4. `ARCHITECTURE.md` updated if modules, dependencies, or invariants changed
 5. Affected module `README.md` files updated
-6. Design doc cross-linked from `ARCHITECTURE.md` (if applicable)
+6. Design doc (if any) saved to `docs/plans/`
 
 ## Backlog
 

@@ -6,15 +6,21 @@ The high-level summary lives in [`developer-workflow.md`](developer-workflow.md)
 
 ## When to release
 
-**Soft trigger:** after PR merges that include `feat:` or `fix:` commits scoped to a publishable crate, decide whether to ship. The fastest check is to dry-run the changelog scaffold:
+**Soft trigger:** after notable PR merges, dry-run the changelog scaffold for whichever crate the change touched. If meaningful entries appear, ship within a week.
 
 ```bash
-git cliff --include-path 'crates/<crate>/**' --tag-pattern '<crate>-v.*' --unreleased
+# For agx-photo:
+git cliff --include-path 'crates/agx/**' --tag-pattern 'agx-photo-v.*' --unreleased
+
+# For agx-cli:
+git cliff --include-path 'crates/agx-cli/**' --tag-pattern 'agx-cli-v.*' --unreleased
 ```
 
-If the output has meaningful entries, ship within a week. There's no fixed schedule.
+The two invocations use different tokens for path (`crates/agx/**` vs `crates/agx-cli/**`) and tag pattern (`agx-photo-v.*` vs `agx-cli-v.*`) — `agx-photo`'s directory is `crates/agx/`, but the package name (and tag prefix) is `agx-photo`. Don't conflate them.
 
-`[Unreleased]` in the committed `CHANGELOG.md` files is normally empty between releases — entries are scaffolded and curated at release time, not appended per-PR. Don't use the on-disk `[Unreleased]` as the trigger; use the dry-run output above.
+The dry-run is the source of truth. The on-disk `[Unreleased]` section in each `CHANGELOG.md` is normally empty between releases — entries are scaffolded and curated at release time, not appended per-PR. Don't use the on-disk `[Unreleased]` as the trigger; use the dry-run above.
+
+There's no fixed schedule.
 
 **Independent versions:** `agx-photo` and `agx-cli` ship on separate timelines. Bumping one does not require bumping the other — except as noted under [Multi-crate releases](#multi-crate-releases) below.
 
@@ -81,7 +87,15 @@ For a release of `agx-cli`:
    A few additional touches at curate time:
    - Strip any `(#N)` PR references from commit subjects. Project convention bans `#N` in commits and PR bodies because GitHub auto-links every `#N` to whatever issue or PR happens to carry that number.
    - Update the link references at the bottom of `CHANGELOG.md`. Change the existing `[Unreleased]: ...compare/<previous-tag>...HEAD` line to use the new tag (e.g., `agx-cli-v0.2.0` → `agx-cli-v0.3.0`), and add a new `[X.Y.Z]: ...releases/tag/<crate>-vX.Y.Z` line for this release. `cargo-release` does not maintain these references automatically.
-   - If `[Unreleased]` would be empty (e.g., a no-source-change re-release of `agx-cli` to pick up a new `agx-photo` — see [Multi-crate releases](#multi-crate-releases)), write a one-line entry under it before continuing — for example, `### Changed\n\n- Updated agx-photo dependency to X.Y.Z.` — otherwise the published changelog will have an entry header with no body.
+   - If `[Unreleased]` would be empty (e.g., a no-source-change re-release of `agx-cli` to pick up a new `agx-photo` — see [Multi-crate releases](#multi-crate-releases)), write a one-line entry under it before continuing. For example:
+
+     ```markdown
+     ### Changed
+
+     - Updated agx-photo dependency to X.Y.Z.
+     ```
+
+     Otherwise the published changelog will have an entry header with no body.
 
 5. **Commit the changelog edit:**
 
@@ -101,6 +115,8 @@ For a release of `agx-cli`:
    ```
 
    Without `--execute`, cargo-release runs in dry-run mode and shows what it would do. With `--execute`, it prompts before each side-effecting step. Once `cargo publish` runs (the last prompt), the version is on crates.io permanently — yank-only, not deletable. Read each prompt before confirming.
+
+   Each release leaves two commits on `main`: your changelog edit from step 5 and `cargo-release`'s auto-generated `chore: Release <crate> version X.Y.Z`. That's expected; `release.toml` does not set `consolidate-commits = true` and no amending is needed.
 
    `cargo-release` runs `cargo publish --verify` as part of step 6, which performs a from-scratch verification build inside `target/package/`. Expect 1-3 minutes between prompts during this phase — it's not hung. The verify step is intentional (catches "works on my machine, breaks for downstream") and is on by default.
 

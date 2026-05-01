@@ -222,9 +222,12 @@ Self-contained guide. Sections: when to release, one-time setup
 (`cargo install cargo-release git-cliff`), versioning rules, release steps,
 multi-crate ordering, troubleshooting.
 
-The "when to release" trigger: glance at the crate's `[Unreleased]` section
-after PR merges; if user-visible changes have accumulated, ship within a
-week. Soft heuristic, no schedule.
+The "when to release" trigger: dry-run the scaffold (`git cliff --unreleased`
+scoped to the crate) after notable PR merges; if meaningful entries appear,
+ship within a week. The on-disk `[Unreleased]` section is intentionally
+empty between releases (entries are curated at release time, not appended
+per-PR), so the dry-run is the source of truth for accumulated changes.
+Soft heuristic, no schedule.
 
 The detailed step list lives in `release-process.md` itself; this design doc
 does not duplicate the commands. At a high level: scaffold a draft from
@@ -279,12 +282,14 @@ Before merge:
 - Manual: run `git cliff --include-path "crates/agx/**" --tag-pattern "agx-photo-v.*" --unreleased`
   on the branch and confirm the output groups feature/fix/refactor commits
   under the right Keep-a-Changelog headings.
-- Manual config validation: `cargo release config -p agx-cli` (read-only)
-  prints the resolved cargo-release config and confirms `allow-branch`,
-  `tag-name`, `dependent-version`, and `pre-release-replacements` are set as
-  intended. Note: `cargo release patch -p agx-cli` (the dry-run form) is
-  blocked by `allow-branch = ["main"]` from any non-`main` branch — the
-  block is the intended safety, so don't disable it for the verification.
+- Manual config validation: `cargo release config --manifest-path crates/agx-cli/Cargo.toml`
+  (read-only) prints the resolved cargo-release config and confirms
+  `allow-branch`, `tag-name`, `dependent-version`, and
+  `pre-release-replacements` are set as intended. (`cargo release config` does
+  not accept `-p`; use `--manifest-path` for per-crate scoping.) Note:
+  `cargo release patch -p agx-cli` (the dry-run form) is blocked by
+  `allow-branch = ["main"]` from any non-`main` branch — the block is the
+  intended safety, so don't disable it for the verification.
 
 ## Out of scope
 

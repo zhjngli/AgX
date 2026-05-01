@@ -110,46 +110,9 @@ Each module has (or will have) a README.md documenting its public API, internal 
 
 ## Design Docs
 
-### Plans
+Design docs live in [`docs/plans/`](docs/plans/). Each is a dated `YYYY-MM-DD-<topic>-design.md` capturing the rationale, alternatives, and decisions for a non-trivial change. Browse the directory chronologically or by topic — file names are descriptive enough to navigate without an index.
 
-| Date       | Document                                                                         |
-|------------|----------------------------------------------------------------------------------|
-| 2026-02-14 | [Architecture Design](docs/plans/2026-02-14-architecture-design.md)              |
-| 2026-02-16 | [LUT Support Design](docs/plans/2026-02-16-lut-support-design.md)                |
-| 2026-02-16 | [Raw Format Support Design](docs/plans/2026-02-16-raw-format-support-design.md)  |
-| 2026-02-17 | [Image Quality & Metadata Design](docs/plans/2026-02-17-image-quality-metadata-design.md)       |
-| 2026-03-04 | [Harness Engineering Design](docs/plans/2026-03-04-harness-engineering-design.md)                |
-| 2026-03-05 | [Developer Loop Design](docs/plans/2026-03-05-developer-loop-design.md)                          |
-| 2026-03-05 | [HSL Adjustments Design](docs/plans/2026-03-05-hsl-adjustments-design.md)                        |
-| 2026-03-07 | [Batch Processing Design](docs/plans/2026-03-07-batch-processing-design.md)                      |
-| 2026-03-07 | [Preset Composability Design](docs/plans/2026-03-07-preset-composability-design.md)              |
-| 2026-03-15 | [Rename to AgX Design](docs/plans/2026-03-15-rename-to-agx-design.md)                            |
-| 2026-03-15 | [E2E Tests Design](docs/plans/2026-03-15-e2e-tests-design.md)                                   |
-| 2026-03-17 | [Comprehensive E2E Overhaul Design](docs/plans/2026-03-17-comprehensive-e2e-overhaul-design.md)  |
-| 2026-03-18 | [Vignette Design](docs/plans/2026-03-18-vignette-design.md)                                      |
-| 2026-03-18 | [Color Grading Design](docs/plans/2026-03-18-color-grading-design.md)                            |
-| 2026-03-18 | [Tone Curves Design](docs/plans/2026-03-18-tone-curves-design.md)                                |
-| 2026-03-21 | [Detail Pass Design](docs/plans/2026-03-21-detail-pass-design.md)                                |
-| 2026-03-21 | [Dehaze Design](docs/plans/2026-03-21-dehaze-design.md)                                          |
-| 2026-03-22 | [Noise Reduction Design](docs/plans/2026-03-22-noise-reduction-design.md)                        |
-| 2026-03-23 | [Grain Design](docs/plans/2026-03-23-grain-design.md)                                            |
-| 2026-03-27 | [E2E Look Consolidation Design](docs/plans/2026-03-27-e2e-look-consolidation-design.md)          |
-| 2026-03-27 | [Grain Size Fix Design](docs/plans/2026-03-27-grain-size-fix-design.md)                          |
-| 2026-04-01 | [Pluggable Pipeline Design](docs/plans/2026-04-01-pluggable-pipeline-design.md)                  |
-| 2026-04-02 | [Parallel Render Design](docs/plans/2026-04-02-parallel-render-design.md)                        |
-| 2026-04-03 | [Parallel Render P3+P4 Design](docs/plans/2026-04-03-parallel-render-p3-p4-design.md)            |
-| 2026-04-05 | [Multi-Apply & E2E Speed Design](docs/plans/2026-04-05-multi-apply-e2e-speed-design.md)          |
-| 2026-04-05 | [Dehaze Parallelization Design](docs/plans/2026-04-05-dehaze-parallelization-design.md)          |
-| 2026-04-06 | [Documentation Initiative Design](docs/plans/2026-04-06-documentation-initiative-design.md)      |
-| 2026-04-06 | [Docs Infrastructure Design](docs/plans/2026-04-06-docs-infrastructure-design.md)                |
-| 2026-04-09 | [API Doc Retrofit Design](docs/plans/2026-04-09-api-doc-retrofit-design.md)                      |
-| 2026-04-11 | [AgX Docgen Design](docs/plans/2026-04-11-agx-docgen-design.md)                                 |
-
-### Backlog
-
-| Document                                              |
-|-------------------------------------------------------|
-| [Backlog](docs/backlog/README.md)                      |
+The backlog of future work — epics, sub-tasks, and bugs — lives in [`docs/backlog/`](docs/backlog/README.md).
 
 ## When a Structural Test Fails
 
