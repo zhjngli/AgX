@@ -15,6 +15,10 @@ use crate::error::{AgxError, Result};
 pub mod validate;
 
 /// Preset metadata (name, version, author).
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PresetMetadata {
     /// Human-readable preset name.
@@ -32,41 +36,89 @@ pub struct PresetMetadata {
 }
 
 /// Tone adjustment section of a preset (Option fields for composability).
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-struct ToneSection {
+pub(crate) struct ToneSection {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    exposure: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -5.0, max = 5.0))
+    )]
+    pub(crate) exposure: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    contrast: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) contrast: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    highlights: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) highlights: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    shadows: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) shadows: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    whites: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) whites: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    blacks: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) blacks: Option<f32>,
 }
 
 /// White balance section of a preset (Option fields for composability).
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-struct WhiteBalanceSection {
+pub(crate) struct WhiteBalanceSection {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    temperature: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) temperature: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    tint: Option<f32>,
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = -100.0, max = 100.0))
+    )]
+    pub(crate) tint: Option<f32>,
 }
 
 /// LUT section of a preset.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct LutSection {
+pub(crate) struct LutSection {
     #[serde(default)]
-    path: Option<String>,
+    pub(crate) path: Option<String>,
 }
 
 /// Internal TOML layout for a preset file.
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct PresetRaw {
+pub(crate) struct PresetRaw {
     #[serde(default)]
     metadata: PresetMetadata,
     #[serde(default)]

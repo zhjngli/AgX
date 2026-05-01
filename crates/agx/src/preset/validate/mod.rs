@@ -7,13 +7,16 @@
 //! - [`Diagnostic`], [`DiagnosticCode`], [`Location`], [`Severity`] — diagnostic types
 //! - [`ValidationReport`] — per-file or per-batch validation result
 //!
-//! Future tasks (not yet implemented) will add:
+//! Implemented passes:
 //! - `structural::detect_unknown_fields` — unknown-field detection with line numbers
 //! - `semantic::check_schema` — type/required/range checks via jsonschema
+//!
+//! Future tasks (not yet implemented):
 //! - `filesystem::check_filesystem` — LUT existence and extends chain
 //! - `Preset::validate` — public top-level API tying all three passes together
 
 mod diagnostic;
+pub(crate) mod semantic;
 pub(crate) mod structural;
 
 pub use diagnostic::{

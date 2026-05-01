@@ -138,6 +138,23 @@ fn known_fields_for(table: &str) -> HashSet<&'static str> {
     fields.iter().copied().collect()
 }
 
+/// Find the (line, column) for a dotted field path like "tone.exposure" or "lut.path".
+///
+/// Used by the semantic pass to enrich jsonschema errors with source positions.
+pub(super) fn find_position_by_path(source: &str, path: &str) -> (usize, usize) {
+    let parts: Vec<&str> = path.split('.').collect();
+    match parts.as_slice() {
+        [single] => find_key_position(source, single, None),
+        [parent, child] => find_key_position(source, child, Some(parent)),
+        _ => {
+            // Deeper paths: best-effort — find the last segment within the second-to-last
+            let parent = parts[parts.len() - 2];
+            let child = parts[parts.len() - 1];
+            find_key_position(source, child, Some(parent))
+        }
+    }
+}
+
 /// Compute (line, column) for a top-level key in the document.
 fn position_for_key(doc: &toml_edit::DocumentMut, key: &str) -> (usize, usize) {
     let source = doc.to_string();

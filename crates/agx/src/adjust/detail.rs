@@ -38,24 +38,39 @@ fn default_sharpening_threshold() -> f32 {
 }
 
 /// Sharpening parameters controlling unsharp-mask strength, radius, threshold, and edge masking.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SharpeningParams {
     /// Sharpening intensity, 0–100. Default 0 (off).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 100.0))
+    )]
     pub amount: f32,
     /// Gaussian blur radius in pixels. Larger radius sharpens coarser detail. Default 1.0.
     #[serde(default = "default_sharpening_radius")]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.5, max = 3.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.5, max = 3.0))
+    )]
     pub radius: f32,
     /// Minimum luminance delta (0–255 scale) below which sharpening is suppressed. Default 25.
     #[serde(default = "default_sharpening_threshold")]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 100.0))
+    )]
     pub threshold: f32,
     /// Edge-aware masking strength, 0–100. Higher restricts sharpening to strong edges. Default 0.
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = 0.0, max = 100.0)))]
+    #[cfg_attr(
+        any(feature = "docgen", feature = "validate"),
+        schemars(range(min = 0.0, max = 100.0))
+    )]
     pub masking: f32,
 }
 
@@ -73,7 +88,10 @@ impl Default for SharpeningParams {
 /// Combined detail parameters: sharpening, clarity, and texture.
 ///
 /// Each control targets a different spatial frequency range via unsharp mask sigma.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetailParams {
     /// Sharpening sub-parameters (amount, radius, threshold, masking).
@@ -81,11 +99,11 @@ pub struct DetailParams {
     pub sharpening: SharpeningParams,
     /// Mid-frequency local contrast, -100 to +100. Positive adds punch, negative softens.
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub clarity: f32,
     /// Fine-frequency detail, -100 to +100. Positive enhances fine texture, negative smooths.
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub texture: f32,
 }
 

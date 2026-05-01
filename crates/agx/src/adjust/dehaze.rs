@@ -14,12 +14,15 @@ pub const DEHAZE_AMOUNT_MAX: f32 = 100.0;
 
 /// Dehaze adjustment parameters. Amount range: -100 to +100. Positive removes haze,
 /// negative adds haze/fog. When amount is 0, the dehaze pass is skipped entirely.
-#[cfg_attr(feature = "docgen", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DehazeParams {
     /// Dehaze strength from -100 (add fog) to +100 (remove haze). Default 0 (neutral).
     #[serde(default)]
-    #[cfg_attr(feature = "docgen", schemars(range(min = -100.0, max = 100.0)))]
+    #[cfg_attr(any(feature = "docgen", feature = "validate"), schemars(range(min = -100.0, max = 100.0)))]
     pub amount: f32,
 }
 

@@ -7,4 +7,4 @@ exposure = 0.5
 contrast = 10.0
 
 [white_balance]
-temperature = 5500.0
+temperature = 30.0

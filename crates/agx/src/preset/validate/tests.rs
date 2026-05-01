@@ -131,6 +131,60 @@ fn report_has_errors_reflects_summary() {
     assert!(!clean.has_errors());
 }
 
+mod semantic_pass {
+    use super::super::semantic::check_schema;
+    use super::super::*;
+    use std::path::Path;
+
+    fn fixture(name: &str) -> String {
+        let path = Path::new("src/preset/validate/tests/fixtures").join(name);
+        std::fs::read_to_string(&path).unwrap()
+    }
+
+    #[test]
+    fn clean_preset_passes_semantic_check() {
+        let toml_str = fixture("clean.toml");
+        let diags = check_schema(&toml_str);
+        assert_eq!(diags, vec![]);
+    }
+
+    #[test]
+    fn type_mismatch_is_detected() {
+        let toml_str = fixture("type_mismatch.toml");
+        let diags = check_schema(&toml_str);
+
+        assert!(!diags.is_empty(), "expected at least one diagnostic");
+        let type_errors: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == DiagnosticCode::TypeMismatch)
+            .collect();
+        assert_eq!(type_errors.len(), 1);
+        assert_eq!(type_errors[0].location.field, "tone.exposure");
+    }
+
+    #[test]
+    fn out_of_range_is_detected() {
+        let toml_str = fixture("out_of_range.toml");
+        let diags = check_schema(&toml_str);
+
+        let range_errors: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == DiagnosticCode::OutOfRange)
+            .collect();
+        assert_eq!(
+            range_errors.len(),
+            1,
+            "expected exactly one out-of-range diagnostic"
+        );
+        assert_eq!(range_errors[0].location.field, "tone.exposure");
+        assert!(
+            range_errors[0].message.contains("99"),
+            "message should mention the offending value, got: {}",
+            range_errors[0].message,
+        );
+    }
+}
+
 mod structural_pass {
     use super::super::structural::detect_unknown_fields;
     use super::super::*;
@@ -216,5 +270,18 @@ mod structural_pass {
             diag.location.line, 4,
             "line number should point at the [[unknown_array]] heading"
         );
+    }
+}
+
+mod missing_required {
+    use super::*;
+
+    #[test]
+    fn missing_required_diagnostic_code_is_reserved_for_future_use() {
+        // Currently no preset fields are marked required by the schemars-derived
+        // schema (every field has `#[serde(default)]`), so this code is reserved
+        // for future schema changes that may introduce required fields.
+        // If/when a required field is added, add a fixture and test here.
+        let _ = DiagnosticCode::MissingRequired;
     }
 }
