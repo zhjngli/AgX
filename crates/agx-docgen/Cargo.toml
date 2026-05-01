@@ -5,6 +5,11 @@ edition = "2021"
 publish = false
 description = "Generates CLI and preset reference markdown for the AgX documentation site"
 
+# Dev-only crate — opt out of cargo-release's version bumps, replacements, and
+# tag operations. `publish = false` only stops the upload, not the rest.
+[package.metadata.release]
+release = false
+
 [dependencies]
 agx = { package = "agx-photo", path = "../agx", features = ["docgen"] }
 agx-cli = { path = "../agx-cli" }

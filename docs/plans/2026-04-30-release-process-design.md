@@ -76,8 +76,11 @@ ones).
 
 Generation flow at release time (the C-tier hybrid):
 
-1. `git cliff --include-path "crates/<crate>/**" --unreleased` produces a
-   draft entry from conventional commits since the last tag.
+1. `git cliff --include-path "crates/<crate>/**" --tag-pattern "<crate>-v.*" --unreleased`
+   produces a draft entry from conventional commits since the last
+   crate-scoped tag. The `--tag-pattern` is necessary in a multi-crate
+   workspace; without it, `--unreleased` anchors to whichever crate's tag
+   is most recent globally.
 2. Maintainer curates the draft: condenses bullets into narrative, drops
    noise, writes prose for major changes.
 3. Curated entry pasted under `## [Unreleased]` in the crate's `CHANGELOG.md`.
@@ -161,7 +164,7 @@ commit_parsers = [
 ```
 
 Per-crate scoping at invocation time: `git cliff --include-path
-"crates/<crate>/**"`.
+"crates/<crate>/**" --tag-pattern "<crate>-v.*"`.
 
 ### Backfill plan
 
@@ -238,7 +241,7 @@ crates.io); `cargo-release` handles the dep pin rewrite via
 
 - Step 4 (Document) gains a sentence noting that `CHANGELOG.md` exists per
   crate but is curated at release time, not per-PR.
-- New Step 7 (Release, when applicable) summarizes the release flow and links
+- New Step 6 (Release, when applicable) summarizes the release flow and links
   to `release-process.md`. Reinforces that conventional commit prefixes are
   load-bearing for changelog scaffolding.
 
@@ -273,10 +276,15 @@ commits (`84f6dbb`, `0bf1649`).
 Before merge:
 
 - `verify.sh` passes (markdown lint catches malformed changelogs).
-- Manual: run `git cliff --include-path "crates/agx/**" --unreleased` against
-  a synthetic new feature commit, confirm output groups correctly.
-- Manual: `cargo release patch -p agx-cli` (no `--execute`) prints planned
-  actions; confirm bumps + replacements look right.
+- Manual: run `git cliff --include-path "crates/agx/**" --tag-pattern "agx-photo-v.*" --unreleased`
+  on the branch and confirm the output groups feature/fix/refactor commits
+  under the right Keep-a-Changelog headings.
+- Manual config validation: `cargo release config -p agx-cli` (read-only)
+  prints the resolved cargo-release config and confirms `allow-branch`,
+  `tag-name`, `dependent-version`, and `pre-release-replacements` are set as
+  intended. Note: `cargo release patch -p agx-cli` (the dry-run form) is
+  blocked by `allow-branch = ["main"]` from any non-`main` branch — the
+  block is the intended safety, so don't disable it for the verification.
 
 ## Out of scope
 

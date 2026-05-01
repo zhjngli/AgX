@@ -30,11 +30,12 @@ body = """
 footer = ""
 
 [git]
-# Surface non-conventional commits in scaffolds so the curator can decide
-# whether to retag, hand-write an entry, or skip. Default is true (silently drop).
+# `conventional_commits = true` already filters out non-conventional commits at
+# the parser level, so `filter_unconventional` is effectively a no-op here.
+# Setting it explicitly anyway to document intent: we expect every in-range
+# commit to follow the conventional spec; pre-convention commits in the repo
+# history are intentionally dropped from scaffolds.
 filter_unconventional = false
-
-# Require commit messages to follow the conventional spec.
 conventional_commits = true
 
 # Map conventional commit types to changelog sections. docs/chore/style/test/build/ci

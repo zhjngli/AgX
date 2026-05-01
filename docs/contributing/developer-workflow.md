@@ -147,7 +147,7 @@ Before declaring done, re-read your diff and ask:
 
 ## 6. Release (when applicable)
 
-Most PRs do not trigger a release on merge — releases happen periodically when user-visible changes have accumulated. Check `crates/<crate>/CHANGELOG.md` `[Unreleased]` section after merging.
+Most PRs do not trigger a release on merge — releases happen periodically when user-visible changes have accumulated. After a merge that contains `feat:` or `fix:` commits, decide whether to ship by dry-running the changelog scaffold (`git cliff --include-path 'crates/<crate>/**' --tag-pattern '<crate>-v.*' --unreleased`). The on-disk `[Unreleased]` section in `CHANGELOG.md` stays empty between releases — entries are scaffolded and curated at release time, not appended per-PR.
 
 If your work is user-visible (new feature, bug fix, breaking change), it will surface in the next release's changelog scaffolded from your conventional commit messages. Use accurate prefixes (`feat:` → Added, `fix:` → Fixed, `refactor:` / `perf:` → Changed) — `docs:`, `chore:`, `style:`, `test:`, `build:`, `ci:` are skipped.
 
