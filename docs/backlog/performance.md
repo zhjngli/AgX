@@ -43,7 +43,7 @@ Render pipeline performance improvements prioritized by profiling data. The prof
 
 ### Code quality
 
-- [ ] Consolidate dual `BatchOpts` — CLI has `BatchOpts` (clap args) and `batch::BatchOpts` (internal). Could unify.
+- [x] Consolidate dual `BatchOpts` — internal struct renamed to `BatchContext` so the only `BatchOpts` is the public clap-derived CLI input. They had different shapes (owned `PathBuf` + `OutputOpts` vs. borrowed `&Path` + pre-extracted `format_ext`) so unifying the type was the wrong move; only the name collision needed fixing.
 
 ## How to Re-Profile
 

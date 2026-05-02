@@ -197,8 +197,8 @@ fn process_single(
     Ok(start.elapsed())
 }
 
-/// Options shared by all batch operations.
-struct BatchOpts<'a> {
+/// Pre-derived runner state for batch operations.
+struct BatchContext<'a> {
     input_dir: &'a Path,
     output_dir: &'a Path,
     recursive: bool,
@@ -209,7 +209,7 @@ struct BatchOpts<'a> {
 }
 
 /// Generic batch processing: discover images, process in parallel, summarize.
-fn run_batch<F>(opts: &BatchOpts<'_>, process: F) -> BatchSummary
+fn run_batch<F>(opts: &BatchContext<'_>, process: F) -> BatchSummary
 where
     F: Fn(&Path, &Path) -> Result<Duration, String> + Sync,
 {
@@ -310,7 +310,7 @@ pub fn run_batch_apply(
         }
     };
 
-    let opts = BatchOpts {
+    let opts = BatchContext {
         input_dir,
         output_dir,
         recursive,
@@ -341,7 +341,7 @@ pub fn run_batch_edit(
     skip_errors: bool,
     use_gpu: bool,
 ) -> BatchSummary {
-    let opts = BatchOpts {
+    let opts = BatchContext {
         input_dir,
         output_dir,
         recursive,
