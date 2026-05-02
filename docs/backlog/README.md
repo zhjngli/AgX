@@ -35,9 +35,8 @@ Practical improvements to existing functionality — small scope, clear value.
 | Priority | Idea | Why now |
 |----------|------|---------|
 | 1 | [Performance](performance.md) | P1-P5 parallelization + GPU shipped; remaining work is memory passes (dehaze guided filter buffers, decode/encode), P6 SIMD, and a GPU CI runner |
-| 2 | [Parallel CI E2E](parallel-ci-e2e.md) | Matrix fan-out shipped; build-artifact sharing across matrix jobs is the remaining win |
-| 3 | [Preset Tooling](preset-tooling.md) | `agx validate` and apply-time unknown-field warnings shipped; remaining sub-tasks (schema versioning, variables) are lower urgency until the schema changes meaningfully |
-| 4 | [Processing Parity](processing-parity.md) | Per-feature algorithm verification against darktable/RawTherapee — long arc, ship one algo at a time |
+| 2 | [Preset Tooling](preset-tooling.md) | `agx validate` and apply-time unknown-field warnings shipped; remaining sub-tasks (schema versioning, variables) are lower urgency until the schema changes meaningfully |
+| 3 | [Processing Parity](processing-parity.md) | Per-feature algorithm verification against darktable/RawTherapee — long arc, ship one algo at a time |
 
 ### Mid-term
 
@@ -45,11 +44,11 @@ Larger efforts that expand AgX's capabilities or improve code quality.
 
 | Priority | Idea | Why next |
 |----------|------|----------|
-| 5 | [Documentation Initiative](documentation-initiative.md) | Coherent docs system (mdbook site, rustdoc, auto-gen CLI/preset ref, algorithm explanations) |
-| 6 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
-| 7 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
-| 8 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
-| 9 | [Color Management](color-management.md) | Wide gamut and ICC profiles are the gap between consumer and professional |
+| 4 | [Documentation Initiative](documentation-initiative.md) | Coherent docs system (mdbook site, rustdoc, auto-gen CLI/preset ref, algorithm explanations) |
+| 5 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
+| 6 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
+| 7 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
+| 8 | [Color Management](color-management.md) | Wide gamut and ICC profiles are the gap between consumer and professional |
 
 ### Long-term
 
@@ -57,11 +56,11 @@ Major features that require significant design work or change the project's scop
 
 | Priority | Idea | Notes |
 |----------|------|-------|
-| 10 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
-| 11 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
-| 12 | [Platform and Distribution](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
-| 13 | [UI](ui.md) | Desktop and web interfaces |
-| 14 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
+| 9 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
+| 10 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
+| 11 | [Platform and Distribution](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
+| 12 | [UI](ui.md) | Desktop and web interfaces |
+| 13 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
 
 ## By Category
 
@@ -78,7 +77,6 @@ Major features that require significant design work or change the project's scop
 |------|---------|
 | [performance.md](performance.md) | Data-driven render optimization roadmap (P1-P5 + P7 GPU shipped; memory and SIMD remaining) |
 | [pluggable-pipeline.md](pluggable-pipeline.md) | Stage-based render pipeline with caching and color-space awareness |
-| [parallel-ci-e2e.md](parallel-ci-e2e.md) | Parallelize e2e tests in GitHub Actions via matrix strategy |
 | [preset-tooling.md](preset-tooling.md) | Schema versioning, validation, and authoring shortcuts |
 
 ### Quality and Correctness
