@@ -28,14 +28,16 @@ A known defect in an existing feature. Add it under a **Bug fixes** heading in t
 
 Prioritized by alignment with the project philosophy: preset-first batch editing via CLI and API. Features that make presets more expressive or batch workflows faster come first. Developer velocity improvements are also high priority.
 
+The [Documentation Initiative](documentation-initiative.md) is substantially complete — only optional theme/polish remains — so it no longer appears in the priority tables below.
+
 ### Near-term
 
 Practical improvements to existing functionality — small scope, clear value.
 
 | Priority | Idea | Why now |
 |----------|------|---------|
-| 1 | [Performance](performance.md) | P1-P5 parallelization + GPU shipped; remaining work is memory passes (dehaze guided filter buffers, decode/encode), P6 SIMD, and a GPU CI runner |
-| 2 | [Preset Tooling](preset-tooling.md) | `agx validate` and apply-time unknown-field warnings shipped; remaining sub-tasks (schema versioning, variables) are lower urgency until the schema changes meaningfully |
+| 1 | [Performance](performance.md) | P1-P5 parallelization + GPU shipped; remaining work is batch memory profiling, P6 SIMD, and a GPU CI runner |
+| 2 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera and ships HEIC by default; supporting it unblocks the largest single user-reach gap |
 | 3 | [Processing Parity](processing-parity.md) | Per-feature algorithm verification against darktable/RawTherapee — long arc, ship one algo at a time |
 
 ### Mid-term
@@ -44,11 +46,10 @@ Larger efforts that expand AgX's capabilities or improve code quality.
 
 | Priority | Idea | Why next |
 |----------|------|----------|
-| 4 | [Documentation Initiative](documentation-initiative.md) | Coherent docs system (mdbook site, rustdoc, auto-gen CLI/preset ref, algorithm explanations) |
-| 5 | [Pluggable Pipeline](pluggable-pipeline.md) | Architectural improvement — 4 neighborhood ops justify the abstraction now |
-| 6 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera; unblocks a large user base |
-| 7 | [Ecosystem Interop](ecosystem-interop.md) | Lightroom XMP import alone would unlock existing preset libraries |
-| 8 | [Color Management](color-management.md) | Wide gamut and ICC profiles are the gap between consumer and professional |
+| 4 | [Color Management](color-management.md) | Wide gamut and ICC profiles close the consumer/professional gap and unlock log + wide-gamut working spaces other features depend on |
+| 5 | [Preset Tooling](preset-tooling.md) | `agx validate` and apply-time unknown-field warnings shipped; schema versioning + variables become urgent on first breaking schema change |
+| 6 | [Pluggable Pipeline](pluggable-pipeline.md) | Stage trait + per-pixel/neighborhood extraction shipped; remaining sub-tasks (stage caching, color-space auto-insert) gate on interactive UI work and wider gamut support |
+| 7 | [Ecosystem Interop](ecosystem-interop.md) | XMP/costyle/pp3 import — parameter mapping is inherently approximate; defer until concrete user demand appears |
 
 ### Long-term
 
