@@ -2,6 +2,22 @@
 
 AgX is published on [crates.io](https://crates.io/crates/agx-cli) and installs with a single `cargo` command.
 
+## System prerequisites
+
+AgX decodes raw camera files via LibRaw and HEIC/HEIF files via libheif. Both are system libraries you need installed before `cargo install agx-cli` can link successfully:
+
+```bash
+# macOS
+brew install libraw libheif
+
+# Debian/Ubuntu
+sudo apt install libraw-dev libheif-dev
+```
+
+If you skip these, `cargo install agx-cli` fails at link time with a missing-library error.
+
+If you only want to build the `agx-photo` library without raw or HEIC support, you can opt out of those features in your `Cargo.toml` — see [Use as a Rust library](#use-as-a-rust-library) below.
+
 ## Install the CLI
 
 ```bash
