@@ -36,6 +36,11 @@ struct heif_image {
     _opaque: [u8; 0],
 }
 
+// libheif's `heif_error_code` and `heif_suberror_code` are C enums. On Clang
+// and GCC for x86-64 and arm64 — the platforms this crate targets — C enums
+// are int-sized, so we represent them as `c_int`. If porting to a target
+// where the C compiler uses `-fshort-enums`, this struct layout would need
+// to be revisited.
 #[allow(non_camel_case_types)]
 #[repr(C)]
 struct heif_error {
@@ -50,7 +55,7 @@ const HEIF_COLORSPACE_RGB: c_int = 1;
 #[allow(dead_code)]
 const HEIF_CHROMA_INTERLEAVED_RGB: c_int = 10;
 #[allow(dead_code)]
-const HEIF_CHROMA_INTERLEAVED_RRGGBB_LE: c_int = 13;
+const HEIF_CHROMA_INTERLEAVED_RRGGBB_LE: c_int = 14;
 
 // Channel enum for plane access
 #[allow(dead_code)]
@@ -68,7 +73,7 @@ extern "C" {
         ctx: *mut heif_context,
         out_handle: *mut *mut heif_image_handle,
     ) -> heif_error;
-    fn heif_image_handle_release(handle: *mut heif_image_handle);
+    fn heif_image_handle_release(handle: *const heif_image_handle);
     fn heif_image_handle_get_luma_bits_per_pixel(handle: *const heif_image_handle) -> c_int;
     fn heif_decode_image(
         handle: *const heif_image_handle,
@@ -77,7 +82,7 @@ extern "C" {
         chroma: c_int,
         options: *const c_void,
     ) -> heif_error;
-    fn heif_image_release(img: *mut heif_image);
+    fn heif_image_release(img: *const heif_image);
     fn heif_image_get_plane_readonly(
         img: *const heif_image,
         channel: c_int,
@@ -253,5 +258,10 @@ mod tests {
     fn decode_heic_nonexistent_file_returns_error() {
         let result = decode_heic(Path::new("/nonexistent/photo.heic"));
         assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("libheif"),
+            "Error should mention libheif: {err_msg}"
+        );
     }
 }
