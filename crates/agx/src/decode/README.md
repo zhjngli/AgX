@@ -19,7 +19,7 @@ Decode image files into linear sRGB `Rgb32FImage` buffers for the engine.
 
 - **Standard formats:** Supported automatically via the `image` crate. If `image` adds a new format, it works with no changes.
 - **Raw formats:** Add the extension to `RAW_EXTENSIONS`. LibRaw already supports 1000+ camera models, so new raw formats typically just need the extension added.
-- **HEIF container formats:** Add the extension to `HEIC_EXTENSIONS`. libheif handles every codec inside (HEVC for `.heic`, AV1 for `.avif` if libheif is built with AV1 support), so new HEIF variants typically just need an extension entry.
+- **HEIF container formats:** AgX recognizes `.heic` and `.heif` extensions today. To add AV1-based `.avif` decoding, append `"avif"` to `HEIC_EXTENSIONS`; libheif will handle the codec if the system build of libheif was compiled with AV1 support. New variants typically just need an extension entry.
 
 ## Does NOT
 

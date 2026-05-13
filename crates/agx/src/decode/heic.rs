@@ -310,6 +310,12 @@ enum SourceColorSpace {
     /// Display P3 primaries; matrix-converted to sRGB in linear space.
     DisplayP3,
     /// BT.2020 primaries; matrix-converted to sRGB in linear space.
+    ///
+    /// Not currently returned by `probe_source_color_space` — BT.2020 sources
+    /// fall back to `Srgb` with a warning until the color-management work lands.
+    /// Kept here so the BT.2020 matrix-application code paths remain reachable
+    /// for the future color-management implementation.
+    #[allow(dead_code)]
     Bt2020,
 }
 
@@ -321,6 +327,13 @@ const P3_TO_SRGB: [[f32; 3]; 3] = [
 ];
 
 /// 3x3 matrix to convert BT.2020 (D65) linear values into linear sRGB.
+///
+/// Not reachable in the current revision — `probe_source_color_space` falls back
+/// to `Srgb` for BT.2020 sources with a warning, because the BT.2020 OETF
+/// (and PQ/HLG HDR variants) requires the color-management work to handle
+/// correctly. The matrix is retained here as documentation of the transform
+/// coefficients for future implementation.
+#[allow(dead_code)]
 const BT2020_TO_SRGB: [[f32; 3]; 3] = [
     [1.6605, -0.5876, -0.0728],
     [-0.1246, 1.1329, -0.0083],
@@ -346,7 +359,7 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
     if profile_type == HEIF_COLOR_PROFILE_TYPE_RICC || profile_type == HEIF_COLOR_PROFILE_TYPE_PROF
     {
         eprintln!(
-            "agx: HEIC source declares an ICC color profile; gamut-mapping as sRGB. \
+            "agx: HEIC source declares an ICC color profile; treating as sRGB. \
              Full ICC support requires the color-management work."
         );
         return SourceColorSpace::Srgb;
@@ -359,7 +372,13 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
 
     let mut nclx_ptr: *mut heif_color_profile_nclx = std::ptr::null_mut();
     let err = unsafe { heif_image_handle_get_nclx_color_profile(handle.ptr, &mut nclx_ptr) };
-    if err.code != 0 || nclx_ptr.is_null() {
+    if err.code != 0 {
+        if !nclx_ptr.is_null() {
+            unsafe { heif_nclx_color_profile_free(nclx_ptr) };
+        }
+        return SourceColorSpace::Srgb;
+    }
+    if nclx_ptr.is_null() {
         return SourceColorSpace::Srgb;
     }
 
@@ -371,11 +390,18 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
     match primaries {
         COLOR_PRIMARIES_BT709 => SourceColorSpace::Srgb,
         COLOR_PRIMARIES_SMPTE_EG432_DISPLAY_P3 => SourceColorSpace::DisplayP3,
-        COLOR_PRIMARIES_BT2020 => SourceColorSpace::Bt2020,
+        COLOR_PRIMARIES_BT2020 => {
+            eprintln!(
+                "agx: HEIC source declares BT.2020 primaries; treating as sRGB \
+                 because BT.2020 transfer curve (and PQ/HLG HDR variants) \
+                 require color-management work. Tone fidelity may suffer."
+            );
+            SourceColorSpace::Srgb
+        }
         _ => {
             eprintln!(
                 "agx: HEIC source NCLX color_primaries={primaries} not recognized; \
-                 gamut-mapping as sRGB."
+                 treating as sRGB."
             );
             SourceColorSpace::Srgb
         }
@@ -401,10 +427,10 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
 /// # Color space
 ///
 /// Source primaries declared as BT.709 or sRGB are treated as sRGB
-/// directly. Display P3 and BT.2020 sources are gamut-mapped to sRGB
-/// at decode (see the design doc for the deferred wide-gamut work).
-/// ICC profile and unknown matrices fall back to "treat as sRGB"
-/// with a stderr warning.
+/// directly. Display P3 sources are matrix-converted to linear sRGB at
+/// decode. BT.2020, ICC profile, and unknown NCLX primaries all fall back
+/// to "treat as sRGB" with a stderr warning (see the design doc for the
+/// deferred wide-gamut and color-management work).
 pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     use palette::{LinSrgb, Srgb};
 
@@ -417,6 +443,11 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     let (chroma, bytes_per_pixel) = match bits {
         8 => (HEIF_CHROMA_INTERLEAVED_RGB, 3),
         9 | 10 => (HEIF_CHROMA_INTERLEAVED_RRGGBB_LE, 6),
+        -1 => {
+            return Err(AgxError::Decode(
+                "libheif: could not determine bit depth of source image".into(),
+            ));
+        }
         _ => {
             return Err(AgxError::Decode(format!(
                 "libheif: unsupported bit depth {bits}"
@@ -493,8 +524,11 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
 /// Extract EXIF metadata from a HEIC/HEIF file as a raw byte buffer.
 ///
 /// Returns `None` on any error (missing file, malformed container, no EXIF
-/// block present). The returned bytes are a standard EXIF buffer (TIFF
-/// header + IFDs) suitable for `little_exif` and `kamadak-exif`.
+/// block present). The returned bytes are a standard TIFF header + IFDs
+/// buffer — no `Exif\0\0` prefix, no app-marker — same shape as a TIFF
+/// IFD on its own. Downstream encode paths that need `Exif\0\0` (notably
+/// JPEG segment injection via `img-parts`) prepend it themselves; consumers
+/// of `little_exif` may pass the buffer directly.
 ///
 /// HEIF stores EXIF with a leading 4-byte TIFF-header-offset prefix per
 /// ISO/IEC 23008-12. This function strips that prefix when present.

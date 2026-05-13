@@ -17,11 +17,13 @@ pub struct ImageMetadata {
 /// Extract metadata (EXIF, ICC profile) from an input image file.
 ///
 /// Extraction strategy (best-effort, cascading):
-/// 1. `img-parts` for JPEG/PNG — lossless byte-level copy
-/// 2. `kamadak-exif` for TIFF-based raw files (behind `raw` feature)
-/// 3. LibRaw parsed fields for non-TIFF raw files (behind `raw` feature)
-/// 4. `libheif` for HEIC/HEIF containers (behind `heic` feature)
-/// 5. Return None — no metadata extracted
+/// 1. `img-parts` for JPEG — lossless byte-level copy
+/// 2. `img-parts` for PNG — lossless byte-level copy
+/// 3. `kamadak-exif` for TIFF-based raw files (behind `raw` feature)
+/// 4. LibRaw parsed fields for non-TIFF raw files (behind `raw` feature)
+/// 5. `libheif` for HEIC/HEIF containers (behind `heic` feature)
+///
+/// Falls through to `None` — no metadata extracted — if none of the above match.
 ///
 /// Returns `None` for unsupported formats or if the file can't be read.
 /// This is best-effort — metadata extraction failure should never block processing.

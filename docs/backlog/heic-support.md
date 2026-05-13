@@ -19,6 +19,16 @@ Add decoding support for HEIC/HEIF images (`.heic`, `.heif`), the default photo 
 - HEIF is a container format that can hold HEVC or AV1 (AVIF) encoded images.
 - `libheif` is the most mature option but adds an FFI dependency (similar to LibRaw for RAW).
 
+## Known gaps (post-MVP follow-up)
+
+These were surfaced during the initial HEIC support adversarial review and deliberately deferred. Each is a real concern but doesn't block initial decode shipping.
+
+- **End-to-end coverage for Display P3 and 10-bit branches.** The shipped e2e fixture (`temple_blossoms.heic`) is BT.709 / 8-bit, so the matrix-conversion and 10-bit decode code paths are reachable only by local manual testing. Add synthetic Display P3 (`heif-enc -p color_primaries=12 -p transfer_characteristics=13 -p matrix_coefficients=6 ...`) and 10-bit (`heif-enc -b 10 ...`) fixtures, with noop-only goldens to keep repo size in check.
+- **BT.2020 transfer curve handling.** Initial decode falls back to "treat as sRGB" with a warning when the file declares BT.2020 primaries, because the BT.2020 OETF (and PQ/HLG HDR variants) requires color-management work. Surface this when the color-management epic is picked up.
+- **Out-of-gamut clamping audit.** P3 → sRGB matrix conversion can produce linear values outside [0, 1] (vivid P3 reds map to negative G/B in linear sRGB). Engine stages (HSL, contrast, LUT lookup) may not handle negatives gracefully. Audit each stage; either clamp at decode or document the negative-tolerant intermediates.
+- **EXIF buffer shape consistency.** The HEIC EXIF extractor returns a raw TIFF (header + IFDs, no `Exif\0\0` prefix). The legacy raw-TIFF path (`metadata.rs::extract_metadata_raw_tiff`) returns bytes that include `Exif\0\0`. Downstream encode logic handles both today because of prefix-tolerant parsing in `img-parts`, but the asymmetry is a latent footgun. Decide on a canonical shape and reconcile.
+- **Multiple EXIF blocks per HEIF.** `extract_heic_metadata` reads the first EXIF block only. iPhone files occasionally carry more than one; we silently drop the rest. Decide whether to merge or surface them when a real-world case emerges.
+
 ## Related
 
 - [Ecosystem Interop](ecosystem-interop.md) — HEIC is part of the broader format support story
