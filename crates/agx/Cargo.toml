@@ -2,9 +2,6 @@
 name = "agx-photo"
 version = "0.1.0"
 edition = "2021"
-
-[package.metadata.docs.rs]
-features = ["raw", "heic", "validate", "docgen"]
 description = "An open-source photo editing library with a readable, portable preset format"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/zhjngli/AgX"
@@ -54,3 +51,6 @@ profiling = ["dep:serde_json"]
 docgen = ["dep:schemars", "dep:serde_json"]
 validate = ["dep:schemars", "dep:serde_json", "dep:jsonschema", "dep:toml_edit"]
 gpu = ["dep:wgpu", "dep:naga_oil", "dep:naga", "dep:bytemuck", "dep:pollster", "dep:half"]
+
+[package.metadata.docs.rs]
+features = ["raw", "heic", "validate", "docgen"]
