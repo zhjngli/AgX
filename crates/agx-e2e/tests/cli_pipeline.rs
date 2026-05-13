@@ -131,6 +131,18 @@ fn cli_temple_blossoms() {
 }
 
 #[test]
+fn cli_temple_blossoms_heic() {
+    run_image_matrix(
+        "heic/temple_blossoms.heic",
+        "temple_blossoms",
+        "heic",
+        2,
+        0.0,
+        ALL_LOOKS,
+    );
+}
+
+#[test]
 fn cli_night_city_blur() {
     run_image_matrix(
         "raw/night_city_blur.raf",
