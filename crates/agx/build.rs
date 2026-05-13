@@ -27,4 +27,21 @@ fn main() {
         }
         build.compile("agx_libraw_meta");
     }
+
+    #[cfg(feature = "heic")]
+    {
+        println!("cargo:rustc-link-lib=heif");
+
+        if cfg!(target_os = "macos") {
+            if let Ok(output) = std::process::Command::new("brew")
+                .args(["--prefix", "libheif"])
+                .output()
+            {
+                if output.status.success() {
+                    let prefix = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    println!("cargo:rustc-link-search=native={prefix}/lib");
+                }
+            }
+        }
+    }
 }

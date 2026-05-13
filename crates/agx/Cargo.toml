@@ -46,6 +46,7 @@ cc = "1"
 [features]
 default = ["gpu"]
 raw = []
+heic = []
 profiling = ["dep:serde_json"]
 docgen = ["dep:schemars", "dep:serde_json"]
 validate = ["dep:schemars", "dep:serde_json", "dep:jsonschema", "dep:toml_edit"]
