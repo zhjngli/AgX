@@ -5,6 +5,9 @@ mod orientation;
 #[cfg(feature = "raw")]
 pub mod raw;
 
+#[cfg(feature = "heic")]
+pub mod heic;
+
 use image::Rgb32FImage;
 use palette::{LinSrgb, Srgb};
 
