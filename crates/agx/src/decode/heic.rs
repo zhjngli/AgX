@@ -54,7 +54,6 @@ struct heif_error {
 const HEIF_COLORSPACE_RGB: c_int = 1;
 #[allow(dead_code)]
 const HEIF_CHROMA_INTERLEAVED_RGB: c_int = 10;
-#[allow(dead_code)]
 const HEIF_CHROMA_INTERLEAVED_RRGGBB_LE: c_int = 14;
 
 // Channel enum for plane access
@@ -272,9 +271,10 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     let bits = handle.luma_bits_per_pixel();
     let (chroma, bytes_per_pixel) = match bits {
         8 => (HEIF_CHROMA_INTERLEAVED_RGB, 3),
+        9 | 10 => (HEIF_CHROMA_INTERLEAVED_RRGGBB_LE, 6),
         _ => {
             return Err(AgxError::Decode(format!(
-                "libheif: unsupported bit depth {bits} (only 8-bit supported in this revision)"
+                "libheif: unsupported bit depth {bits}"
             )));
         }
     };
@@ -301,16 +301,34 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     // asserted above; on any real HEIF the product fits comfortably in `usize`.
     let pixel_slice: &[u8] = unsafe { std::slice::from_raw_parts(data, stride * height as usize) };
 
-    let buf = Rgb32FImage::from_fn(width, height, |x, y| {
-        let row_offset = (y as usize) * stride;
-        let col_offset = (x as usize) * bytes_per_pixel;
-        let i = row_offset + col_offset;
-        let sr = pixel_slice[i] as f32 / 255.0;
-        let sg = pixel_slice[i + 1] as f32 / 255.0;
-        let sb = pixel_slice[i + 2] as f32 / 255.0;
-        let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
-        image::Rgb([lin.red, lin.green, lin.blue])
-    });
+    let buf = if bits == 8 {
+        Rgb32FImage::from_fn(width, height, |x, y| {
+            let row_offset = (y as usize) * stride;
+            let col_offset = (x as usize) * bytes_per_pixel;
+            let i = row_offset + col_offset;
+            let sr = pixel_slice[i] as f32 / 255.0;
+            let sg = pixel_slice[i + 1] as f32 / 255.0;
+            let sb = pixel_slice[i + 2] as f32 / 255.0;
+            let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
+            image::Rgb([lin.red, lin.green, lin.blue])
+        })
+    } else {
+        // 9 or 10-bit values packed into 16-bit little-endian containers.
+        let max_value = ((1u32 << bits) - 1) as f32;
+        Rgb32FImage::from_fn(width, height, |x, y| {
+            let row_offset = (y as usize) * stride;
+            let col_offset = (x as usize) * bytes_per_pixel;
+            let i = row_offset + col_offset;
+            let r_raw = u16::from_le_bytes([pixel_slice[i], pixel_slice[i + 1]]);
+            let g_raw = u16::from_le_bytes([pixel_slice[i + 2], pixel_slice[i + 3]]);
+            let b_raw = u16::from_le_bytes([pixel_slice[i + 4], pixel_slice[i + 5]]);
+            let sr = r_raw as f32 / max_value;
+            let sg = g_raw as f32 / max_value;
+            let sb = b_raw as f32 / max_value;
+            let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
+            image::Rgb([lin.red, lin.green, lin.blue])
+        })
+    };
 
     Ok(buf)
 }
