@@ -239,15 +239,73 @@ impl Drop for HeifImage {
     }
 }
 
-// --- Public API (filled in by later tasks) ---
+// --- Public API ---
 
 /// Decode a HEIC/HEIF file into linear sRGB f32.
 ///
-/// Stub for Task 3.
-pub fn decode_heic(_path: &Path) -> Result<Rgb32FImage> {
-    Err(AgxError::Decode(
-        "libheif: decode_heic not yet implemented".into(),
-    ))
+/// libheif handles the container, codec backend, and orientation
+/// transformations. This function inspects the source bit depth,
+/// requests RGB-interleaved decode in the appropriate chroma layout,
+/// and converts the pixel data to the engine's linear sRGB f32 contract.
+///
+/// # Supported sources
+///
+/// 8-bit and 10-bit HEIF images. iPhone HEIC captures are the primary
+/// target. Multi-image HEIF containers are read for their primary image
+/// only; auxiliary images (depth, burst, alternate exposures) are not
+/// surfaced.
+///
+/// # Color space
+///
+/// Source primaries declared as BT.709 or sRGB are treated as sRGB
+/// directly. Display P3 and BT.2020 sources are gamut-mapped to sRGB
+/// at decode (see the design doc for the deferred wide-gamut work).
+/// ICC profile and unknown matrices fall back to "treat as sRGB"
+/// with a stderr warning.
+pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
+    use palette::{LinSrgb, Srgb};
+
+    let ctx = HeifContext::new()?;
+    ctx.read_from_file(path)?;
+    let handle = ctx.primary_image_handle()?;
+
+    let bits = handle.luma_bits_per_pixel();
+    let (chroma, bytes_per_pixel) = match bits {
+        8 => (HEIF_CHROMA_INTERLEAVED_RGB, 3),
+        _ => {
+            return Err(AgxError::Decode(format!(
+                "libheif: unsupported bit depth {bits} (only 8-bit supported in this revision)"
+            )));
+        }
+    };
+
+    let img = handle.decode(HEIF_COLORSPACE_RGB, chroma)?;
+    let width = img.width();
+    let height = img.height();
+    let (data, stride) = img.plane_readonly();
+    if data.is_null() {
+        return Err(AgxError::Decode(
+            "libheif: decoded image has no pixel data".into(),
+        ));
+    }
+    let stride = stride as usize;
+
+    // Safety: data points to width*height pixels with the given stride for the
+    // lifetime of `img`. We read it before `img` is dropped.
+    let pixel_slice: &[u8] = unsafe { std::slice::from_raw_parts(data, stride * height as usize) };
+
+    let buf = Rgb32FImage::from_fn(width, height, |x, y| {
+        let row_offset = (y as usize) * stride;
+        let col_offset = (x as usize) * bytes_per_pixel;
+        let i = row_offset + col_offset;
+        let sr = pixel_slice[i] as f32 / 255.0;
+        let sg = pixel_slice[i + 1] as f32 / 255.0;
+        let sb = pixel_slice[i + 2] as f32 / 255.0;
+        let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
+        image::Rgb([lin.red, lin.green, lin.blue])
+    });
+
+    Ok(buf)
 }
 
 #[cfg(test)]
