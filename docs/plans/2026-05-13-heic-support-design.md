@@ -194,12 +194,49 @@ Local developer experience:
 - `./scripts/e2e-quick.sh` includes a HEIC smoke case in its matrix.
 - `decode/README.md` documents the install steps and the `--features heic` flag for direct library users.
 
+## Documentation updates
+
+HEIC is not algorithmic, so the explanation quadrant of the book stays untouched. The updates are structural and contributor-facing.
+
+**Rustdoc (`///` doc comments).** The `agx-photo` crate enforces `deny(missing_docs)`, so every new `pub` item ships with doc comments:
+
+- Module-level `//!` doc on `decode/heic.rs` describing the FFI wrapper and the linear-sRGB output contract.
+- `///` comments on `is_heic_extension`, `heic::decode_heic`, `heic::extract_heic_metadata`, including supported file extensions, the feature-flag prerequisite, and the color-space gamut-mapping note.
+
+**`crates/agx/src/decode/README.md`.** Extend the existing structure:
+
+- "Public API" section: add the three new items.
+- "Extension Guide" section: a third bullet for HEIC, explaining that adding a new HEIF variant is just adding the extension to `HEIC_EXTENSIONS` (libheif handles the codec).
+- "Building from source" entry for libheif (the section already covers LibRaw).
+
+**`ARCHITECTURE.md`.**
+
+- Module-table row for `metadata` (line 61): extend the "May import from" cell to include `heic::extract_heic_metadata` alongside the existing `raw::extract_raw_metadata`.
+- Negative-constraints bullet for `decode` (line 76): broaden "No metadata interpretation beyond what LibRaw provides" to also acknowledge libheif's EXIF blob, since the wording today is LibRaw-specific.
+- Core invariants section: no change — output is still linear sRGB.
+
+**Root `README.md`.**
+
+- Features list near the top: add HEIC alongside the existing "Raw format support" bullet.
+- The "EXIF orientation: automatic ... (JPEG, PNG, TIFF)" line: extend to mention HEIC.
+- The `// Decode an image (auto-detects format: JPEG, PNG, TIFF, CR2, NEF, DNG, etc.)` comment in the library usage example: add HEIC to the format list.
+- "System requirements" section: a libheif install block (brew on macOS, apt on Linux) paralleling the existing libraw block.
+
+**Book `docs/book/src/install.md`.** Currently the book install page silently assumes the system libraries are already installed — the existing LibRaw prerequisite is documented only in the root README. Adding HEIC is a natural moment to fix that gap:
+
+- New "System prerequisites" subsection in `install.md` that documents both libraw and libheif install steps (matching the README content, with a one-line callout that `cargo install agx-cli` will fail to link without them).
+
+**Auto-generated reference (`agx-docgen`).** No manual change needed. The CLI reference is generated from `clap-markdown`; HEIC files are accepted by the same `apply` / `batch-apply` / `multi-apply` subcommands so help text doesn't change. The preset reference is unaffected. If the docgen run produces a drift, it's regenerated as part of the implementation.
+
+**No book quadrant changes.** No tutorial, how-to, explanation, or reference-concepts page needs a new section. HEIC is a format unlock, not a new feature or concept.
+
 ## Verification before merge
 
-1. `./scripts/verify.sh` passes on a machine with libheif installed. Because `agx-cli` and `agx-e2e` hardcode the `heic` feature on their `agx-photo` dependency, the HEIC code path is built and its unit tests run.
+1. `./scripts/verify.sh` passes on a machine with libheif installed. Because `agx-cli` and `agx-e2e` hardcode the `heic` feature on their `agx-photo` dependency, the HEIC code path is built and its unit tests run. `verify.sh` also runs `markdown-lint`, `book-linkcheck`, and `sibling-md-clean`, which catch any doc-update mistakes.
 2. `cargo build -p agx-photo --no-default-features` passes — verifies the library still builds with no FFI features at all.
 3. `./scripts/e2e-quick.sh` passes on a machine with libheif installed.
 4. `./scripts/e2e.sh` passes in CI (full matrix) with libheif installed on each runner.
-5. `ARCHITECTURE.md`: no changes — the linear sRGB working-space invariant still holds, and `decode` already declares the FFI exception.
-6. `decode/README.md` updated with the new public API and build instructions.
-7. `docs/backlog/heic-support.md` shipped sub-tasks checked off; deferred sub-tasks remain.
+5. `ARCHITECTURE.md` updated per the Documentation updates section above.
+6. `crates/agx/src/decode/README.md` updated with the new public API and build instructions.
+7. Root `README.md` and `docs/book/src/install.md` updated per the Documentation updates section above.
+8. `docs/backlog/heic-support.md` shipped sub-tasks checked off; deferred sub-tasks remain.
