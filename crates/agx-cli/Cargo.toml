@@ -16,7 +16,7 @@ name = "agx"
 path = "src/main.rs"
 
 [dependencies]
-agx = { package = "agx-photo", path = "../agx", version = "0.1.0", features = ["raw", "validate"] }
+agx = { package = "agx-photo", path = "../agx", version = "0.1.0", features = ["raw", "validate", "heic"] }
 clap = { version = "4", features = ["derive"] }
 image = "0.25"
 rayon = "1"
