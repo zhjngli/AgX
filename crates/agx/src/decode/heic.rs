@@ -128,7 +128,9 @@ impl HeifContext {
     fn new() -> Result<Self> {
         let ptr = unsafe { heif_context_alloc() };
         if ptr.is_null() {
-            return Err(AgxError::Decode("libheif: failed to allocate context".into()));
+            return Err(AgxError::Decode(
+                "libheif: failed to allocate context".into(),
+            ));
         }
         Ok(Self { ptr })
     }
@@ -154,7 +156,9 @@ impl HeifContext {
             check_heif(heif_context_get_primary_image_handle(self.ptr, &mut handle))?;
         }
         if handle.is_null() {
-            return Err(AgxError::Decode("libheif: file has no primary image".into()));
+            return Err(AgxError::Decode(
+                "libheif: file has no primary image".into(),
+            ));
         }
         Ok(HeifImageHandle { ptr: handle })
     }
@@ -189,7 +193,9 @@ impl HeifImageHandle {
             ))?;
         }
         if img.is_null() {
-            return Err(AgxError::Decode("libheif: decode returned null image".into()));
+            return Err(AgxError::Decode(
+                "libheif: decode returned null image".into(),
+            ));
         }
         Ok(HeifImage { ptr: img })
     }
