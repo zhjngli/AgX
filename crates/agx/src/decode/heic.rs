@@ -288,10 +288,17 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
             "libheif: decoded image has no pixel data".into(),
         ));
     }
+    if stride <= 0 {
+        return Err(AgxError::Decode(
+            "libheif: decoded plane has invalid stride".into(),
+        ));
+    }
     let stride = stride as usize;
 
-    // Safety: data points to width*height pixels with the given stride for the
-    // lifetime of `img`. We read it before `img` is dropped.
+    // Safety: `data` points to a buffer of at least `stride * height` bytes
+    // allocated by libheif and owned by `img`. The slice is dropped before
+    // `img` (which holds the allocation) goes out of scope. `stride > 0` was
+    // asserted above; on any real HEIF the product fits comfortably in `usize`.
     let pixel_slice: &[u8] = unsafe { std::slice::from_raw_parts(data, stride * height as usize) };
 
     let buf = Rgb32FImage::from_fn(width, height, |x, y| {
