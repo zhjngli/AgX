@@ -66,19 +66,28 @@ const HEIF_COLOR_PROFILE_TYPE_RICC: c_int = 0x72494343; // 'rICC'
 const HEIF_COLOR_PROFILE_TYPE_PROF: c_int = 0x70726f66; // 'prof'
 
 // ITU-T H.273 color_primaries values
-const COLOR_PRIMARIES_BT709: u16 = 1;
-const COLOR_PRIMARIES_BT2020: u16 = 9;
-const COLOR_PRIMARIES_SMPTE_RP431_DISPLAY_P3: u16 = 12; // Display P3 (D65)
+const COLOR_PRIMARIES_BT709: u32 = 1;
+const COLOR_PRIMARIES_BT2020: u32 = 9;
+const COLOR_PRIMARIES_SMPTE_EG432_DISPLAY_P3: u32 = 12; // Display P3 (D65, used by iPhone)
 
+// libheif's `heif_color_profile_nclx` mirrors a C struct where color_primaries,
+// transfer_characteristics, and matrix_coefficients are C enums. On Clang/GCC
+// for x86-64 and arm64 — the platforms this crate targets — C enums are
+// int-sized (4 bytes). The Rust struct must match this layout exactly; a size
+// mismatch causes field reads at wrong offsets and silently breaks gamut
+// detection. The `_pad0`/`_pad1` fields provide the alignment padding that the
+// C compiler inserts, making the struct exactly 52 bytes.
 #[repr(C)]
 #[allow(non_camel_case_types)]
 #[allow(dead_code)]
 struct heif_color_profile_nclx {
     version: u8,
-    color_primaries: u16,
-    transfer_characteristics: u16,
-    matrix_coefficients: u16,
+    _pad0: [u8; 3],
+    color_primaries: u32,
+    transfer_characteristics: u32,
+    matrix_coefficients: u32,
     full_range_flag: u8,
+    _pad1: [u8; 3],
     color_primary_red_x: f32,
     color_primary_red_y: f32,
     color_primary_green_x: f32,
@@ -342,7 +351,7 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
 
     match primaries {
         COLOR_PRIMARIES_BT709 => SourceColorSpace::Srgb,
-        COLOR_PRIMARIES_SMPTE_RP431_DISPLAY_P3 => SourceColorSpace::DisplayP3,
+        COLOR_PRIMARIES_SMPTE_EG432_DISPLAY_P3 => SourceColorSpace::DisplayP3,
         COLOR_PRIMARIES_BT2020 => SourceColorSpace::Bt2020,
         _ => {
             eprintln!(
@@ -481,5 +490,23 @@ mod tests {
             err_msg.contains("libheif"),
             "Error should mention libheif: {err_msg}"
         );
+    }
+
+    #[test]
+    fn nclx_struct_size_matches_libheif() {
+        // libheif's heif_color_profile_nclx is 52 bytes on the target platforms
+        // (Clang/GCC, x86-64 and arm64). A drift here means our FFI reads at
+        // wrong offsets and gamut detection silently fails.
+        assert_eq!(std::mem::size_of::<heif_color_profile_nclx>(), 52);
+    }
+
+    #[test]
+    fn apply_matrix_identity_preserves_input() {
+        let id = [[1.0f32, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+        let v = [0.5f32, 0.3, 0.8];
+        let out = apply_matrix(v, &id);
+        assert!((out[0] - 0.5).abs() < 1e-6);
+        assert!((out[1] - 0.3).abs() < 1e-6);
+        assert!((out[2] - 0.8).abs() < 1e-6);
     }
 }
