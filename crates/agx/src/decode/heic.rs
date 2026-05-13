@@ -133,6 +133,25 @@ extern "C" {
         out_data: *mut *mut heif_color_profile_nclx,
     ) -> heif_error;
     fn heif_nclx_color_profile_free(profile: *mut heif_color_profile_nclx);
+    fn heif_image_handle_get_number_of_metadata_blocks(
+        handle: *const heif_image_handle,
+        type_filter: *const c_char,
+    ) -> c_int;
+    fn heif_image_handle_get_list_of_metadata_block_IDs(
+        handle: *const heif_image_handle,
+        type_filter: *const c_char,
+        ids_out: *mut u32,
+        count: c_int,
+    ) -> c_int;
+    fn heif_image_handle_get_metadata_size(
+        handle: *const heif_image_handle,
+        metadata_id: u32,
+    ) -> usize;
+    fn heif_image_handle_get_metadata(
+        handle: *const heif_image_handle,
+        metadata_id: u32,
+        out_data: *mut c_void,
+    ) -> heif_error;
 }
 
 // --- Error helpers ---
@@ -471,6 +490,77 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     Ok(buf)
 }
 
+/// Extract EXIF metadata from a HEIC/HEIF file as a raw byte buffer.
+///
+/// Returns `None` on any error (missing file, malformed container, no EXIF
+/// block present). The returned bytes are a standard EXIF buffer (TIFF
+/// header + IFDs) suitable for `little_exif` and `kamadak-exif`.
+///
+/// HEIF stores EXIF with a leading 4-byte TIFF-header-offset prefix per
+/// ISO/IEC 23008-12. This function strips that prefix when present.
+pub fn extract_heic_metadata(path: &Path) -> Option<Vec<u8>> {
+    let ctx = HeifContext::new().ok()?;
+    ctx.read_from_file(path).ok()?;
+    let handle = ctx.primary_image_handle().ok()?;
+
+    let exif_type = CString::new("Exif").ok()?;
+    let count =
+        unsafe { heif_image_handle_get_number_of_metadata_blocks(handle.ptr, exif_type.as_ptr()) };
+    if count <= 0 {
+        return None;
+    }
+
+    let mut ids: Vec<u32> = vec![0; count as usize];
+    let got = unsafe {
+        heif_image_handle_get_list_of_metadata_block_IDs(
+            handle.ptr,
+            exif_type.as_ptr(),
+            ids.as_mut_ptr(),
+            count,
+        )
+    };
+    if got <= 0 {
+        return None;
+    }
+
+    // Take the first EXIF block (HEIC files normally carry one).
+    let id = ids[0];
+    let size = unsafe { heif_image_handle_get_metadata_size(handle.ptr, id) };
+    if size == 0 {
+        return None;
+    }
+
+    let mut buf: Vec<u8> = vec![0; size];
+    let err =
+        unsafe { heif_image_handle_get_metadata(handle.ptr, id, buf.as_mut_ptr() as *mut c_void) };
+    if err.code != 0 {
+        return None;
+    }
+
+    // Strip the 4-byte TIFF-header-offset prefix when present. Per
+    // ISO/IEC 23008-12, EXIF blocks in HEIF lead with a 4-byte big-endian
+    // offset. A non-stripped buffer would confuse downstream EXIF parsers.
+    if buf.len() > 4 {
+        let offset = u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+        // The offset is to "II*\0" or "MM\0*" (TIFF header). If the bytes at
+        // (4 + offset) look like a TIFF header, treat the leading 4 bytes as
+        // the prefix and trim. Otherwise leave the buffer untouched.
+        let probe_at = 4 + offset;
+        if probe_at + 2 <= buf.len() {
+            let probe = &buf[probe_at..probe_at + 2];
+            if probe == b"II" || probe == b"MM" {
+                buf.drain(..probe_at);
+            }
+        }
+    }
+
+    if buf.is_empty() {
+        None
+    } else {
+        Some(buf)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,5 +598,11 @@ mod tests {
         assert!((out[0] - 0.5).abs() < 1e-6);
         assert!((out[1] - 0.3).abs() < 1e-6);
         assert!((out[2] - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn extract_heic_metadata_nonexistent_returns_none() {
+        let meta = extract_heic_metadata(Path::new("/nonexistent/photo.heic"));
+        assert!(meta.is_none());
     }
 }
