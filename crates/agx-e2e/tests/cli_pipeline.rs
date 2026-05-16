@@ -136,8 +136,12 @@ fn cli_temple_blossoms_heic() {
         "heic/temple_blossoms.heic",
         "temple_blossoms",
         "heic",
-        2,
-        0.0,
+        // Moderate tolerance: libheif/libde265 decode is mostly deterministic,
+        // but cross-platform version jitter shows up at LUT-amplified boundary
+        // pixels (~0.07% of pixels, max channel diff ~4 in practice). Tighter
+        // than the raw path (which absorbs LibRaw demosaicing variance).
+        10,
+        1.0,
         ALL_LOOKS,
     );
 }
