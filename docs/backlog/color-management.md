@@ -11,6 +11,7 @@ Wide gamut support, ICC profiles, and per-camera color matrices for AgX.
 - [ ] **Per-camera color matrices** — custom color matrices for each camera model (DCP/ICC camera profiles) to improve raw color accuracy
 - [ ] **Soft proofing** — preview how an image will look in a different color space (e.g., CMYK for print)
 - [ ] **Relax sRGB-only invariant** — update ARCHITECTURE.md core invariant #3 when this work begins
+- [ ] **Revisit HEIC wide-gamut preservation** — initial HEIC decode (see `heic-support.md`) gamut-maps Display P3 / BT.2020 sources to linear sRGB at decode time. When the working space widens, drop that early conversion so wide-gamut iPhone captures survive end-to-end. Only the decode-stage conversion needs to change; the rest of the HEIC path is already gamut-agnostic.
 
 ## Considerations
 

@@ -21,9 +21,10 @@ For the longer discussion of what these mean and what AgX deliberately isn't, se
 - **White balance**: temperature and tint shifts
 - **HSL adjustments**: per-channel hue, saturation, and luminance targeting
 - **3D LUT support**: apply `.cube` LUT files for color grading and film emulation
-- **EXIF orientation**: automatic orientation correction for standard formats (JPEG, PNG, TIFF)
+- **EXIF orientation**: automatic orientation correction for standard formats (JPEG, PNG, TIFF) and HEIF containers
 - **Preset composability**: presets can `extend` a base preset, with Option-style inheritance
 - **Raw format support**: decode CR2, CR3, NEF, ARW, RAF, DNG, and 1000+ camera formats via LibRaw
+- **HEIF container support**: decode HEIC and HEIF files (iPhone default capture format) via libheif
 - **Batch processing**: process entire directories with parallel execution via rayon
 - **TOML presets**: human-readable, shareable, version-controllable editing presets
 - **Metadata preservation**: EXIF and ICC profiles carried through the pipeline
@@ -139,7 +140,7 @@ use agx::{Engine, Lut3D, Preset};
 use agx::decode::decode;
 use agx::encode::encode_to_file;
 
-// Decode an image (auto-detects format: JPEG, PNG, TIFF, CR2, NEF, DNG, etc.)
+// Decode an image (auto-detects format: JPEG, PNG, TIFF, HEIC, HEIF, CR2, NEF, DNG, etc.)
 let image = decode("photo.jpg".as_ref()).unwrap();
 
 // Create engine and apply a preset
@@ -224,6 +225,20 @@ The library is published as `agx-photo` but its Rust crate name remains `agx`, s
 [dependencies]
 agx-photo = { version = "0.1", features = ["raw"] }
 ```
+
+## Building with HEIC Support
+
+HEIC/HEIF decoding requires [libheif](https://github.com/strukturag/libheif) installed on your system:
+
+```bash
+# macOS
+brew install libheif
+
+# Debian/Ubuntu
+sudo apt install libheif-dev libheif-plugin-libde265
+```
+
+The CLI enables HEIC support by default, the same as raw support. To use the library without HEIC support (no libheif dependency), depend on `agx-photo` without the `heic` feature.
 
 ## License
 

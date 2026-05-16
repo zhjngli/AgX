@@ -46,7 +46,11 @@ cc = "1"
 [features]
 default = ["gpu"]
 raw = []
+heic = []
 profiling = ["dep:serde_json"]
 docgen = ["dep:schemars", "dep:serde_json"]
 validate = ["dep:schemars", "dep:serde_json", "dep:jsonschema", "dep:toml_edit"]
 gpu = ["dep:wgpu", "dep:naga_oil", "dep:naga", "dep:bytemuck", "dep:pollster", "dep:half"]
+
+[package.metadata.docs.rs]
+features = ["raw", "heic", "validate", "docgen"]

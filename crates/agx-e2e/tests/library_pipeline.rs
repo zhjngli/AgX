@@ -35,6 +35,16 @@ fn library_raw_noop_roundtrip() {
 }
 
 #[test]
+fn library_heic_noop_roundtrip() {
+    let input = fixture_path("heic/temple_blossoms.heic");
+    let dir = TempDir::new().unwrap();
+    let output = dir.path().join("output.png");
+
+    process_with_params(&input, &output, |_| {});
+    assert_valid_output(&output);
+}
+
+#[test]
 fn library_apply_preset() {
     let input = fixture_path("jpeg/temple_blossoms.jpg");
     let preset_path = fixture_path("looks/portra_400.toml");

@@ -5,6 +5,9 @@ mod orientation;
 #[cfg(feature = "raw")]
 pub mod raw;
 
+#[cfg(feature = "heic")]
+pub mod heic;
+
 use image::Rgb32FImage;
 use palette::{LinSrgb, Srgb};
 
@@ -24,11 +27,22 @@ pub fn is_raw_extension(path: &std::path::Path) -> bool {
         .is_some_and(|ext| RAW_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
 }
 
+/// Known HEIF container extensions decoded via libheif.
+const HEIC_EXTENSIONS: &[&str] = &["heic", "heif"];
+
+/// Check if a file path has a known HEIF container extension.
+pub fn is_heic_extension(path: &std::path::Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| HEIC_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
+}
+
 /// Decode any supported image file into linear sRGB f32.
 ///
 /// Auto-detects format from file extension:
 /// - Standard formats (JPEG, PNG, TIFF, BMP, WebP): decoded via the `image` crate
 /// - Raw formats (CR2, CR3, NEF, ARW, RAF, DNG, etc.): decoded via LibRaw (requires `raw` feature)
+/// - HEIF container formats (HEIC, HEIF): decoded via libheif (requires `heic` feature)
 pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
     if is_raw_extension(path) {
         #[cfg(feature = "raw")]
@@ -39,6 +53,18 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
         {
             return Err(AgxError::Decode(
                 "raw format support requires the 'raw' feature flag".into(),
+            ));
+        }
+    }
+    if is_heic_extension(path) {
+        #[cfg(feature = "heic")]
+        {
+            return heic::decode_heic(path);
+        }
+        #[cfg(not(feature = "heic"))]
+        {
+            return Err(AgxError::Decode(
+                "heic format support requires the 'heic' feature flag".into(),
             ));
         }
     }
@@ -209,5 +235,21 @@ mod tests {
                 pixel.0[i]
             );
         }
+    }
+
+    #[test]
+    fn is_heic_extension_detects_heif_container() {
+        assert!(is_heic_extension(std::path::Path::new("photo.heic")));
+        assert!(is_heic_extension(std::path::Path::new("photo.HEIC")));
+        assert!(is_heic_extension(std::path::Path::new("photo.heif")));
+        assert!(is_heic_extension(std::path::Path::new("photo.HEIF")));
+    }
+
+    #[test]
+    fn is_heic_extension_rejects_other_formats() {
+        assert!(!is_heic_extension(std::path::Path::new("photo.jpg")));
+        assert!(!is_heic_extension(std::path::Path::new("photo.png")));
+        assert!(!is_heic_extension(std::path::Path::new("photo.cr2")));
+        assert!(!is_heic_extension(std::path::Path::new("photo.tiff")));
     }
 }

@@ -13,7 +13,7 @@ set -euo pipefail
 #   clippy         cargo clippy -D warnings
 #   test-lib       cargo test -p agx-photo
 #   test-cli       cargo test -p agx-cli
-#   test-features  feature-gated tests (docgen, raw)
+#   test-features  feature-gated tests (docgen, raw, heic)
 #   rustdoc        cargo doc with warnings-as-errors
 #   doc-links      markdown link validation
 #   book-linkcheck mdbook build with linkcheck backend enabled
@@ -112,6 +112,7 @@ check_test_features() {
     cargo test -p agx-photo --features docgen
     cargo test -p agx-docgen
     cargo test -p agx-photo --features raw
+    cargo test -p agx-photo --features heic
 }
 
 check_rustdoc() {

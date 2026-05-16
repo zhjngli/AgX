@@ -58,7 +58,7 @@ These rules are enforced by `crates/agx/tests/architecture.rs`.
 | `adjust`   | engine, decode, encode, preset, lut, metadata     | external crates only (palette)                           |
 | `lut`      | engine, decode, encode, preset, metadata           | error                                                    |
 | `decode`   | engine, encode, preset, adjust, lut, metadata      | error                                                    |
-| `metadata` | engine, preset, adjust, lut, encode                | error, decode (`is_raw_extension`, `raw::extract_raw_metadata`) |
+| `metadata` | engine, preset, adjust, lut, encode                | error, decode (`is_raw_extension`, `raw::extract_raw_metadata`, `is_heic_extension`, `heic::extract_heic_metadata`) |
 | `encode`   | engine, preset, adjust, lut, decode                | error, metadata (`ImageMetadata`)                        |
 | `preset`   | decode, encode, metadata                           | engine (`Parameters`), lut (`Lut3D`), error              |
 | `engine`   | no restrictions within library                     | adjust, lut, preset, error                               |
@@ -73,7 +73,7 @@ What does NOT exist in each module -- violations of these constraints indicate a
 
 - **adjust**: No image I/O. No file system access. No knowledge of presets or engine state. Pure pixel math only.
 - **lut**: No image decoding/encoding. No preset parsing. Does not apply LUTs to images (that is the engine's job).
-- **decode**: No image processing or adjustments. No encoding. No metadata interpretation beyond what LibRaw provides.
+- **decode**: No image processing or adjustments. No encoding. No metadata interpretation beyond what LibRaw and libheif expose as raw EXIF blobs.
 - **metadata**: No pixel manipulation. No encoding. Does not decide what to do with metadata -- it only extracts and represents it.
 - **encode**: No decoding. No adjustments. No preset logic. Receives final pixels and metadata, writes output.
 - **preset**: No I/O beyond TOML file reading. No pixel math. Does not execute adjustments -- it only declares parameter values.

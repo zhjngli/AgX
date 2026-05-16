@@ -25,9 +25,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fast-checks
-      - name: Install libraw
+      - name: Install libraw and libheif
         if: matrix.check != 'fmt'
-        run: sudo apt-get update && sudo apt-get install -y libraw-dev
+        run: sudo apt-get update && sudo apt-get install -y libraw-dev libheif-dev libheif-plugin-libde265
       - name: Run check
         run: ./scripts/verify.sh ${{ matrix.check }}
 
@@ -65,9 +65,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: docs-checks
-      - name: Install libraw
+      - name: Install libraw and libheif
         if: matrix.check == 'rustdoc' || matrix.check == 'book-linkcheck' || matrix.check == 'doc-commands'
-        run: sudo apt-get update && sudo apt-get install -y libraw-dev
+        run: sudo apt-get update && sudo apt-get install -y libraw-dev libheif-dev libheif-plugin-libde265
       - name: Install mdbook and preprocessors
         if: matrix.check == 'book-linkcheck'
         run: |
@@ -116,8 +116,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install libraw
-        run: sudo apt-get update && sudo apt-get install -y libraw-dev
+      - name: Install libraw and libheif
+        run: sudo apt-get update && sudo apt-get install -y libraw-dev libheif-dev libheif-plugin-libde265
       - name: Build CLI
         run: cargo build --release -p agx-cli
       - name: Run E2E tests
