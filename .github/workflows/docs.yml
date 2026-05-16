@@ -23,7 +23,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install libraw and libheif
-        run: sudo apt-get update && sudo apt-get install -y libraw-dev libheif-dev
+        run: sudo apt-get update && sudo apt-get install -y libraw-dev libheif-dev libheif-plugin-libde265
       - name: Install mdbook and preprocessors
         run: |
           cargo install --locked mdbook --version 0.4.40

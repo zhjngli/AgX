@@ -39,4 +39,4 @@ Decode image files into linear sRGB `Rgb32FImage` buffers for the engine.
 The optional FFI-backed decoders require system libraries:
 
 - **LibRaw** (for `raw` feature): `brew install libraw` (macOS) or `sudo apt install libraw-dev` (Debian/Ubuntu).
-- **libheif** (for `heic` feature): `brew install libheif` (macOS) or `sudo apt install libheif-dev` (Debian/Ubuntu).
+- **libheif** (for `heic` feature): `brew install libheif` (macOS) or `sudo apt install libheif-dev libheif-plugin-libde265` (Debian/Ubuntu — the plugin package provides the HEVC decoder backend, which `libheif-dev` no longer pulls in transitively on Ubuntu 24.04).

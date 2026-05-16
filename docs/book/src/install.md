@@ -11,7 +11,7 @@ The CLI binary links against LibRaw (for raw decoding) and libheif (for HEIC/HEI
 brew install libraw libheif
 
 # Debian/Ubuntu
-sudo apt install libraw-dev libheif-dev
+sudo apt install libraw-dev libheif-dev libheif-plugin-libde265
 ```
 
 If you skip these, `cargo install agx-cli` fails at link time with a missing-library error.

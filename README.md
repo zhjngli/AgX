@@ -235,7 +235,7 @@ HEIC/HEIF decoding requires [libheif](https://github.com/strukturag/libheif) ins
 brew install libheif
 
 # Debian/Ubuntu
-sudo apt install libheif-dev
+sudo apt install libheif-dev libheif-plugin-libde265
 ```
 
 The CLI enables HEIC support by default, the same as raw support. To use the library without HEIC support (no libheif dependency), depend on `agx-photo` without the `heic` feature.
