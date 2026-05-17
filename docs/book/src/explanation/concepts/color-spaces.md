@@ -1,8 +1,8 @@
 # Color spaces
 
-The render pipeline does math on pixel values in two related color spaces: linear sRGB and sRGB gamma. This page explains why each stage runs in the space it runs in, what working sRGB-only costs, and what wider gamut support would unlock.
+AgX's render pipeline does color math in a wider working space than either the input image or the final output. The pipeline runs in **linear Rec.2020** for physical-light operations and **gamma-encoded Rec.2020** for perceptual operations. This page explains why those two spaces were chosen, what they unlock for wide-gamut inputs, and what's intentionally deferred.
 
-If you want to look up a conversion formula or the per-stage color-space table, see the [color spaces reference](../../reference/concepts/color-spaces.md).
+If you want to look up a conversion formula, a matrix, or the per-stage color-space table, see the [color spaces reference](../../reference/concepts/color-spaces.md).
 
 ## Why physical operations run in linear space
 
@@ -13,46 +13,48 @@ Physical operations operate on light intensities. They produce correct results o
 - **Dehaze** restores local contrast where atmospheric haze has reduced it. Haze is an additive optical phenomenon — it adds an offset to the physical light reaching the sensor. The math that recovers the original signal works in linear light, not in the perceptually-encoded representation.
 - **Noise reduction** smooths sensor noise. Sensor noise is a property of the linear-light signal, not the perceptual one; smoothing in linear space avoids creating perceptual artifacts that gamma-space smoothing would introduce.
 
-## Why perceptual operations run in sRGB gamma space
+The gamut for these operations is **linear Rec.2020**. The core point (physical math needs linear values) is unchanged from any other linear working space; what Rec.2020 changes is the volume of colors the math can carry without clipping.
+
+## Why perceptual operations run in gamma space
 
 Perceptual operations operate on what the image *looks like*. They produce correct results only when the values represent perceptual brightness.
 
-- **Contrast** pushes values away from or toward a midpoint. The "midpoint" that looks right is the perceptual midtone (sRGB 0.5), not the physical midpoint (linear 0.5, which looks very bright).
+- **Contrast** pushes values away from or toward a midpoint. The "midpoint" that looks right is the perceptual midtone (~0.5 in gamma space), not the physical midpoint (linear 0.5, which looks very bright).
 - **Highlights, shadows, whites, blacks** target specific tonal regions. These regions are defined by how they *look* on screen, which means they're defined in the perceptual space.
 
 If you applied contrast in linear space, the result would look wrong: the midpoint would be too bright, and shadows would get crushed while highlights barely change.
 
-## Why LUTs run in sRGB gamma space
+The gamut for these operations is **gamma-encoded Rec.2020**. AgX reuses the sRGB transfer-curve shape — the same piecewise function that maps linear 0.18 to roughly 0.5 in gamma space — but applies it to Rec.2020 linear values rather than sRGB linear values. The result: the 0.5 perceptual midtone keeps the same meaning a colorist would expect, just over a wider gamut. A sign-preserving variant of the curve handles the small negative components that arise when wide-gamut inputs (or aggressive edits) push values just outside the Rec.2020 cube on intermediate matrix conversions.
 
-LUTs are created by colorists while looking at a screen displaying sRGB. When a colorist tweaks a film emulation LUT, they're working with pixel values as they appear on screen (sRGB gamma). The input-output mapping in the LUT corresponds to sRGB values, not linear light values.
+## Why LUTs still sample in sRGB gamma
 
-Applying a LUT designed for sRGB input to linear values would produce incorrect colors. AgX applies LUTs in sRGB gamma space, which is correct for the vast majority of creative `.cube` LUTs.
+Existing `.cube` LUTs are universally authored in the sRGB-gamma domain. A colorist tweaking a film emulation LUT works with pixel values as they appear on an sRGB display; the input–output mapping baked into the LUT corresponds to sRGB values, not Rec.2020 values.
 
-## Working sRGB-only
+To preserve portability — so third-party LUTs work out of the box — AgX wraps the LUT call with a conversion bracket: gamma Rec.2020 → linear Rec.2020 → linear sRGB → gamma sRGB → LUT sample → gamma sRGB → linear sRGB → linear Rec.2020 → gamma Rec.2020. The LUT itself stays gamut-agnostic; the engine handles the wide-working-space round trip on every pixel.
 
-AgX currently works exclusively in sRGB color space — the standard color space for displays, web, and consumer photography. This is a deliberate scoping decision, not a placeholder.
+## What this means for Display P3 photos
 
-Working in sRGB constrains the gamut to what an sRGB display can show. The trade-off is simplicity and a clean match to the input format that consumer cameras and editing software already use. Wider working spaces (Adobe RGB, ProPhoto RGB, Display P3) can hold colors that would clip in sRGB, at the cost of more careful color management — gamut handling, ICC profile reading, profile embedding, and out-of-gamut clipping policies.
+The wide working space matters most for inputs that already carry wide-gamut color. iPhone HEIC captures are typically tagged Display P3. Without a wide working space, AgX would have to squash those to sRGB at decode time, discarding wide-gamut information before any adjustment ran.
 
-For the current scope:
+With linear Rec.2020 as the working space, Display P3 is matrix-converted directly into the working space (P3 is a subset of Rec.2020). Vivid reds, saturated greens, and other wide-gamut colors flow through the entire pipeline unclamped; the final clamp to display gamut happens only at encode.
 
-- Decoded images (JPEG, PNG, TIFF) are assumed to be sRGB.
-- No ICC profile reading or embedding.
-- No wide-gamut support.
+For sRGB-only workflows — the historical case — the math is functionally unchanged. Input sRGB widens to Rec.2020 at decode, edits happen in the wider space, and encode brings the result back. The end-to-end output looks the same (modulo float rounding) unless the input was actually wide-gamut.
 
-## What wider color spaces would add
+## What hasn't changed
 
-Future versions may add wider working spaces:
+The sRGB perceptual-curve shape stays. The 0.5 midpoint, the 0.25 and 0.75 region splits, and the same tone-slider math carry over unchanged. Existing presets and `.cube` LUTs continue to work without modification. Output is still 8-bit sRGB JPEG, PNG, or TIFF; the wide working space is an internal detail.
 
-- **Adobe RGB** — wider gamut for professional print workflows (more greens and cyans).
-- **ProPhoto RGB** — very wide gamut used internally by Lightroom for lossless editing.
-- **Display P3** — Apple's wide-gamut display standard.
-- **ICC profile handling** — read embedded profiles from input images, embed profiles in output.
-- **Log input LUTs** — support for LUTs designed for video log curves (S-Log3, LogC).
+## What's intentionally deferred
 
-Each of these would require gamut-aware color math at every stage and a policy for handling out-of-gamut values.
+A few related capabilities are out of scope:
+
+- **ICC profile reading from input images.** Only the NCLX color-primaries tag is consulted today; embedded ICC profiles are not parsed.
+- **Wide-gamut output.** Encoded output is sRGB. Rec.2020 or P3 output containers are not produced.
+- **HDR transfer curves.** PQ and HLG inputs fall back to "treat as sRGB" at decode with a stderr warning.
+
+Color management is an evolving area; further work is tracked in the project backlog.
 
 ## See also
 
 - [Color spaces reference](../../reference/concepts/color-spaces.md) — definitions, conversions, per-stage table.
-- [Render pipeline](render-pipeline.md) — why pipeline order matters in concert with the color-space rule.
+- [Render pipeline](render-pipeline.md) — where in the pipeline the linear↔gamma conversions happen.
