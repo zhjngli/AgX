@@ -179,7 +179,11 @@ fn estimate_airlight(buf: &[[f32; 3]], dark_ch: &[f32]) -> [f32; 3] {
     // Uses O(n) average-case selection instead of O(n log n) full sort.
     let mut indices: Vec<usize> = (0..n).collect();
     let pivot = top_count.min(n) - 1;
-    indices.select_nth_unstable_by(pivot, |&a, &b| dark_ch[b].partial_cmp(&dark_ch[a]).unwrap());
+    indices.select_nth_unstable_by(pivot, |&a, &b| {
+        dark_ch[b]
+            .partial_cmp(&dark_ch[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Among top dark channel pixels, find the one with highest intensity
     let mut best_idx = indices[0];
@@ -332,7 +336,7 @@ const T_MIN: f32 = 0.1;
 
 /// Apply dehaze adjustment to a linear RGB buffer.
 ///
-/// The buffer contains pixels in linear sRGB space (after white balance and exposure).
+/// The buffer contains pixels in linear Rec.2020 space (after white balance and exposure).
 /// Positive amount removes haze, negative amount adds haze/fog.
 /// Returns a new buffer of the same size.
 pub fn apply_dehaze(

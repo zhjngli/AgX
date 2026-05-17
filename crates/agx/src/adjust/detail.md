@@ -5,9 +5,9 @@
      so the explanation and implementation stay in sync. -->
 
 The detail pass is AgX's three-slider neighborhood stage. It runs on
-the sRGB gamma-space buffer after the per-pixel tone, HSL, color
-grading, and LUT work, but before the final conversion back to linear
-RGB. The pass covers sharpening, clarity, and texture with one common
+the gamma Rec.2020 working-space buffer after the per-pixel tone, HSL,
+color grading, and LUT work, but before the final conversion back to
+linear RGB. The pass covers sharpening, clarity, and texture with one common
 idea: build a blurred version of the image, subtract it from the
 original to isolate a frequency band, then add some of that band back
 in. All three controls work on luminance only, so the code can change

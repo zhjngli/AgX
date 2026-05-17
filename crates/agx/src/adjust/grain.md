@@ -8,7 +8,7 @@ Film grain gives digital images a less sterile surface by reintroducing the kind
 
 ## How it works
 
-`grain.rs` applies grain in sRGB gamma space after the main tonal and detail work. The core pipeline is:
+`grain.rs` applies grain in the gamma Rec.2020 working space after the main tonal and detail work. The core pipeline is:
 
 1. Build a deterministic white-noise field from the render seed.
 2. Optionally Gaussian-blur that noise with `sigma` derived from `size`.

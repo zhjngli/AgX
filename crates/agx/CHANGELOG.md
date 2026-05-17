@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- **Working space widened to linear Rec.2020.** Stages 1–4 (white balance, exposure, dehaze, noise reduction) run in linear Rec.2020; stages 5–8 (per-pixel adjustments, detail, grain, vignette) run in gamma-encoded Rec.2020. Decode converts every input format to linear Rec.2020 at the boundary; encode converts linear Rec.2020 to 8-bit sRGB at output. The public function `linear_to_srgb_rgb8` was renamed to `encode_linear_rec2020_to_srgb_rgb8` and its input contract changed from linear sRGB to linear Rec.2020. Library consumers must migrate at this release.
+- **HEIC Display P3 inputs preserve wide gamut end-to-end.** The decoder previously squashed P3 to sRGB at the boundary; iPhone HEIC captures now keep their wider gamut through the entire pipeline.
+- **Aesthetic intermediate clamps removed.** Stage outputs no longer clip wide-gamut headroom; only domain-safety clamps (LUT-index, HSL `[0, 1]` palette guard, color-grading luminance weight) remain. The final clamp to display gamut happens at encode.
+
+### Added
+
+- `crate::color_space` module exposing the Rec.2020 ↔ sRGB matrices, the sign-preserving sRGB transfer curve (`srgb_curve_signed` / `_inverse`), and the `wrap_lut_lookup` helper.
+- `LinearRec2020` and `GammaRec2020` variants on the `ColorSpace` enum.
+- Synthetic Display P3 HEIC e2e fixture (`synthetic_p3_red.heic`) demonstrating wide-gamut preservation.
+
 ## [0.1.0] - 2026-04-26
 
 First public release of `agx-photo` to crates.io.

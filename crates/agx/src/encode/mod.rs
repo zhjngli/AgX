@@ -101,7 +101,10 @@ pub fn resolve_output(
     }
 }
 
-/// Convert a single linear sRGB f32 channel value to a u8 sRGB-encoded byte.
+/// Convert a single sRGB-gamma f32 channel value to 8-bit u8 with clamping;
+/// NaN/inf inputs map to 255, negative inputs to 0. Called from
+/// `encode_linear_rec2020_to_srgb_rgb8` after the matrix and transfer-curve
+/// passes (i.e. the input is already post-matrix, post-curve sRGB gamma).
 ///
 /// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
 /// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round

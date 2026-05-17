@@ -83,7 +83,8 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
 /// The input image is assumed to be in sRGB gamma space (ICC parsing is
 /// deferred). Each pixel is converted from sRGB gamma to linear sRGB and then
 /// matrix-converted into the engine working space (linear Rec.2020) in a
-/// single fused per-pixel pass.
+/// single fused per-pixel pass. The output `Rgb32FImage` is the engine's
+/// working-space contract: linear Rec.2020.
 pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let img = image::ImageReader::open(path)
         .map_err(AgxError::Io)?

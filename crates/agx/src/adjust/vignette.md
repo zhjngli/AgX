@@ -61,10 +61,10 @@ pipeline), not a **lens-correction vignette** (undoing optical falloff
 early). The two have different placements: lens correction runs on
 linear-light data near the start of the pipeline, before tonal and
 color adjustments, so it cancels a physical artifact before later math
-amplifies it. Creative vignette runs in sRGB gamma space late in the
-pipeline, after every tonal and color adjustment, so it shapes the
+amplifies it. Creative vignette runs in the gamma Rec.2020 working space late in
+the pipeline, after every tonal and color adjustment, so it shapes the
 final perceptual image the way a darkroom dodge or a software wash
-would. AgX puts this stage right before the final sRGB-to-linear
+would. AgX puts this stage right before the final gamma-to-linear
 conversion, matching where Lightroom and Capture One place their
 "Effects" vignette.
 
@@ -128,7 +128,7 @@ independently — a child preset can override `amount` without touching
 - **CPU (Rust):** [`crates/agx/src/adjust/vignette.rs`](https://github.com/zhjngli/AgX/blob/main/crates/agx/src/adjust/vignette.rs)
 - **GPU (WGSL):** [`crates/agx/src/shaders/vignette.wgsl`](https://github.com/zhjngli/AgX/blob/main/crates/agx/src/shaders/vignette.wgsl)
 - **GPU dispatcher:** [`crates/agx/src/engine/gpu/stages/vignette.rs`](https://github.com/zhjngli/AgX/blob/main/crates/agx/src/engine/gpu/stages/vignette.rs)
-- **Render-pipeline placement:** runs in sRGB gamma space immediately before the final sRGB-to-linear conversion in `engine::render`.
+- **Render-pipeline placement:** runs in the gamma Rec.2020 working space immediately before the final gamma-to-linear conversion in `engine::render`.
 
 The CPU and GPU implementations follow the same mask equation. The CPU
 path precomputes `VignettePrecomputed` once per render; the GPU path

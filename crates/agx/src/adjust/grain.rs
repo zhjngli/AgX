@@ -262,14 +262,14 @@ fn generate_white_noise_buffer(width: usize, height: usize, seed: u64) -> Vec<f3
     buf
 }
 
-/// Apply grain to an sRGB gamma buffer using white noise + blur-based sizing.
+/// Apply grain to a gamma Rec.2020 working-space buffer using white noise + blur-based sizing.
 ///
 /// Generates four white noise buffers (1 shared + 3 per-channel) and optionally
 /// blurs them to control grain size. Per-channel noise is blended with the shared
 /// noise based on pixel saturation and the grain type's chromatic intensity, so
 /// saturated pixels get subtle color fringing while neutral pixels stay monochrome.
 ///
-/// Mutates `buf` in-place. Each pixel is `[r, g, b]` in sRGB gamma [0.0, 1.0].
+/// Mutates `buf` in-place. Each pixel is `[r, g, b]` in gamma Rec.2020 [0.0, 1.0].
 pub fn apply_grain_buffer(
     buf: &mut [[f32; 3]],
     width: usize,

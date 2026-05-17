@@ -4,11 +4,7 @@ Widen AgX beyond the current "sRGB only" invariant so wide-gamut inputs (iPhone 
 
 ## Status
 
-AgX today edits everything in linear sRGB. `ARCHITECTURE.md` core invariant #3 codifies this: no working-space conversion, no ICC profile handling. Several backlog items are already waiting on this assumption being lifted:
-
-- The HEIC decoder reads Display P3 / BT.2020 nclx tags but currently matrix-converts to linear sRGB at decode time, discarding the wider gamut (see `heic-support.md` known gaps).
-- The pluggable pipeline already exposes a `ColorSpace` enum (`LinearSrgb`, `SrgbGamma`) and auto-inserts conversion stages — the scaffolding is ready for more variants.
-- Several adjust stages assume input values lie in `[0, 1]`; once the working space widens, P3 colors in linear sRGB can be negative or > 1 and stages must handle that gracefully.
+AgX edits in linear Rec.2020 for physical operations and gamma-encoded Rec.2020 for perceptual operations (SP1 shipped). `ARCHITECTURE.md` core invariant #3 codifies the new working space. The remaining sub-projects below cover ICC profile handling, output gamut choice, and HDR — independently useful capabilities that build on SP1.
 
 The work below is sequenced so each sub-project lands an independently useful capability and unblocks the next.
 
@@ -20,16 +16,16 @@ Each sub-project gets its own design doc (`docs/plans/`) and implementation plan
 
 Widen the engine's internal working space beyond linear sRGB so wide-gamut inputs are preserved through editing. Handle the small set of well-known color spaces (sRGB, Display P3, Adobe RGB, Rec.2020) via hardcoded primary matrices — no general ICC profile parsing yet.
 
-- [ ] Pick the wider working space (candidates: linear Rec.2020, linear ACEScg, linear ProPhoto). Document the trade-offs in the design doc.
-- [ ] Audit every adjust stage (`basic_tone`, `contrast`, `hsl`, `color_grading`, `tone_curves`, `detail`, `dehaze`, `denoise`, `grain`, `vignette`, LUT lookup) for tolerance to values outside `[0, 1]`.
-- [ ] Update decode paths: standard (assume sRGB), RAW (LibRaw output → working space), HEIC (use nclx tags instead of squashing to sRGB).
-- [ ] Update encode paths: convert working space → sRGB before encode (output ICC embed is sub-project 2; output gamut choice is sub-project 4).
-- [ ] Decide what `.cube` LUTs do: today they assume sRGB-domain input. Either keep LUT semantics sRGB and auto-convert around them, or migrate.
-- [ ] Update `ColorSpace` enum in `engine/mod.rs` if more variants are needed.
-- [ ] Flip `ARCHITECTURE.md` core invariant #3 to reflect the new working space.
-- [ ] Add e2e fixtures: a Display P3 source with out-of-sRGB-gamut color, with goldens.
+- [x] Pick the wider working space (candidates: linear Rec.2020, linear ACEScg, linear ProPhoto). Document the trade-offs in the design doc.
+- [x] Audit every adjust stage (`basic_tone`, `contrast`, `hsl`, `color_grading`, `tone_curves`, `detail`, `dehaze`, `denoise`, `grain`, `vignette`, LUT lookup) for tolerance to values outside `[0, 1]`.
+- [x] Update decode paths: standard (assume sRGB), RAW (LibRaw output → working space), HEIC (use nclx tags instead of squashing to sRGB).
+- [x] Update encode paths: convert working space → sRGB before encode (output ICC embed is sub-project 2; output gamut choice is sub-project 4).
+- [x] Decide what `.cube` LUTs do: today they assume sRGB-domain input. Either keep LUT semantics sRGB and auto-convert around them, or migrate.
+- [x] Update `ColorSpace` enum in `engine/mod.rs` if more variants are needed.
+- [x] Flip `ARCHITECTURE.md` core invariant #3 to reflect the new working space.
+- [x] Add e2e fixtures: a Display P3 source with out-of-sRGB-gamut color, with goldens.
 
-**Acceptance:** iPhone HEIC (Display P3) round-trips through the pipeline with vivid colors preserved (relative to today's squash-to-sRGB baseline). All existing e2e goldens still pass (default output remains sRGB). Architectural tests updated. New wide-gamut e2e fixture has goldens.
+**Acceptance:** met (commit range pending merge). iPhone HEIC (Display P3) round-trips through the pipeline with vivid colors preserved (relative to the pre-SP1 squash-to-sRGB baseline). Existing e2e goldens regenerated for the wider working space; default output remains sRGB. Architectural tests updated. New wide-gamut e2e fixture has goldens.
 
 ### 2. Output ICC embed (sRGB default)
 

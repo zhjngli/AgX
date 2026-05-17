@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-// --- Vignette (sRGB gamma space, position-dependent) ---
+// --- Vignette (gamma Rec.2020 working space, position-dependent) ---
 
 /// Vignette falloff geometry.
 #[cfg_attr(
@@ -104,7 +104,7 @@ pub fn apply_vignette_pre(
     (r * multiplier, g * multiplier, b * multiplier)
 }
 
-/// Apply creative vignette to an sRGB gamma pixel (convenience wrapper).
+/// Apply creative vignette to a gamma Rec.2020 pixel (convenience wrapper).
 ///
 /// Darkens (negative amount) or brightens (positive amount) edges based on
 /// distance from center. Amount range: -100 to +100. 0 = no effect.
@@ -135,7 +135,7 @@ pub fn apply_vignette(
     )
 }
 
-/// Apply vignette to an sRGB gamma buffer in-place using precomputed invariants.
+/// Apply vignette to a gamma Rec.2020 buffer in-place using precomputed invariants.
 pub fn apply_vignette_buffer(
     buf: &mut [[f32; 3]],
     width: u32,

@@ -26,7 +26,7 @@ pub use exposure::{apply_exposure, exposure_factor};
 pub mod white_balance;
 pub use white_balance::apply_white_balance;
 
-/// Basic tone sliders: contrast, highlights, shadows, whites, blacks (sRGB gamma space).
+/// Basic tone sliders: contrast, highlights, shadows, whites, blacks (gamma Rec.2020 working space).
 pub mod basic_tone;
 pub use basic_tone::{apply_blacks, apply_contrast, apply_highlights, apply_shadows, apply_whites};
 
@@ -34,7 +34,7 @@ pub use basic_tone::{apply_blacks, apply_contrast, apply_highlights, apply_shado
 pub mod hsl;
 pub use hsl::{apply_hsl, cosine_weight, hue_distance, WeightFn};
 
-/// Three-way (shadows / midtones / highlights) color grading (sRGB gamma space).
+/// Three-way (shadows / midtones / highlights) color grading (gamma Rec.2020 working space).
 pub mod color_grading;
 pub use color_grading::{
     apply_color_grading_pre, ColorGradingParams, ColorGradingPrecomputed, ColorWheel,
@@ -104,9 +104,9 @@ pub fn apply_white_balance_exposure_buffer(
     }
 }
 
-// --- Per-pixel adjustments (sRGB gamma space) ---
+// --- Per-pixel adjustments (gamma Rec.2020 working space) ---
 
-/// All per-pixel parameters needed for the sRGB gamma-space adjustment pass.
+/// All per-pixel parameters needed for the gamma Rec.2020 working-space adjustment pass.
 ///
 /// The `lut_fn` closure abstracts over the LUT lookup so that `adjust`
 /// does not depend on the `lut` module (architecture rule).
@@ -138,10 +138,11 @@ pub struct PerPixelParams<'a> {
     pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + Sync + 'a)>,
 }
 
-/// Apply all per-pixel adjustments to an sRGB gamma buffer in-place.
+/// Apply all per-pixel adjustments to a gamma Rec.2020 buffer in-place.
 ///
 /// Processes contrast, highlights, shadows, whites, blacks, tone curves,
-/// HSL, color grading, and LUT in that order. Operates in sRGB gamma space.
+/// HSL, color grading, and LUT in that order. Operates in the gamma Rec.2020
+/// working space.
 pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
     buf.par_chunks_mut(1024).for_each(|chunk| {
         for pixel in chunk.iter_mut() {

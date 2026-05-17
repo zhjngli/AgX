@@ -3,7 +3,7 @@ use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
 use crate::error::AgxError;
 
 /// Sharpening, clarity, and texture via Gaussian blur + unsharp mask.
-/// Operates in sRGB gamma space as a buffer-level pass.
+/// Operates in the gamma Rec.2020 working space as a buffer-level pass.
 pub struct DetailStage;
 
 impl Default for DetailStage {

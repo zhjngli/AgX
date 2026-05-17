@@ -3,7 +3,7 @@ use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
 use crate::error::AgxError;
 
 /// Film grain simulation via noise generation + Gaussian blur.
-/// Operates in sRGB gamma space as a buffer-level pass.
+/// Operates in the gamma Rec.2020 working space as a buffer-level pass.
 pub struct GrainStage {
     seed: u64,
 }
