@@ -60,6 +60,21 @@ pub const LINEAR_P3_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
     [-0.001210, 0.017601, 0.983610],
 ];
 
+/// Apply a 3×3 matrix to every pixel of a `[[f32; 3]]` buffer in place.
+///
+/// Pixel layout: `buf[i] = [r, g, b]`. The matrix is applied as
+/// `out = m * v` (row-major).
+pub fn apply_matrix_3x3(buf: &mut [[f32; 3]], m: &[[f32; 3]; 3]) {
+    for px in buf.iter_mut() {
+        let r = px[0];
+        let g = px[1];
+        let b = px[2];
+        px[0] = m[0][0] * r + m[0][1] * g + m[0][2] * b;
+        px[1] = m[1][0] * r + m[1][1] * g + m[1][2] * b;
+        px[2] = m[2][0] * r + m[2][1] * g + m[2][2] * b;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -97,6 +112,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn apply_matrix_3x3_round_trips_through_inverse() {
+        let mut buf = vec![[1.0_f32, 0.5, 0.2], [0.0, 1.2, -0.1]];
+        apply_matrix_3x3(&mut buf, &LINEAR_REC2020_TO_LINEAR_SRGB);
+        apply_matrix_3x3(&mut buf, &LINEAR_SRGB_TO_LINEAR_REC2020);
+        assert!((buf[0][0] - 1.0).abs() < 1e-4);
+        assert!((buf[0][1] - 0.5).abs() < 1e-4);
+        assert!((buf[1][1] - 1.2).abs() < 1e-4);
+        assert!((buf[1][2] - (-0.1)).abs() < 1e-4);
     }
 
     #[test]
