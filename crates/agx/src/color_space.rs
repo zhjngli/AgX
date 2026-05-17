@@ -61,6 +61,18 @@ pub const LINEAR_P3_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
     [-0.001210, 0.017601, 0.983610],
 ];
 
+/// Linear BT.2020 → linear Rec.2020. Identity matrix (BT.2020 primaries
+/// == Rec.2020 primaries).
+///
+/// Defined explicitly so call sites that dispatch over a source-primaries
+/// enum (e.g. `decode/heic.rs`) can apply *one* "X → Rec.2020" matrix per
+/// pixel without a special-case branch for the no-op. Removing this constant
+/// in a future "simplify" pass would silently re-introduce the special case
+/// and break the symmetry — the `bt2020_to_rec2020_is_identity` unit test
+/// guards against that drift.
+pub const LINEAR_BT2020_TO_LINEAR_REC2020: [[f32; 3]; 3] =
+    [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
 /// Apply a 3×3 matrix to every pixel of a `[[f32; 3]]` buffer in place.
 ///
 /// Pixel layout: `buf[i] = [r, g, b]`. The matrix is applied as
@@ -228,6 +240,69 @@ mod tests {
             assert!((og - g).abs() < 1e-3, "g drift: in={g} out={og}");
             assert!((ob - b).abs() < 1e-3, "b drift: in={b} out={ob}");
         }
+    }
+
+    #[test]
+    fn bt2020_to_rec2020_is_identity() {
+        let m = LINEAR_BT2020_TO_LINEAR_REC2020;
+        for v in &[
+            [1.0_f32, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.5, 0.5, 0.5],
+            [-0.1, 1.2, 0.3],
+        ] {
+            let out = [
+                m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+                m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+                m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
+            ];
+            assert!((out[0] - v[0]).abs() < 1e-9);
+            assert!((out[1] - v[1]).abs() < 1e-9);
+            assert!((out[2] - v[2]).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn display_p3_red_survives_as_wider_gamut_in_rec2020() {
+        // P3 pure red, mapped to linear Rec.2020, should stay in-gamut and
+        // produce a wider primary than sRGB pure red (whose Rec.2020 mapping
+        // squashes to ~(0.627, 0.069, 0.016)). Specifically, P3 red mapped to
+        // Rec.2020 has a notably larger R component than sRGB red mapped to
+        // Rec.2020, because P3 is between sRGB and Rec.2020 in gamut size.
+        let p3_red = [1.0_f32, 0.0, 0.0];
+        let m = LINEAR_P3_TO_LINEAR_REC2020;
+        let rec2020 = [
+            m[0][0] * p3_red[0] + m[0][1] * p3_red[1] + m[0][2] * p3_red[2],
+            m[1][0] * p3_red[0] + m[1][1] * p3_red[1] + m[1][2] * p3_red[2],
+            m[2][0] * p3_red[0] + m[2][1] * p3_red[1] + m[2][2] * p3_red[2],
+        ];
+
+        // Ground truth from the matrix: column 0 is (~0.7538, ~0.0457, ~-0.00121).
+        assert!(
+            rec2020[0] > 0.7,
+            "P3 red R component too small in Rec.2020: {}",
+            rec2020[0]
+        );
+        assert!(
+            rec2020[1] > 0.0,
+            "P3 red G component should be positive in Rec.2020"
+        );
+        assert!(
+            rec2020[2].abs() < 0.05,
+            "P3 red B should be near zero (small negative OK)"
+        );
+
+        // Sanity: this Rec.2020 representation is *brighter on R* than the equivalent
+        // sRGB-red mapped to Rec.2020, which is the whole point of preserving P3.
+        let m_srgb = LINEAR_SRGB_TO_LINEAR_REC2020;
+        let srgb_red_in_rec2020 = m_srgb[0][0]; // 0.627404
+        assert!(
+            rec2020[0] > srgb_red_in_rec2020,
+            "P3 red ({}) should map to a *wider* R in Rec.2020 than sRGB red ({}); \
+             that's the entire reason we route P3 directly rather than squashing.",
+            rec2020[0],
+            srgb_red_in_rec2020,
+        );
     }
 
     #[test]
