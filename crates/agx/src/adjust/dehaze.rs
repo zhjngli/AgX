@@ -351,8 +351,17 @@ pub fn apply_dehaze(
     // Step 1: Dark channel of the original image
     let dc = dark_channel(buf, width, height);
 
-    // Step 2: Atmospheric light estimation
-    let a = estimate_airlight(buf, &dc);
+    // Step 2: Atmospheric light estimation.
+    // Clamp the estimator output to [0, 1]: atmospheric light is a physical
+    // notion of haze color (sky/fog color), not a pixel value. An OOG input
+    // pixel dominating the brightest-region heuristic would produce a nonsensical
+    // airlight; clamping here prevents that from skewing the scene recovery math.
+    let a_raw = estimate_airlight(buf, &dc);
+    let a = [
+        a_raw[0].clamp(0.0, 1.0),
+        a_raw[1].clamp(0.0, 1.0),
+        a_raw[2].clamp(0.0, 1.0),
+    ];
 
     if amount < 0.0 {
         // Negative amount: add haze by blending toward airlight
@@ -366,7 +375,7 @@ pub fn apply_dehaze(
                 for (i, px) in chunk.iter_mut().enumerate() {
                     let src = buf[base + i];
                     for c in 0..3 {
-                        px[c] = (src[c] * (1.0 - strength) + a[c] * strength).clamp(0.0, 1.0);
+                        px[c] = src[c] * (1.0 - strength) + a[c] * strength;
                     }
                 }
             });
@@ -428,8 +437,8 @@ pub fn apply_dehaze(
                 let idx = base + i;
                 let t = t_refined[idx].max(T_MIN);
                 for c in 0..3 {
-                    let recovered = (buf[idx][c] - a[c]) / t + a[c];
-                    px[c] = recovered.clamp(0.0, 1.0);
+                    // Output is unclamped; the final clamp is at encode.
+                    px[c] = (buf[idx][c] - a[c]) / t + a[c];
                 }
             }
         });
@@ -577,13 +586,13 @@ mod tests {
     }
 
     #[test]
-    fn apply_dehaze_output_clamped_to_0_1() {
+    fn apply_dehaze_output_finite() {
         let buf = vec![[0.95, 0.95, 0.95]; 100]; // very bright, 10x10
         let params = DehazeParams { amount: 100.0 };
         let result = apply_dehaze(&buf, 10, 10, &params);
         for px in &result {
             for &v in px {
-                assert!((0.0..=1.0).contains(&v), "Output {v:.4} out of [0,1]");
+                assert!(v.is_finite(), "Output {v:.4} is not finite");
             }
         }
     }
@@ -596,10 +605,30 @@ mod tests {
         for px in &result {
             for &v in px {
                 assert!(
-                    (0.0..=1.0).contains(&v),
-                    "T_MIN should prevent extreme values, got {v:.4}"
+                    v.is_finite(),
+                    "T_MIN should prevent non-finite values, got {v:.4}"
                 );
             }
         }
+    }
+
+    #[test]
+    fn dehaze_tolerates_out_of_range_input() {
+        // OOG red channel (1.2) on a predominantly saturated scene.
+        // After removing the per-pixel clamp, output should remain finite.
+        // The airlight estimator output is clamped to [0, 1] as domain-safety,
+        // but pixel outputs are unclamped.
+        let buf = vec![[1.2_f32, 0.05, 0.02]; 16];
+        let params = DehazeParams { amount: 50.0 };
+        let result = apply_dehaze(&buf, 4, 4, &params);
+        for px in &result {
+            assert!(px[0].is_finite(), "dehaze produced non-finite value");
+        }
+        // OOG red should not be suppressed to <= 1.0 (verify it survives)
+        assert!(
+            result[0][0] > 0.9,
+            "OOG red unexpectedly suppressed: {}",
+            result[0][0]
+        );
     }
 }
