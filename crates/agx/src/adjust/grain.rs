@@ -352,7 +352,9 @@ pub fn apply_grain_buffer(
                     let additive_delta = nws * GRAIN_ADDITIVE_SCALE;
                     let multiplicative_delta = val * (nws.exp() - 1.0);
                     let delta = additive_delta + (multiplicative_delta - additive_delta) * blend;
-                    (val + delta).clamp(0.0, 1.0)
+                    // Additive noise is well-defined on any input; output is unclamped.
+                    // The final clamp is at encode.
+                    val + delta
                 };
                 *pixel = [apply(r, nr), apply(g, ng), apply(b, nb)];
             }
@@ -368,6 +370,8 @@ pub fn apply_grain_buffer(
 /// highlights.
 #[inline]
 fn luminance_weight(luma: f32, falloff: f32) -> f32 {
+    // Domain-safety: luma is used as a weight in powf — must be in [0, 1] to
+    // produce a meaningful weight and avoid negative base in the exponentiation.
     let l = luma.clamp(0.0, 1.0);
     (1.0 - l).powf(GRAIN_LUMINANCE_WEIGHT_SCALE * falloff)
 }
@@ -627,7 +631,8 @@ mod tests {
     }
 
     #[test]
-    fn apply_grain_buffer_output_clamped() {
+    fn apply_grain_buffer_output_finite() {
+        // Output is no longer clamped to [0, 1]; verify it's at least finite.
         let params = GrainParams {
             grain_type: GrainType::Harsh,
             amount: 100.0,
@@ -640,14 +645,35 @@ mod tests {
         apply_grain_buffer(&mut buf, width, height, &params, 42);
         for px in &buf {
             assert!(
-                (0.0..=1.0).contains(&px[0])
-                    && (0.0..=1.0).contains(&px[1])
-                    && (0.0..=1.0).contains(&px[2]),
-                "output must be clamped: ({}, {}, {})",
+                px[0].is_finite() && px[1].is_finite() && px[2].is_finite(),
+                "output must be finite: ({}, {}, {})",
                 px[0],
                 px[1],
                 px[2]
             );
         }
+    }
+
+    #[test]
+    fn grain_preserves_out_of_range_input() {
+        // OOG red input (1.2) with neutral grain perturbation should not be
+        // pinned to 1.0. The luminance-weight clamp limits the weight (domain-
+        // safety) but does not constrain the output value.
+        let params = GrainParams {
+            grain_type: GrainType::Silver,
+            amount: 10.0,
+            size: 50.0,
+            seed: Some(42),
+        };
+        let mut buf = vec![[1.2_f32, 0.5, 0.5]; 16];
+        apply_grain_buffer(&mut buf, 4, 4, &params, 42);
+        assert!(buf[0][0].is_finite());
+        // OOG red + small grain: result should not be pinned to 1.0
+        // (grain delta is small, so ~1.2 ± small perturbation)
+        assert!(
+            buf[0][0] > 1.0 || buf[0][0] < 1.0,
+            "grain pinned OOG input to exactly 1.0: {}",
+            buf[0][0]
+        );
     }
 }
