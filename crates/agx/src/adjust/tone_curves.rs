@@ -108,7 +108,10 @@ pub(crate) fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
     let n = pts.len();
     debug_assert!(n >= 2);
 
-    // Special case: 2 points = linear interpolation
+    // Special case: 2 points = linear interpolation.
+    // Out-of-[0, 1] curve domain: piecewise interpolation linearly
+    // extrapolates from the nearest segment endpoint. Wide-gamut headroom
+    // is preserved; the final clamp is at encode.
     if n == 2 {
         let mut lut = [0.0_f32; 256];
         let (x0, y0) = pts[0];
@@ -117,7 +120,7 @@ pub(crate) fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
         for (i, slot) in lut.iter_mut().enumerate() {
             let t = i as f32 / 255.0;
             let frac = if dx.abs() < 1e-9 { 0.0 } else { (t - x0) / dx };
-            *slot = (y0 + frac * (y1 - y0)).clamp(0.0, 1.0);
+            *slot = y0 + frac * (y1 - y0);
         }
         return lut;
     }
@@ -187,7 +190,7 @@ pub(crate) fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
         let h01 = -2.0 * t3 + 3.0 * t2;
         let h11 = t3 - t2;
 
-        *slot = (h00 * y0 + h10 * h * m[seg] + h01 * y1 + h11 * h * m[seg + 1]).clamp(0.0, 1.0);
+        *slot = h00 * y0 + h10 * h * m[seg] + h01 * y1 + h11 * h * m[seg + 1];
     }
 
     lut
@@ -197,6 +200,10 @@ pub(crate) fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
 #[inline(always)]
 pub(crate) fn lut_lookup(lut: &[f32; 256], value: f32) -> f32 {
     let idx = value * 255.0;
+    // Domain-safety: clamp index to valid array bounds. OOG inputs are handled
+    // by returning the endpoint LUT value (nearest-boundary lookup, not
+    // extrapolation). The LUT values themselves may be OOG if the curve is
+    // non-identity; those propagate unclamped to the output.
     let idx = idx.clamp(0.0, 255.0);
     let lo = idx.floor() as usize;
     let hi = (lo + 1).min(255);
@@ -259,9 +266,9 @@ pub fn apply_tone_curves_pre(
         let l_new = lut_lookup(lut, l);
         if l > 1e-6 {
             let scale = l_new / l;
-            r = (r * scale).clamp(0.0, 1.0);
-            g = (g * scale).clamp(0.0, 1.0);
-            b = (b * scale).clamp(0.0, 1.0);
+            r *= scale;
+            g *= scale;
+            b *= scale;
         } else {
             // Near-zero luminance: set uniform gray at mapped value
             r = l_new;
@@ -406,6 +413,31 @@ mod tests {
             (ratio_after - ratio_before).abs() < 0.1,
             "color ratios should be preserved: before={ratio_before}, after={ratio_after}"
         );
+    }
+
+    #[test]
+    fn tone_curve_extrapolates_outside_unit_interval() {
+        // Identity curve (all LUTs are None): OOG input passes through unchanged.
+        // Input 1.2 should return 1.2, not clamped to 1.0.
+        let params = ToneCurveParams::default();
+        let pre = ToneCurvePrecomputed::new(&params);
+        let (r, _g, _b) = apply_tone_curves_pre(1.2, 0.5, 0.5, &pre);
+        assert!(r > 1.0, "tone curve clamped OOG: {}", r);
+        assert!(r.is_finite());
+    }
+
+    #[test]
+    fn tone_curve_oog_input_finite_with_active_luma_curve() {
+        // Non-identity luma curve: OOG input must produce finite output.
+        // lut_lookup clamps the index (domain-safety) so the luma lookup returns
+        // a bounded value, then the scale factor is applied unclamped.
+        let mut params = ToneCurveParams::default();
+        params.luma.points = vec![(0.0, 0.0), (0.5, 0.4), (1.0, 0.9)];
+        let pre = ToneCurvePrecomputed::new(&params);
+        let (r, g, b) = apply_tone_curves_pre(1.2, 0.8, 0.7, &pre);
+        assert!(r.is_finite(), "r not finite: {}", r);
+        assert!(g.is_finite(), "g not finite: {}", g);
+        assert!(b.is_finite(), "b not finite: {}", b);
     }
 
     #[test]
