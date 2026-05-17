@@ -42,12 +42,12 @@ impl GpuPipeline {
     /// 1. Linear adjustments (white balance + exposure)
     /// 2. Dehaze
     /// 3. Denoise
-    /// 4. Linear → sRGB conversion
+    /// 4. Linear → Gamma transfer
     /// 5. Gamma adjustments (contrast, HSL, tone curves, color grading, LUT)
     /// 6. Detail (texture, clarity, sharpening)
     /// 7. Grain
     /// 8. Vignette
-    /// 9. sRGB → Linear conversion
+    /// 9. Gamma → Linear transfer
     pub fn execute(
         &mut self,
         original: &Rgb32FImage,
@@ -159,21 +159,23 @@ impl GpuPipeline {
             }
         }
 
-        // 4. Linear → sRGB
+        // 4. Linear → Gamma
         {
             #[cfg(feature = "profiling")]
             let stage_start = std::time::Instant::now();
 
-            stages::color_space::dispatch_linear_to_srgb(
+            stages::color_space::dispatch_linear_to_gamma(
                 &self.runtime,
-                self.shaders.get("linear_to_srgb").expect("linear_to_srgb"),
+                self.shaders
+                    .get("linear_to_gamma")
+                    .expect("linear_to_gamma"),
             );
 
             #[cfg(feature = "profiling")]
             {
                 self.runtime.device.poll(wgpu::Maintain::Wait);
                 profile_stages.push((
-                    "linear_to_srgb".to_string(),
+                    "linear_to_gamma".to_string(),
                     stage_start.elapsed().as_secs_f64() * 1000.0,
                 ));
             }
@@ -270,21 +272,23 @@ impl GpuPipeline {
             }
         }
 
-        // 9. sRGB → Linear
+        // 9. Gamma → Linear
         {
             #[cfg(feature = "profiling")]
             let stage_start = std::time::Instant::now();
 
-            stages::color_space::dispatch_srgb_to_linear(
+            stages::color_space::dispatch_gamma_to_linear(
                 &self.runtime,
-                self.shaders.get("srgb_to_linear").expect("srgb_to_linear"),
+                self.shaders
+                    .get("gamma_to_linear")
+                    .expect("gamma_to_linear"),
             );
 
             #[cfg(feature = "profiling")]
             {
                 self.runtime.device.poll(wgpu::Maintain::Wait);
                 profile_stages.push((
-                    "srgb_to_linear".to_string(),
+                    "gamma_to_linear".to_string(),
                     stage_start.elapsed().as_secs_f64() * 1000.0,
                 ));
             }

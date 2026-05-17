@@ -1,10 +1,8 @@
-// Algorithm: sRGB-to-linear conversion pass for scene-referred processing
+// Algorithm: gamma Rec.2020 -> linear Rec.2020 transfer (sign-preserving sRGB curve inverse)
 // Canonical explanation: docs/book/src/reference/concepts/color-spaces.md
-// CPU equivalent: crates/agx/src/adjust/mod.rs (srgb_to_linear)
+// CPU equivalent: crate::color_space::srgb_curve_signed_inverse (per channel)
 // Bindings: storage pixels
 // Entry points: main
-
-// sRGB gamma to linear sRGB conversion compute shader.
 
 #import common::color
 
@@ -17,7 +15,7 @@ fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: 
     if idx >= pixel_count { return; }
     let base = idx * 3u;
     let rgb = vec3f(pixels[base], pixels[base + 1u], pixels[base + 2u]);
-    let result = common::color::srgb_to_linear(rgb);
+    let result = common::color::gamma_to_linear(rgb);
     pixels[base] = result.x;
     pixels[base + 1u] = result.y;
     pixels[base + 2u] = result.z;

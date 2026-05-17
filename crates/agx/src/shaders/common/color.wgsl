@@ -1,40 +1,6 @@
 #define_import_path common::color
 // Color space conversion and HSL utilities for AgX compute shaders.
 
-// Convert a single linear sRGB channel to sRGB gamma.
-fn linear_to_srgb_channel(v: f32) -> f32 {
-    if v <= 0.0031308 {
-        return v * 12.92;
-    }
-    return 1.055 * pow(v, 1.0 / 2.4) - 0.055;
-}
-
-// Convert a single sRGB gamma channel to linear sRGB.
-fn srgb_to_linear_channel(v: f32) -> f32 {
-    if v <= 0.04045 {
-        return v / 12.92;
-    }
-    return pow((v + 0.055) / 1.055, 2.4);
-}
-
-// Convert linear sRGB pixel to sRGB gamma.
-fn linear_to_srgb(rgb: vec3f) -> vec3f {
-    return vec3f(
-        linear_to_srgb_channel(rgb.x),
-        linear_to_srgb_channel(rgb.y),
-        linear_to_srgb_channel(rgb.z),
-    );
-}
-
-// Convert sRGB gamma pixel to linear sRGB.
-fn srgb_to_linear(rgb: vec3f) -> vec3f {
-    return vec3f(
-        srgb_to_linear_channel(rgb.x),
-        srgb_to_linear_channel(rgb.y),
-        srgb_to_linear_channel(rgb.z),
-    );
-}
-
 // Linear Rec.2020 -> linear sRGB. WGSL mat3x3 is column-major, so the
 // vec3 arguments below are columns of the matrix -- equivalent to the
 // row-major declaration in crate::color_space.
@@ -78,6 +44,24 @@ fn srgb_curve_signed_inverse(x: f32) -> f32 {
         ax <= 0.04045
     );
     return sign_factor * lin;
+}
+
+// Sign-preserving sRGB transfer applied per channel.
+// CPU equivalent: srgb_curve_signed in crate::color_space, applied to each channel.
+fn linear_to_gamma(rgb: vec3f) -> vec3f {
+    return vec3f(
+        srgb_curve_signed(rgb.x),
+        srgb_curve_signed(rgb.y),
+        srgb_curve_signed(rgb.z),
+    );
+}
+
+fn gamma_to_linear(rgb: vec3f) -> vec3f {
+    return vec3f(
+        srgb_curve_signed_inverse(rgb.x),
+        srgb_curve_signed_inverse(rgb.y),
+        srgb_curve_signed_inverse(rgb.z),
+    );
 }
 
 // Convert sRGB to HSL. Returns (hue 0-360, saturation 0-1, lightness 0-1).
