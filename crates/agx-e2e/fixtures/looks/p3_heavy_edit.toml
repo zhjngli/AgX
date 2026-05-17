@@ -1,0 +1,64 @@
+[metadata]
+name = "Heavy edit (wide gamut stress test)"
+author = "agx"
+
+# Aggressive contrast push — stresses the tone curve's behavior in
+# regions near the gamut edges where the wide working space gives
+# meaningfully more headroom than the old sRGB-only design.
+[tone]
+contrast = 45.0
+highlights = -25.0
+shadows = 18.0
+whites = 15.0
+blacks = -20.0
+
+[tone_curve.rgb]
+# Strong S-curve to amplify both contrast and any wide-gamut
+# in-pipeline values.
+points = [[0.0, 0.0], [0.15, 0.05], [0.5, 0.5], [0.85, 0.95], [1.0, 1.0]]
+
+# Saturation push across every HSL band — the headline wide-gamut
+# stress. Pre-migration, this would have clipped at the sRGB gamut
+# boundary; post-migration the wider Rec.2020 working space holds
+# the saturation push before the final encode clamp.
+[hsl.red]
+saturation = 30.0
+
+[hsl.orange]
+saturation = 20.0
+
+[hsl.yellow]
+saturation = 20.0
+
+[hsl.green]
+saturation = 25.0
+
+[hsl.aqua]
+saturation = 25.0
+
+[hsl.blue]
+saturation = 30.0
+
+[hsl.purple]
+saturation = 25.0
+
+[hsl.magenta]
+saturation = 25.0
+
+# Color grading wheel pushed for additional gamut stress.
+[color_grading.shadows]
+hue = 220.0
+saturation = 25.0
+
+[color_grading.highlights]
+hue = 35.0
+saturation = 20.0
+
+[detail]
+clarity = 25.0
+
+[detail.sharpening]
+amount = 50.0
+radius = 1.0
+threshold = 20.0
+masking = 15.0
