@@ -20,6 +20,35 @@ pub const LINEAR_SRGB_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
     [0.016391, 0.088013, 0.895595],
 ];
 
+/// Apply the sRGB transfer curve in a sign-preserving way.
+///
+/// The standard sRGB curve is defined for non-negative inputs. For negative
+/// inputs (which can arise from heavy edits in a wide working space), apply
+/// the curve to the absolute value and negate the result. Equivalent to:
+/// `sign(x) * srgb_curve(abs(x))`.
+pub fn srgb_curve_signed(x: f32) -> f32 {
+    let sign_factor = if x < 0.0 { -1.0 } else { 1.0 };
+    let absx = x.abs();
+    let curved = if absx <= 0.0031308 {
+        12.92 * absx
+    } else {
+        1.055 * absx.powf(1.0 / 2.4) - 0.055
+    };
+    sign_factor * curved
+}
+
+/// Inverse of `srgb_curve_signed`. Sign-preserving inverse sRGB curve.
+pub fn srgb_curve_signed_inverse(x: f32) -> f32 {
+    let sign_factor = if x < 0.0 { -1.0 } else { 1.0 };
+    let absx = x.abs();
+    let linear = if absx <= 0.04045 {
+        absx / 12.92
+    } else {
+        ((absx + 0.055) / 1.055).powf(2.4)
+    };
+    sign_factor * linear
+}
+
 /// Linear Display P3 → linear Rec.2020.
 ///
 /// Display P3 uses the DCI-P3 primaries with D65 white point. Rec.2020 is
@@ -67,6 +96,27 @@ mod tests {
                     c, v[c], out[c]
                 );
             }
+        }
+    }
+
+    #[test]
+    fn srgb_curve_signed_handles_negatives_by_sign_extension() {
+        let positive = srgb_curve_signed(0.5);
+        let negative = srgb_curve_signed(-0.5);
+        assert!(positive > 0.0);
+        assert!(negative < 0.0);
+        assert!((positive + negative).abs() < 1e-6, "curve must be odd");
+    }
+
+    #[test]
+    fn srgb_curve_signed_round_trip() {
+        for v in &[-1.5_f32, -0.5, 0.0, 0.18, 0.5, 1.0, 1.5] {
+            let gamma = srgb_curve_signed(*v);
+            let back = srgb_curve_signed_inverse(gamma);
+            assert!(
+                (back - v).abs() < 1e-5,
+                "round-trip drift at v={}: got {}", v, back
+            );
         }
     }
 
