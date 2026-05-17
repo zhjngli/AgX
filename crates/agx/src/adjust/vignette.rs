@@ -92,15 +92,16 @@ pub fn apply_vignette_pre(
     let dy = (y as f32 - pre.half_h) * pre.inv_y;
     let d_sq = dx * dx + dy * dy;
 
+    // Domain-safety: base is used as a weight (factor = base * base). Without the
+    // clamp, pixels outside the normalized unit circle (d_sq > 1) would produce a
+    // negative base and therefore a negative factor, which would invert the vignette
+    // effect for extreme corners. Keeping the clamp bounds the weight to [0, 1].
     let base = (1.0 - d_sq).clamp(0.0, 1.0);
     let factor = base * base;
     let multiplier = 1.0 + pre.strength * (1.0 - factor);
 
-    (
-        (r * multiplier).clamp(0.0, 1.0),
-        (g * multiplier).clamp(0.0, 1.0),
-        (b * multiplier).clamp(0.0, 1.0),
-    )
+    // Output unclamped; the final clamp is at encode.
+    (r * multiplier, g * multiplier, b * multiplier)
 }
 
 /// Apply creative vignette to an sRGB gamma pixel (convenience wrapper).
@@ -224,6 +225,30 @@ mod tests {
             100,
         );
         assert!(r > 0.5, "Corner should be brightened, got r={r}");
+    }
+
+    #[test]
+    fn vignette_preserves_out_of_range_input() {
+        // OOG red input (1.2) + negative vignette (darkening): multiplier < 1.0
+        // but output is unclamped so the result is finite and not pinned to 1.0.
+        let (r, g, b) = super::apply_vignette(
+            1.2,
+            0.5,
+            0.5,
+            -50.0,
+            super::VignetteShape::Elliptical,
+            50,
+            50,
+            100,
+            100,
+        );
+        // Center pixel at (50, 50) in 100x100: d_sq ≈ 0, factor ≈ 1, multiplier ≈ 1.
+        // So output ≈ input (1.2), which is OOG but finite.
+        assert!(r.is_finite(), "vignette produced non-finite r: {r}");
+        assert!(g.is_finite(), "vignette produced non-finite g: {g}");
+        assert!(b.is_finite(), "vignette produced non-finite b: {b}");
+        // Near-center: multiplier ≈ 1.0, so r ≈ 1.2 (not clamped)
+        assert!(r > 1.0, "vignette clamped OOG input at center: {r}");
     }
 
     #[test]
