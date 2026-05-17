@@ -31,9 +31,12 @@ pub struct RenderProfile {
 
 /// Result of a render operation. Contains the rendered image and optional
 /// profiling data (when compiled with the `profiling` feature).
+///
+/// **Output color space:** linear Rec.2020 f32. The encoder converts to
+/// the target output space (sRGB in this release).
 #[derive(Debug, Clone)]
 pub struct RenderResult {
-    /// Rendered image in linear sRGB float.
+    /// Rendered image in linear Rec.2020 float.
     pub image: Rgb32FImage,
     /// Per-stage profiling data, present when compiled with `profiling` feature.
     #[cfg(feature = "profiling")]
@@ -41,11 +44,22 @@ pub struct RenderResult {
 }
 
 /// Color space declaration for pipeline stages.
+///
+/// After the wide working space migration, the engine's working space is
+/// `LinearRec2020` (for stages 1–3) and `GammaRec2020` (for stages 5–8,
+/// using the sRGB transfer curve applied to Rec.2020 linear values).
+/// `LinearSrgb` and `SrgbGamma` are retained for encode-side intermediates
+/// and the LUT-wrap conversion bracket.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorSpace {
-    /// Linear sRGB (scene-referred, pre-gamma).
+    /// Linear Rec.2020 (working space for stages 1–3 and the engine boundary).
+    LinearRec2020,
+    /// Gamma-encoded Rec.2020 — sRGB transfer curve applied to Rec.2020 linear values
+    /// (working space for stages 5–8).
+    GammaRec2020,
+    /// Linear sRGB (encode-side intermediate; LUT-wrap intermediate).
     LinearSrgb,
-    /// sRGB with gamma encoding (display-referred).
+    /// sRGB with gamma encoding (encode-side final; LUT-wrap intermediate).
     SrgbGamma,
 }
 
@@ -1340,7 +1354,7 @@ impl Engine {
         }
     }
 
-    /// Create a new engine with the given linear sRGB image and neutral parameters.
+    /// Create a new engine with the given linear Rec.2020 image and neutral parameters.
     ///
     /// Always uses the CPU pipeline. This is the canonical path for deterministic
     /// output across all platforms. Use [`Engine::new_gpu`] or
