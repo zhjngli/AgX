@@ -50,9 +50,13 @@ impl Stage for PerPixelAdjustmentsStage {
     }
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
-        let lut_lookup = ctx
-            .lut
-            .map(|lut| move |r: f32, g: f32, b: f32| lut.lookup(r, g, b));
+        let lut_lookup = ctx.lut.map(|lut| {
+            move |r: f32, g: f32, b: f32| {
+                crate::engine::color_space::wrap_lut_lookup(r, g, b, |rr, gg, bb| {
+                    lut.lookup(rr, gg, bb)
+                })
+            }
+        });
         let pp = adjust::PerPixelParams {
             contrast: ctx.params.contrast,
             highlights: ctx.params.highlights,
@@ -113,5 +117,54 @@ mod tests {
         let params = Parameters::default();
         let stage = PerPixelAdjustmentsStage::new();
         assert!(stage.is_active(&params));
+    }
+
+    #[test]
+    fn per_pixel_stage_with_identity_lut_round_trips() {
+        use crate::lut::Lut3D;
+
+        let size = 17;
+        let mut table = Vec::with_capacity(size * size * size);
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    let denom = (size - 1) as f32;
+                    table.push([r as f32 / denom, g as f32 / denom, b as f32 / denom]);
+                }
+            }
+        }
+        let lut = Lut3D {
+            title: None,
+            size,
+            domain_min: [0.0, 0.0, 0.0],
+            domain_max: [1.0, 1.0, 1.0],
+            table,
+        };
+
+        let params = Parameters::default();
+        // Pixels chosen so the forward sRGB conversion stays inside [0, 1] —
+        // otherwise Lut3D::lookup's input clamp invalidates the round-trip.
+        let pixels = vec![[0.5_f32, 0.5, 0.5], [0.3, 0.4, 0.5], [0.6, 0.5, 0.4]];
+        let mut ctx = RenderContext {
+            buf: pixels.clone(),
+            width: 3,
+            height: 1,
+            params: &params,
+            lut: Some(&lut),
+        };
+        let mut stage = PerPixelAdjustmentsStage::new();
+        stage.prepare(&params);
+        stage.process(&mut ctx).unwrap();
+
+        for (i, expected) in pixels.iter().enumerate() {
+            for (c, &want) in expected.iter().enumerate() {
+                let got = ctx.buf[i][c];
+                let drift = (got - want).abs();
+                assert!(
+                    drift < 5e-3,
+                    "pixel[{i}][{c}] drift = {drift}: in={want} out={got}"
+                );
+            }
+        }
     }
 }
