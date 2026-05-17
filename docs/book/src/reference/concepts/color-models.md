@@ -38,12 +38,12 @@ AgX uses luminance as a weighting signal in places where "how bright is this pix
 |-----------|-------|--------|
 | White balance | RGB (linear) | Per-channel multipliers correct color cast at the channel level |
 | Exposure | RGB (linear) | Uniform multiplier across all channels |
-| Contrast, highlights, shadows, whites, blacks | RGB (sRGB gamma) | Targets defined perceptually; tonal regions are selected by luminance |
+| Contrast, highlights, shadows, whites, blacks | RGB (gamma Rec.2020) | Targets defined perceptually; tonal regions are selected by luminance |
 | Tone curves (RGB channel) | RGB | Per-channel response shaping |
 | Tone curves (luma channel) | Luminance | Brightness shaping that preserves hue and saturation |
 | HSL | HSL | Selective edits per color band |
 | Color grading | RGB (per tonal region defined by luminance) | Three-way wheels operate on RGB; their region weights come from luminance |
-| LUT | RGB (sRGB gamma) | LUT is a 3D RGB→RGB mapping |
+| LUT | RGB (gamma Rec.2020; LUT samples in sRGB-gamma via the engine's conversion bracket) | LUT is a 3D RGB→RGB mapping |
 | Grain weighting | Luminance | Strength varies with brightness |
 
 ## See also

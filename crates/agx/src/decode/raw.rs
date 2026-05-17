@@ -1,7 +1,8 @@
 //! Raw format decoding via LibRaw FFI.
 //!
 //! This module provides thin FFI bindings to LibRaw's C API and a safe
-//! `decode_raw()` function that converts raw photo files to linear sRGB f32.
+//! `decode_raw()` function that converts raw photo files into the engine
+//! working space (linear Rec.2020 f32).
 
 use std::ffi::{c_char, c_int, c_uint, CString};
 use std::path::Path;
@@ -9,6 +10,7 @@ use std::path::Path;
 use image::{Rgb, Rgb32FImage};
 use palette::{LinSrgb, Srgb};
 
+use crate::color_space::LINEAR_SRGB_TO_LINEAR_REC2020;
 use crate::error::{AgxError, Result};
 
 // --- FFI declarations ---
@@ -220,11 +222,14 @@ impl Drop for ProcessedImage {
 
 // --- Public API ---
 
-/// Decode a raw photo file into linear sRGB f32 using LibRaw.
+/// Decode a raw photo file into linear Rec.2020 f32 using LibRaw.
 ///
-/// LibRaw handles the full processing pipeline: file parsing, unpacking,
-/// demosaicing, color conversion, and white balance. The output is sRGB
-/// which we convert to linear sRGB f32 for the AgX engine.
+/// LibRaw handles the full raw pipeline (parsing, unpacking, demosaicing,
+/// camera color conversion, white balance) and emits sRGB-gamma output. We
+/// linearise per-pixel and matrix-multiply into the engine working space
+/// (linear Rec.2020) in a single fused pass. LibRaw's native Rec.2020 output
+/// mode is a deferred perf follow-up; staying in its default sRGB output keeps
+/// the SP1 migration mechanical.
 ///
 /// # Supported formats
 ///
@@ -250,6 +255,7 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
     }
 
     let data = img.data();
+    let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
 
     let linear = match bits {
         8 => Rgb32FImage::from_fn(width, height, |x, y| {
@@ -258,7 +264,11 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
             let sg = data[idx + 1] as f32 / 255.0;
             let sb = data[idx + 2] as f32 / 255.0;
             let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
-            Rgb([lin.red, lin.green, lin.blue])
+            Rgb([
+                m[0][0] * lin.red + m[0][1] * lin.green + m[0][2] * lin.blue,
+                m[1][0] * lin.red + m[1][1] * lin.green + m[1][2] * lin.blue,
+                m[2][0] * lin.red + m[2][1] * lin.green + m[2][2] * lin.blue,
+            ])
         }),
         16 => Rgb32FImage::from_fn(width, height, |x, y| {
             let idx = ((y * width + x) * 3) as usize * 2;
@@ -266,7 +276,11 @@ pub fn decode_raw(path: &Path) -> Result<Rgb32FImage> {
             let sg = u16::from_ne_bytes([data[idx + 2], data[idx + 3]]) as f32 / 65535.0;
             let sb = u16::from_ne_bytes([data[idx + 4], data[idx + 5]]) as f32 / 65535.0;
             let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
-            Rgb([lin.red, lin.green, lin.blue])
+            Rgb([
+                m[0][0] * lin.red + m[0][1] * lin.green + m[0][2] * lin.blue,
+                m[1][0] * lin.red + m[1][1] * lin.green + m[1][2] * lin.blue,
+                m[2][0] * lin.red + m[2][1] * lin.green + m[2][2] * lin.blue,
+            ])
         }),
         _ => {
             return Err(AgxError::Decode(format!(

@@ -3,7 +3,7 @@ use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
 use crate::error::AgxError;
 
 /// Position-dependent edge darkening/brightening.
-/// Operates in sRGB gamma space.
+/// Operates in the gamma Rec.2020 working space.
 pub struct VignetteStage;
 
 impl Default for VignetteStage {
@@ -25,11 +25,11 @@ impl Stage for VignetteStage {
     }
 
     fn input_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn output_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn is_active(&self, params: &Parameters) -> bool {
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn vignette_color_space_is_srgb() {
         let stage = VignetteStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::SrgbGamma);
-        assert_eq!(stage.output_color_space(), ColorSpace::SrgbGamma);
+        assert_eq!(stage.input_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(stage.output_color_space(), ColorSpace::GammaRec2020);
     }
 }

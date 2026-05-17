@@ -71,7 +71,7 @@ mod tests {
     use crate::engine::gpu::params::{build_tone_curve_data, GpuParameters};
     use crate::engine::gpu::runtime::gpu_available;
     use crate::engine::gpu::shaders::ShaderCache;
-    use crate::engine::gpu::stages::color_space::dispatch_linear_to_srgb;
+    use crate::engine::gpu::stages::color_space::dispatch_linear_to_gamma;
     use crate::engine::Parameters;
 
     /// Upload identity tone curves for tests that don't test tone curves.
@@ -93,10 +93,10 @@ mod tests {
         let pixels = vec![[0.2, 0.2, 0.2]; 2];
         runtime.upload_pixels(&pixels);
 
-        // Convert to sRGB first (gamma adjustments run in gamma space)
-        let to_srgb = shaders.get("linear_to_srgb").unwrap();
-        dispatch_linear_to_srgb(&runtime, to_srgb);
-        let srgb_before = runtime.download_pixels();
+        // Convert to gamma first (gamma adjustments run in gamma space)
+        let to_gamma = shaders.get("linear_to_gamma").unwrap();
+        dispatch_linear_to_gamma(&runtime, to_gamma);
+        let gamma_before = runtime.download_pixels();
 
         // Apply contrast
         let params = Parameters {
@@ -116,7 +116,7 @@ mod tests {
         // With positive contrast, values below 0.5 should decrease, above 0.5 should increase
         // Our test pixel (0.2 linear → ~0.48 sRGB) is near midpoint, so change should be modest
         // but nonzero
-        for (i, (before, after)) in srgb_before.iter().zip(result.iter()).enumerate() {
+        for (i, (before, after)) in gamma_before.iter().zip(result.iter()).enumerate() {
             let changed = (0..3).any(|c| (before[c] - after[c]).abs() > 1e-6);
             assert!(
                 changed,

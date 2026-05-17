@@ -100,12 +100,15 @@ fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: 
     let dy = (f32(y) - half_h) * inv_y;
     let d_sq = dx * dx + dy * dy;
 
+    // Domain-safety: base is used as a weight factor (factor = base * base).
+    // Clamp prevents negative weight from inverting the effect at extreme corners.
     let base = clamp(1.0 - d_sq, 0.0, 1.0);
     let factor = base * base;
     let multiplier = 1.0 + strength * (1.0 - factor);
 
+    // Output unclamped; the final clamp is at encode.
     let base_idx = idx * 3u;
-    pixels[base_idx]      = clamp(pixels[base_idx]      * multiplier, 0.0, 1.0);
-    pixels[base_idx + 1u] = clamp(pixels[base_idx + 1u] * multiplier, 0.0, 1.0);
-    pixels[base_idx + 2u] = clamp(pixels[base_idx + 2u] * multiplier, 0.0, 1.0);
+    pixels[base_idx]      = pixels[base_idx]      * multiplier;
+    pixels[base_idx + 1u] = pixels[base_idx + 1u] * multiplier;
+    pixels[base_idx + 2u] = pixels[base_idx + 2u] * multiplier;
 }

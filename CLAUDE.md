@@ -49,6 +49,8 @@ Follow this cycle for features and significant changes. See [`docs/contributing/
 
 Write a design doc in `docs/plans/` when the change adds/modifies modules, changes dependencies, or touches 3+ files. Skip for bug fixes, single-file changes, and doc updates.
 
+For larger or cross-cutting changes (new modules, invariant changes, contracts spanning multiple modules), include a **Documentation Updates** section in the design doc that enumerates every doc to update during implementation: `ARCHITECTURE.md`, affected module `README.md` files, per-feature `.md` notes, book pages under `docs/book/src/explanation/`, and code-level comments where invariants are anchored. Treat it as a checklist the adversarial review at the end of implementation can verify against, so documentation can't silently drift from the new contract.
+
 ### 2. Implement
 
 Work on a feature branch (`feat/`, `fix/`, `refactor/`). Write tests alongside code. Follow module contracts in per-module READMEs. Commit incrementally.

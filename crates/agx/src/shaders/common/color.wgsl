@@ -1,37 +1,66 @@
 #define_import_path common::color
 // Color space conversion and HSL utilities for AgX compute shaders.
 
-// Convert a single linear sRGB channel to sRGB gamma.
-fn linear_to_srgb_channel(v: f32) -> f32 {
-    if v <= 0.0031308 {
-        return v * 12.92;
-    }
-    return 1.055 * pow(v, 1.0 / 2.4) - 0.055;
+// Linear Rec.2020 -> linear sRGB. WGSL mat3x3 is column-major, so the
+// vec3 arguments below are columns of the matrix -- equivalent to the
+// row-major declaration in crate::color_space.
+const LINEAR_REC2020_TO_LINEAR_SRGB: mat3x3<f32> = mat3x3<f32>(
+    vec3<f32>( 1.660491, -0.124550, -0.018151),
+    vec3<f32>(-0.587641,  1.132899, -0.100579),
+    vec3<f32>(-0.072850, -0.008349,  1.118730),
+);
+
+// Linear sRGB -> linear Rec.2020 (inverse of the above). Same column-major
+// layout caveat applies.
+const LINEAR_SRGB_TO_LINEAR_REC2020: mat3x3<f32> = mat3x3<f32>(
+    vec3<f32>(0.627404, 0.069097, 0.016391),
+    vec3<f32>(0.329283, 0.919541, 0.088013),
+    vec3<f32>(0.043313, 0.011362, 0.895595),
+);
+
+// Sign-preserving sRGB transfer: sign(x) * srgb_curve(abs(x)). The standard
+// sRGB curve is defined only for non-negative inputs; for negative inputs
+// (which arise from out-of-gamut math in wide working spaces), apply the
+// curve to abs(x) and negate. Matches crate::color_space::srgb_curve_signed.
+fn srgb_curve_signed(x: f32) -> f32 {
+    let sign_factor = select(1.0, -1.0, x < 0.0);
+    let ax = abs(x);
+    let curved = select(
+        1.055 * pow(ax, 1.0 / 2.4) - 0.055,
+        12.92 * ax,
+        ax <= 0.0031308
+    );
+    return sign_factor * curved;
 }
 
-// Convert a single sRGB gamma channel to linear sRGB.
-fn srgb_to_linear_channel(v: f32) -> f32 {
-    if v <= 0.04045 {
-        return v / 12.92;
-    }
-    return pow((v + 0.055) / 1.055, 2.4);
+// Inverse of srgb_curve_signed: sign(x) * srgb_curve_inverse(abs(x)).
+// Matches crate::color_space::srgb_curve_signed_inverse.
+fn srgb_curve_signed_inverse(x: f32) -> f32 {
+    let sign_factor = select(1.0, -1.0, x < 0.0);
+    let ax = abs(x);
+    let lin = select(
+        pow((ax + 0.055) / 1.055, 2.4),
+        ax / 12.92,
+        ax <= 0.04045
+    );
+    return sign_factor * lin;
 }
 
-// Convert linear sRGB pixel to sRGB gamma.
-fn linear_to_srgb(rgb: vec3f) -> vec3f {
+// Sign-preserving sRGB transfer applied per channel.
+// CPU equivalent: srgb_curve_signed in crate::color_space, applied to each channel.
+fn linear_to_gamma(rgb: vec3f) -> vec3f {
     return vec3f(
-        linear_to_srgb_channel(rgb.x),
-        linear_to_srgb_channel(rgb.y),
-        linear_to_srgb_channel(rgb.z),
+        srgb_curve_signed(rgb.x),
+        srgb_curve_signed(rgb.y),
+        srgb_curve_signed(rgb.z),
     );
 }
 
-// Convert sRGB gamma pixel to linear sRGB.
-fn srgb_to_linear(rgb: vec3f) -> vec3f {
+fn gamma_to_linear(rgb: vec3f) -> vec3f {
     return vec3f(
-        srgb_to_linear_channel(rgb.x),
-        srgb_to_linear_channel(rgb.y),
-        srgb_to_linear_channel(rgb.z),
+        srgb_curve_signed_inverse(rgb.x),
+        srgb_curve_signed_inverse(rgb.y),
+        srgb_curve_signed_inverse(rgb.z),
     );
 }
 

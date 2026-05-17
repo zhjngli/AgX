@@ -25,10 +25,11 @@ To support a new LUT format (e.g., `.3dl`):
 
 - Apply LUTs to images (the engine does that).
 - Know about presets, encoding, or decoding.
-- Perform color space conversion (assumes sRGB gamma input as documented).
+- Perform color space conversion (assumes sRGB-gamma input; engine wraps the sample with a gamma-Rec.2020 ↔ gamma-sRGB conversion bracket so the LUT module itself stays gamut-agnostic and sRGB-gamma-domain).
 
 ## Key Decisions
 
 - **Single `Lut3D` struct for all formats.** Parsing is format-specific; lookup is format-agnostic.
 - **Trilinear interpolation.** Values between lattice points are blended from the 8 surrounding cube vertices, giving smooth color transitions.
 - **Input clamping.** `lookup` clamps inputs to the domain range rather than erroring, matching standard LUT behavior.
+- **LUT input domain stays sRGB-gamma** — third-party `.cube` files written for the sRGB workflow remain portable; the engine handles the wide-working-space conversion at the call site.

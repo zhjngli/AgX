@@ -8,7 +8,7 @@ Simulates changing the amount of light reaching the sensor. Doubling exposure do
 
 ## Contrast
 
-Pushes pixel values away from a midpoint, brightening the highlights and darkening the shadows. AgX applies contrast in sRGB gamma space so the midpoint matches the perceptual middle gray, not the linear-light midpoint (which would crush shadows).
+Pushes pixel values away from a midpoint, brightening the highlights and darkening the shadows. AgX applies contrast in the gamma Rec.2020 working space so the midpoint matches the perceptual middle gray, not the linear-light midpoint (which would crush shadows).
 
 ## Highlights
 

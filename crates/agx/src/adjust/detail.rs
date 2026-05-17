@@ -212,11 +212,8 @@ fn apply_unsharp_mask(
         .map(|(i, px)| {
             let high_freq = luminance[i] - blurred[i];
             let delta = strength * high_freq;
-            [
-                (px[0] + delta).clamp(0.0, 1.0),
-                (px[1] + delta).clamp(0.0, 1.0),
-                (px[2] + delta).clamp(0.0, 1.0),
-            ]
+            // Output unclamped; the final clamp is at encode.
+            [px[0] + delta, px[1] + delta, px[2] + delta]
         })
         .collect()
 }
@@ -276,11 +273,8 @@ fn apply_sharpening(
                 1.0
             };
             let delta = strength * high_freq * mask;
-            [
-                (px[0] + delta).clamp(0.0, 1.0),
-                (px[1] + delta).clamp(0.0, 1.0),
-                (px[2] + delta).clamp(0.0, 1.0),
-            ]
+            // Output unclamped; the final clamp is at encode.
+            [px[0] + delta, px[1] + delta, px[2] + delta]
         })
         .collect()
 }
@@ -293,8 +287,8 @@ const CLARITY_SIGMA: f32 = 20.0;
 /// Apply the full detail pass (texture, clarity, sharpening) to a pixel buffer.
 ///
 /// This is the primary public interface for the detail module. The engine calls
-/// this after the per-pixel sRGB gamma-space adjustments, operating on sRGB
-/// gamma-space RGB pixels in \[0, 1\].
+/// this after the per-pixel gamma Rec.2020 working-space adjustments, operating
+/// on gamma Rec.2020 RGB pixels in \[0, 1\].
 pub fn apply_detail_pass(
     buf: &[[f32; 3]],
     width: usize,
@@ -592,6 +586,42 @@ mod tests {
         let params = DetailParams::default();
         let result = apply_detail_pass(&pixels, 4, 4, &params);
         assert_eq!(result, pixels);
+    }
+
+    #[test]
+    fn detail_preserves_out_of_range_input() {
+        // OOG red input (1.2): sharpening/clarity/texture add a luminance delta
+        // that is well-defined on any value; output should be finite and not pinned.
+        let width = 4;
+        let height = 4;
+        let mut pixels: Vec<[f32; 3]> = vec![[1.2_f32, 0.5, 0.5]; width * height];
+        // Vary some pixels so the unsharp mask sees non-uniform input
+        pixels[5] = [0.8, 0.4, 0.3];
+        pixels[10] = [0.9, 0.6, 0.4];
+        let params = DetailParams {
+            sharpening: SharpeningParams {
+                amount: 50.0,
+                radius: 1.0,
+                threshold: 0.0,
+                masking: 0.0,
+            },
+            clarity: 20.0,
+            texture: 10.0,
+        };
+        let result = apply_detail_pass(&pixels, width, height, &params);
+        for px in &result {
+            assert!(
+                px[0].is_finite() && px[1].is_finite() && px[2].is_finite(),
+                "detail produced non-finite value: {:?}",
+                px
+            );
+        }
+        // OOG red should not be pinned to 1.0 by the detail pass
+        assert!(
+            result[0][0] != 1.0,
+            "detail pinned OOG input to exactly 1.0: {}",
+            result[0][0]
+        );
     }
 
     #[test]

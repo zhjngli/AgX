@@ -26,7 +26,7 @@ pub use exposure::{apply_exposure, exposure_factor};
 pub mod white_balance;
 pub use white_balance::apply_white_balance;
 
-/// Basic tone sliders: contrast, highlights, shadows, whites, blacks (sRGB gamma space).
+/// Basic tone sliders: contrast, highlights, shadows, whites, blacks (gamma Rec.2020 working space).
 pub mod basic_tone;
 pub use basic_tone::{apply_blacks, apply_contrast, apply_highlights, apply_shadows, apply_whites};
 
@@ -34,7 +34,7 @@ pub use basic_tone::{apply_blacks, apply_contrast, apply_highlights, apply_shado
 pub mod hsl;
 pub use hsl::{apply_hsl, cosine_weight, hue_distance, WeightFn};
 
-/// Three-way (shadows / midtones / highlights) color grading (sRGB gamma space).
+/// Three-way (shadows / midtones / highlights) color grading (gamma Rec.2020 working space).
 pub mod color_grading;
 pub use color_grading::{
     apply_color_grading_pre, ColorGradingParams, ColorGradingPrecomputed, ColorWheel,
@@ -74,13 +74,23 @@ pub(crate) fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
 
 // --- Color space helpers ---
 
-/// Convert linear sRGB to sRGB gamma space.
+/// Convert a linear sRGB f32 pixel to sRGB-gamma. Pre-migration this was
+/// the engine's working-space transfer; post-migration the engine uses
+/// `crate::color_space::srgb_curve_signed`. This helper remains for the
+/// encode-side matrix-then-curve fused pass and as the inner sRGB step
+/// of the LUT-wrap bracket — both call sites are intentionally working
+/// in sRGB primaries, not Rec.2020.
 pub fn linear_to_srgb(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let srgb: Srgb<f32> = LinSrgb::new(r, g, b).into_encoding();
     (srgb.red, srgb.green, srgb.blue)
 }
 
-/// Convert sRGB gamma space to linear sRGB.
+/// Convert an sRGB-gamma f32 pixel to linear sRGB. Pre-migration this
+/// was the engine's working-space transfer; post-migration the engine
+/// uses `crate::color_space::srgb_curve_signed_inverse`. This helper
+/// remains for the encode-side fused pass and as the inner sRGB step
+/// of the LUT-wrap bracket — both call sites are intentionally working
+/// in sRGB primaries, not Rec.2020.
 pub fn srgb_to_linear(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let lin: LinSrgb<f32> = Srgb::new(r, g, b).into_linear();
     (lin.red, lin.green, lin.blue)
@@ -104,9 +114,9 @@ pub fn apply_white_balance_exposure_buffer(
     }
 }
 
-// --- Per-pixel adjustments (sRGB gamma space) ---
+// --- Per-pixel adjustments (gamma Rec.2020 working space) ---
 
-/// All per-pixel parameters needed for the sRGB gamma-space adjustment pass.
+/// All per-pixel parameters needed for the gamma Rec.2020 working-space adjustment pass.
 ///
 /// The `lut_fn` closure abstracts over the LUT lookup so that `adjust`
 /// does not depend on the `lut` module (architecture rule).
@@ -138,10 +148,11 @@ pub struct PerPixelParams<'a> {
     pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + Sync + 'a)>,
 }
 
-/// Apply all per-pixel adjustments to an sRGB gamma buffer in-place.
+/// Apply all per-pixel adjustments to a gamma Rec.2020 buffer in-place.
 ///
 /// Processes contrast, highlights, shadows, whites, blacks, tone curves,
-/// HSL, color grading, and LUT in that order. Operates in sRGB gamma space.
+/// HSL, color grading, and LUT in that order. Operates in the gamma Rec.2020
+/// working space.
 pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
     buf.par_chunks_mut(1024).for_each(|chunk| {
         for pixel in chunk.iter_mut() {

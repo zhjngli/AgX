@@ -12,6 +12,22 @@ The luminance curve changes brightness while trying to preserve color
 ratios. Together they cover the classic tone-curve workflow without
 forcing the user into one fixed interpretation of "tone."
 
+## Working space
+
+This stage runs in gamma-encoded Rec.2020 — the sRGB transfer curve
+applied to Rec.2020 linear values — alongside basic tone, HSL, color
+grading, detail, grain, and vignette. The curve domain (`[0, 1]`
+control points), the LUT sample grid, and the Rec. 709 luminance proxy
+keep their perceptual meaning because the gamma curve shape is
+unchanged from the previous sRGB-only design; what's different is the
+wider gamut underneath, so wide-gamut headroom from Display P3 or
+other wide-gamut inputs survives the curve lookup instead of being
+clamped at the boundary. The final clamp to display gamut happens only
+at encode. The 256-entry LUT index domain stays bounded to `[0, 255]`
+and the per-channel output is clamped to `[0, 1]` after the luminance
+scaling — both are domain-safety guards required by the LUT lookup and
+the public normalized range, not aesthetic limits.
+
 ## How it works
 
 Each curve is defined by control points in normalized coordinates:

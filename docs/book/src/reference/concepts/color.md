@@ -25,7 +25,7 @@ Per-color-band adjustments to hue, saturation, and luminance. AgX divides the co
 
 Three-way color grading distributes color shifts across tonal regions: shadows get one color, midtones another, highlights a third, with an optional global wheel layered on top. The "blue shadows + orange highlights" cinematic look is the canonical use; AgX also exposes a balance control to bias the regions.
 
-Color grading sits in RGB (sRGB gamma) and uses luminance to weight the regions.
+Color grading sits in RGB (gamma Rec.2020) and uses luminance to weight the regions.
 
 ---
 

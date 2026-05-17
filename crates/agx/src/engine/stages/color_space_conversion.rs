@@ -1,34 +1,36 @@
-use crate::adjust;
+use crate::color_space::{srgb_curve_signed, srgb_curve_signed_inverse};
 use crate::engine::{ColorSpace, RenderContext, Stage};
 use crate::error::AgxError;
+use rayon::prelude::*;
 
-/// Converts the buffer from linear sRGB to sRGB gamma space.
-pub struct LinearToSrgbStage;
+/// Converts the buffer from linear Rec.2020 to gamma-encoded Rec.2020 by
+/// applying the sRGB transfer curve to each Rec.2020 linear channel.
+pub struct LinearToGammaStage;
 
-impl Default for LinearToSrgbStage {
+impl Default for LinearToGammaStage {
     fn default() -> Self {
         Self
     }
 }
 
-impl LinearToSrgbStage {
-    /// Create a new linear-to-sRGB conversion stage.
+impl LinearToGammaStage {
+    /// Create a new linear-to-gamma conversion stage.
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Stage for LinearToSrgbStage {
+impl Stage for LinearToGammaStage {
     fn name(&self) -> &'static str {
-        "linear_to_srgb"
+        "linear_to_gamma"
     }
 
     fn input_color_space(&self) -> ColorSpace {
-        ColorSpace::LinearSrgb
+        ColorSpace::LinearRec2020
     }
 
     fn output_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn is_active(&self, _params: &crate::engine::Parameters) -> bool {
@@ -38,41 +40,43 @@ impl Stage for LinearToSrgbStage {
     fn prepare(&mut self, _params: &crate::engine::Parameters) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
-        for pixel in ctx.buf.iter_mut() {
-            let (r, g, b) = adjust::linear_to_srgb(pixel[0], pixel[1], pixel[2]);
-            *pixel = [r, g, b];
-        }
+        ctx.buf.par_iter_mut().for_each(|pixel| {
+            pixel[0] = srgb_curve_signed(pixel[0]);
+            pixel[1] = srgb_curve_signed(pixel[1]);
+            pixel[2] = srgb_curve_signed(pixel[2]);
+        });
         Ok(())
     }
 }
 
-/// Converts the buffer from sRGB gamma space to linear sRGB.
-pub struct SrgbToLinearStage;
+/// Converts the buffer from gamma-encoded Rec.2020 to linear Rec.2020 by
+/// applying the inverse sRGB transfer curve to each channel.
+pub struct GammaToLinearStage;
 
-impl Default for SrgbToLinearStage {
+impl Default for GammaToLinearStage {
     fn default() -> Self {
         Self
     }
 }
 
-impl SrgbToLinearStage {
-    /// Create a new sRGB-to-linear conversion stage.
+impl GammaToLinearStage {
+    /// Create a new gamma-to-linear conversion stage.
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Stage for SrgbToLinearStage {
+impl Stage for GammaToLinearStage {
     fn name(&self) -> &'static str {
-        "srgb_to_linear"
+        "gamma_to_linear"
     }
 
     fn input_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn output_color_space(&self) -> ColorSpace {
-        ColorSpace::LinearSrgb
+        ColorSpace::LinearRec2020
     }
 
     fn is_active(&self, _params: &crate::engine::Parameters) -> bool {
@@ -82,10 +86,11 @@ impl Stage for SrgbToLinearStage {
     fn prepare(&mut self, _params: &crate::engine::Parameters) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
-        for pixel in ctx.buf.iter_mut() {
-            let (r, g, b) = adjust::srgb_to_linear(pixel[0], pixel[1], pixel[2]);
-            *pixel = [r, g, b];
-        }
+        ctx.buf.par_iter_mut().for_each(|pixel| {
+            pixel[0] = srgb_curve_signed_inverse(pixel[0]);
+            pixel[1] = srgb_curve_signed_inverse(pixel[1]);
+            pixel[2] = srgb_curve_signed_inverse(pixel[2]);
+        });
         Ok(())
     }
 }
@@ -96,7 +101,7 @@ mod tests {
     use crate::engine::Parameters;
 
     #[test]
-    fn linear_to_srgb_roundtrip() {
+    fn linear_to_gamma_roundtrip() {
         let params = Parameters::default();
         let pixels = vec![[0.5, 0.3, 0.1], [0.0, 1.0, 0.25]];
         let mut ctx = RenderContext {
@@ -107,16 +112,16 @@ mod tests {
             lut: None,
         };
 
-        let mut to_srgb = LinearToSrgbStage::new();
-        to_srgb.prepare(&params);
-        to_srgb.process(&mut ctx).unwrap();
+        let mut to_gamma = LinearToGammaStage::new();
+        to_gamma.prepare(&params);
+        to_gamma.process(&mut ctx).unwrap();
 
         assert!(
             (ctx.buf[0][0] - 0.5).abs() > 0.01,
             "gamma encoding should change 0.5"
         );
 
-        let mut to_linear = SrgbToLinearStage::new();
+        let mut to_linear = GammaToLinearStage::new();
         to_linear.prepare(&params);
         to_linear.process(&mut ctx).unwrap();
 
@@ -132,27 +137,27 @@ mod tests {
     }
 
     #[test]
-    fn linear_to_srgb_always_active() {
+    fn linear_to_gamma_always_active() {
         let params = Parameters::default();
-        let stage = LinearToSrgbStage::new();
+        let stage = LinearToGammaStage::new();
         assert!(stage.is_active(&params));
     }
 
     #[test]
-    fn srgb_to_linear_always_active() {
+    fn gamma_to_linear_always_active() {
         let params = Parameters::default();
-        let stage = SrgbToLinearStage::new();
+        let stage = GammaToLinearStage::new();
         assert!(stage.is_active(&params));
     }
 
     #[test]
     fn color_space_declarations_correct() {
-        let to_srgb = LinearToSrgbStage::new();
-        assert_eq!(to_srgb.input_color_space(), ColorSpace::LinearSrgb);
-        assert_eq!(to_srgb.output_color_space(), ColorSpace::SrgbGamma);
+        let to_gamma = LinearToGammaStage::new();
+        assert_eq!(to_gamma.input_color_space(), ColorSpace::LinearRec2020);
+        assert_eq!(to_gamma.output_color_space(), ColorSpace::GammaRec2020);
 
-        let to_linear = SrgbToLinearStage::new();
-        assert_eq!(to_linear.input_color_space(), ColorSpace::SrgbGamma);
-        assert_eq!(to_linear.output_color_space(), ColorSpace::LinearSrgb);
+        let to_linear = GammaToLinearStage::new();
+        assert_eq!(to_linear.input_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(to_linear.output_color_space(), ColorSpace::LinearRec2020);
     }
 }

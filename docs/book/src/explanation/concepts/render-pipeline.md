@@ -19,5 +19,5 @@ The stage order encodes design decisions made when each adjustment was added. Th
 ## See also
 
 - [Render pipeline reference](../../reference/concepts/render-pipeline.md) — the lookup view of the pipeline.
-- [Color spaces](color-spaces.md) — why operations live in linear vs sRGB gamma space.
+- [Color spaces](color-spaces.md) — why operations live in linear vs gamma Rec.2020 working space.
 - [Algorithm explanations](../algorithms/index.md) — per-algorithm walkthroughs.

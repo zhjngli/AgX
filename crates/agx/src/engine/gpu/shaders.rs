@@ -50,12 +50,12 @@ impl ShaderCache {
         // Compile stage shaders
         let stage_shaders = [
             (
-                "linear_to_srgb",
-                include_str!("../../shaders/linear_to_srgb.wgsl"),
+                "linear_to_gamma",
+                include_str!("../../shaders/linear_to_gamma.wgsl"),
             ),
             (
-                "srgb_to_linear",
-                include_str!("../../shaders/srgb_to_linear.wgsl"),
+                "gamma_to_linear",
+                include_str!("../../shaders/gamma_to_linear.wgsl"),
             ),
             (
                 "linear_adjustments",

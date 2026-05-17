@@ -2,7 +2,7 @@
 //!
 //! This module provides FFI bindings to libheif's C API and safe
 //! `decode_heic()` / `extract_heic_metadata()` functions that produce
-//! the same linear sRGB f32 output contract as the other decode paths.
+//! the same linear Rec.2020 f32 output contract as the other decode paths.
 //!
 //! libheif handles the HEIF container and orchestrates the codec
 //! backend (typically libde265 for HEVC). Orientation transformations
@@ -14,6 +14,9 @@ use std::path::Path;
 
 use image::Rgb32FImage;
 
+use crate::color_space::{
+    LINEAR_BT2020_TO_LINEAR_REC2020, LINEAR_P3_TO_LINEAR_REC2020, LINEAR_SRGB_TO_LINEAR_REC2020,
+};
 use crate::error::{AgxError, Result};
 
 // --- FFI types ---
@@ -305,40 +308,19 @@ impl Drop for HeifImage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SourceColorSpace {
-    /// BT.709 / sRGB primaries; no matrix conversion needed.
+    /// BT.709 / sRGB primaries; matrix-converted to linear Rec.2020.
     Srgb,
-    /// Display P3 primaries; matrix-converted to sRGB in linear space.
+    /// Display P3 primaries; matrix-converted to linear Rec.2020 (gamut preserved).
     DisplayP3,
-    /// BT.2020 primaries; matrix-converted to sRGB in linear space.
+    /// BT.2020 primaries; identity matrix (BT.2020 primaries == Rec.2020 primaries).
     ///
     /// Not currently returned by `probe_source_color_space` — BT.2020 sources
-    /// fall back to `Srgb` with a warning until the color-management work lands.
-    /// Kept here so the BT.2020 matrix-application code paths remain reachable
-    /// for the future color-management implementation.
+    /// fall back to `Srgb` with a warning until BT.2020 transfer-curve (and
+    /// PQ/HLG HDR) handling lands. Kept wired so the dispatch is uniform
+    /// for when the probe is eventually taught to distinguish SDR from PQ/HLG.
     #[allow(dead_code)]
     Bt2020,
 }
-
-/// 3x3 matrix to convert Display P3 (D65) linear values into linear sRGB.
-const P3_TO_SRGB: [[f32; 3]; 3] = [
-    [1.2249, -0.2247, 0.0000],
-    [-0.0420, 1.0419, 0.0000],
-    [-0.0197, -0.0786, 1.0982],
-];
-
-/// 3x3 matrix to convert BT.2020 (D65) linear values into linear sRGB.
-///
-/// Not reachable in the current revision — `probe_source_color_space` falls back
-/// to `Srgb` for BT.2020 sources with a warning, because the BT.2020 OETF
-/// (and PQ/HLG HDR variants) requires the color-management work to handle
-/// correctly. The matrix is retained here as documentation of the transform
-/// coefficients for future implementation.
-#[allow(dead_code)]
-const BT2020_TO_SRGB: [[f32; 3]; 3] = [
-    [1.6605, -0.5876, -0.0728],
-    [-0.1246, 1.1329, -0.0083],
-    [-0.0182, -0.1006, 1.1187],
-];
 
 fn apply_matrix(rgb: [f32; 3], m: &[[f32; 3]; 3]) -> [f32; 3] {
     [
@@ -394,7 +376,7 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
             eprintln!(
                 "agx: HEIC source declares BT.2020 primaries; treating as sRGB \
                  because BT.2020 transfer curve (and PQ/HLG HDR variants) \
-                 require color-management work. Tone fidelity may suffer."
+                 require dedicated transfer-curve handling. Tone fidelity may suffer."
             );
             SourceColorSpace::Srgb
         }
@@ -410,12 +392,12 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
 
 // --- Public API ---
 
-/// Decode a HEIC/HEIF file into linear sRGB f32.
+/// Decode a HEIC/HEIF file into linear Rec.2020 f32.
 ///
 /// libheif handles the container, codec backend, and orientation
 /// transformations. This function inspects the source bit depth,
 /// requests RGB-interleaved decode in the appropriate chroma layout,
-/// and converts the pixel data to the engine's linear sRGB f32 contract.
+/// and converts the pixel data to the engine's linear Rec.2020 f32 contract.
 ///
 /// # Supported sources
 ///
@@ -426,11 +408,21 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
 ///
 /// # Color space
 ///
-/// Source primaries declared as BT.709 or sRGB are treated as sRGB
-/// directly. Display P3 sources are matrix-converted to linear sRGB at
-/// decode. BT.2020, ICC profile, and unknown NCLX primaries all fall back
-/// to "treat as sRGB" with a stderr warning (see the design doc for the
-/// deferred wide-gamut and color-management work).
+/// Source primaries are matrix-converted directly into linear Rec.2020,
+/// preserving the wider gamut of Display P3 inputs end-to-end:
+///
+/// - BT.709 / sRGB primaries → `LINEAR_SRGB_TO_LINEAR_REC2020`.
+/// - Display P3 primaries → `LINEAR_P3_TO_LINEAR_REC2020` (vivid reds
+///   and saturated greens survive into the engine instead of being squashed).
+/// - BT.2020 primaries → `LINEAR_BT2020_TO_LINEAR_REC2020` (identity). The
+///   probe currently still falls back to "treat as sRGB" with a stderr
+///   warning for BT.2020 sources because the BT.2020 transfer curve (and
+///   PQ/HLG HDR variants) require dedicated transfer-curve handling; the
+///   identity matrix is wired so that when the probe is eventually taught
+///   to distinguish SDR from PQ/HLG, the matrix side is already correct.
+///
+/// ICC profile and unrecognized NCLX primaries fall back to "treat as
+/// sRGB" with a stderr warning.
 pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     use palette::{LinSrgb, Srgb};
 
@@ -488,9 +480,9 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
             let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
             let lin_rgb = [lin.red, lin.green, lin.blue];
             let out = match source_space {
-                SourceColorSpace::Srgb => lin_rgb,
-                SourceColorSpace::DisplayP3 => apply_matrix(lin_rgb, &P3_TO_SRGB),
-                SourceColorSpace::Bt2020 => apply_matrix(lin_rgb, &BT2020_TO_SRGB),
+                SourceColorSpace::Srgb => apply_matrix(lin_rgb, &LINEAR_SRGB_TO_LINEAR_REC2020),
+                SourceColorSpace::DisplayP3 => apply_matrix(lin_rgb, &LINEAR_P3_TO_LINEAR_REC2020),
+                SourceColorSpace::Bt2020 => apply_matrix(lin_rgb, &LINEAR_BT2020_TO_LINEAR_REC2020),
             };
             image::Rgb(out)
         })
@@ -510,9 +502,9 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
             let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
             let lin_rgb = [lin.red, lin.green, lin.blue];
             let out = match source_space {
-                SourceColorSpace::Srgb => lin_rgb,
-                SourceColorSpace::DisplayP3 => apply_matrix(lin_rgb, &P3_TO_SRGB),
-                SourceColorSpace::Bt2020 => apply_matrix(lin_rgb, &BT2020_TO_SRGB),
+                SourceColorSpace::Srgb => apply_matrix(lin_rgb, &LINEAR_SRGB_TO_LINEAR_REC2020),
+                SourceColorSpace::DisplayP3 => apply_matrix(lin_rgb, &LINEAR_P3_TO_LINEAR_REC2020),
+                SourceColorSpace::Bt2020 => apply_matrix(lin_rgb, &LINEAR_BT2020_TO_LINEAR_REC2020),
             };
             image::Rgb(out)
         })

@@ -180,7 +180,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the module dependency graph and rules
 
 ## Architecture
 
-The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. All processing happens in **sRGB** color space. Adjustments are applied in a fixed pipeline order regardless of the order parameters appear in presets.
+The engine uses an **always-re-render-from-original** model: the original image is stored immutably, and every render applies all adjustments from scratch. Internal processing happens in **linear Rec.2020** for physical operations and **gamma-encoded Rec.2020** for perceptual operations; decode brackets inputs into the working space and encode brackets back to 8-bit sRGB. Adjustments are applied in a fixed pipeline order regardless of the order parameters appear in presets.
 
 For the contract (dependency rules, invariants, structural tests), see [ARCHITECTURE.md](ARCHITECTURE.md). For the discussion of why the architecture is shaped this way, see the [architecture explanation](https://zhjngli.github.io/AgX/explanation/concepts/architecture.html).
 

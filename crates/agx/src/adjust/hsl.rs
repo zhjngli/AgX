@@ -39,7 +39,7 @@ const CHANNEL_CENTERS: [f32; 8] = [0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 
 /// matching the Lightroom/Capture One approach with non-uniform spacing.
 const CHANNEL_HALF_WIDTHS: [f32; 8] = [30.0, 30.0, 30.0, 60.0, 60.0, 30.0, 30.0, 30.0];
 
-/// Apply per-channel HSL adjustments to an sRGB gamma pixel.
+/// Apply per-channel HSL adjustments to a pixel in the gamma Rec.2020 working space.
 ///
 /// Takes 3 arrays of 8 values each (one per channel, ordered Red through Magenta):
 /// - `hue_shifts`: degrees, -180 to +180
@@ -58,7 +58,20 @@ pub fn apply_hsl(
     luminance_shifts: &[f32; 8],
     weight_fn: WeightFn,
 ) -> (f32, f32, f32) {
-    let srgb = Srgb::new(r, g, b);
+    // RGB ↔ HSL conversion via palette's Hsl<Srgb>. The palette type is
+    // named Srgb but the math only cares about [0, 1] RGB tuples — we
+    // feed it gamma Rec.2020 values. The gamma transfer curve shape is
+    // unchanged from sRGB-gamma, so the perceptual saturation /
+    // lightness anchors used by the HSL math carry the same meaning on
+    // Rec.2020 values. The [0, 1] domain clamp on the entry is required
+    // by palette's type; wide-gamut headroom is lost here. OKHsl is the
+    // long-term fix tracked in docs/backlog/color-management.md. The
+    // output saturation/lightness clamps below stay as domain-safety
+    // for the HSL space's [0, 1] convention.
+    let r_in = r.clamp(0.0, 1.0);
+    let g_in = g.clamp(0.0, 1.0);
+    let b_in = b.clamp(0.0, 1.0);
+    let srgb = Srgb::new(r_in, g_in, b_in);
     let hsl: Hsl = srgb.into_color();
     let pixel_hue = hsl.hue.into_positive_degrees();
     let pixel_sat = hsl.saturation;
@@ -84,6 +97,7 @@ pub fn apply_hsl(
     }
 
     let new_hue = (pixel_hue + total_hue_shift).rem_euclid(360.0);
+    // Domain-safety: HSL → RGB inverse requires saturation and lightness in [0, 1].
     let new_sat = (hsl.saturation + total_sat_shift).clamp(0.0, 1.0);
     let new_lum = (hsl.lightness + total_lum_shift).clamp(0.0, 1.0);
 
@@ -219,6 +233,23 @@ mod tests {
             (b - 0.5).abs() < 1e-3,
             "Gray should be unaffected, got b={b}"
         );
+    }
+
+    #[test]
+    fn hsl_clamps_oog_input_at_entry() {
+        // OOG red input (1.2) + neutral HSL adjustments: HSL clamps input to [0, 1]
+        // at the RGB → HSL conversion entry, so output is near the clamped value's
+        // pass-through, not the original 1.2.
+        let zeros = [0.0f32; 8];
+        let (r, _g, _b) = apply_hsl(1.2, 0.0, 0.0, &zeros, &zeros, &zeros, cosine_weight);
+        // After clamping 1.2 to 1.0 at entry, pure red [1.0, 0.0, 0.0] → HSL → RGB
+        // with neutral adjustments → [1.0, 0.0, 0.0]. Output should be ~1.0, not 1.2.
+        assert!(
+            r <= 1.01,
+            "HSL should clamp OOG input at RGB → HSL entry, got r={}",
+            r
+        );
+        assert!(r > 0.9, "Unexpected output for pure-red input: r={}", r);
     }
 
     #[test]

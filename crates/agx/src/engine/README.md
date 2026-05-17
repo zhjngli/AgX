@@ -13,17 +13,21 @@ The engine has two render pipelines that execute the same stages in the same ord
 
 `Engine::new()` always uses the CPU pipeline — this is the canonical path for deterministic output across all platforms. `Engine::new_gpu_auto()` tries GPU first and falls back to CPU (opt-in via `--gpu` CLI flag). `Engine::new_gpu()` forces GPU-only and returns `Err` if unavailable (useful for profiling and testing).
 
+### Working space contract
+
+The engine's working space is linear Rec.2020. Decode delivers buffers in linear Rec.2020; encode expects them in linear Rec.2020 and converts to 8-bit sRGB at output. Stages 1–3 run in linear Rec.2020; stages 5–8 run in gamma-encoded Rec.2020 (the sRGB transfer curve applied to Rec.2020 linear values), reached via the sign-preserving transfer stages at slots 4 and 9. The LUT lookup in stage 5 wraps its sample in a gamma-sRGB conversion bracket so existing sRGB-authored `.cube` LUTs remain portable. Wide-gamut inputs (Display P3 HEIC) survive end-to-end; the final clamp to display gamut happens only at encode.
+
 ### Pipeline Order (fixed, not configurable)
 
-1. WhiteBalanceExposure / linear_adjustments (linear sRGB)
-2. Dehaze (linear sRGB)
-3. Denoise (linear sRGB)
-4. LinearToSrgb (conversion)
-5. PerPixelAdjustments / gamma_adjustments (sRGB gamma) — contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT
-6. Detail (sRGB gamma)
-7. Grain (sRGB gamma)
-8. Vignette (sRGB gamma)
-9. SrgbToLinear (conversion)
+1. WhiteBalanceExposure / linear_adjustments (linear Rec.2020)
+2. Dehaze (linear Rec.2020)
+3. Denoise (linear Rec.2020)
+4. LinearToGamma (conversion: linear Rec.2020 → gamma Rec.2020 via sign-preserving sRGB curve)
+5. PerPixelAdjustments / gamma_adjustments (gamma Rec.2020) — contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT (sampled via sRGB-gamma bracket)
+6. Detail (gamma Rec.2020)
+7. Grain (gamma Rec.2020)
+8. Vignette (gamma Rec.2020)
+9. GammaToLinear (conversion: gamma Rec.2020 → linear Rec.2020)
 
 ### CPU Stage Trait
 
@@ -56,7 +60,7 @@ Key GPU submodules:
 - `Parameters` -- all adjustment fields
 - `VignetteParams` -- vignette parameters: `amount` (f32) and `shape` (`VignetteShape`)
 - `PartialParameters` -- partial parameter set for preset composability
-- `ColorSpace` -- enum: `LinearSrgb`, `SrgbGamma`
+- `ColorSpace` -- enum: `LinearRec2020`, `GammaRec2020`, `LinearSrgb`, `SrgbGamma` (the first two are the engine's working spaces; the latter two are retained for encode-side intermediates and the LUT-wrap conversion bracket)
 - `Engine::new(image)` -- create engine (always CPU, canonical path)
 - `Engine::new_gpu_auto(image)` -- try GPU, fall back to CPU (opt-in)
 - `Engine::new_gpu(image)` -- force GPU pipeline (returns `Err` if unavailable)
@@ -99,7 +103,7 @@ To add a new per-pixel adjustment (within the existing PerPixelAdjustments stage
 
 - **Always re-render from original.** `render()` starts from `self.original` every time.
 - **Fixed internal pipeline order.** The render order is hardcoded. Consumers cannot reorder stages.
-- **Output is linear sRGB.** The rendered image is returned in linear space.
+- **Output is linear Rec.2020.** The rendered image is returned in the linear Rec.2020 working space; encode performs the final conversion to display gamut.
 - **CPU stages delegate to adjust.** CPU stages own orchestration; `adjust` owns the math.
 - **GPU stages are self-contained WGSL.** GPU shaders reimplement the same algorithms in WGSL. The `adjust` module is not used by the GPU path.
 - **CPU is canonical.** CPU pipeline is the default for deterministic output. GPU is opt-in via `new_gpu_auto()` or `--gpu` CLI flag.

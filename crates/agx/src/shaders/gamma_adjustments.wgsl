@@ -114,15 +114,15 @@ fn apply_tone_curves(r_in: f32, g_in: f32, b_in: f32) -> vec3f {
         b = tone_curve_lookup(1024u, b);
     }
 
-    // Step 3: Luminance curve (offset 256)
+    // Step 3: Luminance curve (offset 256); scale is unclamped.
     if params.tc_luma_active > 0.5 {
         let l = common::math::luminance(r, g, b);
         let l_new = tone_curve_lookup(256u, l);
         if l > 1e-6 {
             let scale = l_new / l;
-            r = clamp(r * scale, 0.0, 1.0);
-            g = clamp(g * scale, 0.0, 1.0);
-            b = clamp(b * scale, 0.0, 1.0);
+            r = r * scale;
+            g = g * scale;
+            b = b * scale;
         } else {
             r = l_new;
             g = l_new;
@@ -136,7 +136,12 @@ fn apply_tone_curves(r_in: f32, g_in: f32, b_in: f32) -> vec3f {
 // --- HSL ---
 
 fn apply_hsl_pixel(r: f32, g: f32, b: f32) -> vec3f {
-    let hsl = common::color::rgb_to_hsl(vec3f(r, g, b));
+    // HSL works in [0, 1] RGB; wide-gamut headroom is lost here.
+    // OKHsl is the long-term fix tracked in docs/backlog/color-management.md.
+    let r_in = clamp(r, 0.0, 1.0);
+    let g_in = clamp(g, 0.0, 1.0);
+    let b_in = clamp(b, 0.0, 1.0);
+    let hsl = common::color::rgb_to_hsl(vec3f(r_in, g_in, b_in));
     let pixel_hue = hsl.x;
     let pixel_sat = hsl.y;
 
@@ -196,19 +201,20 @@ fn apply_color_grading_pixel(r: f32, g: f32, b: f32) -> vec3f {
     let combined_g = regional_g * params.cg_global_tint.y;
     let combined_b = regional_b * params.cg_global_tint.z;
 
-    // Multiply pixel by combined tint
-    var out_r = clamp(r * combined_r, 0.0, 1.0);
-    var out_g = clamp(g * combined_g, 0.0, 1.0);
-    var out_b = clamp(b * combined_b, 0.0, 1.0);
+    // Multiply pixel by combined tint; output unclamped — wide-gamut headroom
+    // survives this stage, final clamp is at encode.
+    var out_r = r * combined_r;
+    var out_g = g * combined_g;
+    var out_b = b * combined_b;
 
-    // Luminance shifts (weighted additive, pre-divided by 100 via the .w component)
+    // Luminance shifts (weighted additive, pre-divided by 100 via the .w component); unclamped.
     let adjustment = params.cg_shadow_tint.w * w_shadow
         + params.cg_midtone_tint.w * w_midtone
         + params.cg_highlight_tint.w * w_highlight
         + params.cg_global_tint.w;
-    out_r = clamp(out_r + adjustment, 0.0, 1.0);
-    out_g = clamp(out_g + adjustment, 0.0, 1.0);
-    out_b = clamp(out_b + adjustment, 0.0, 1.0);
+    out_r = out_r + adjustment;
+    out_g = out_g + adjustment;
+    out_b = out_b + adjustment;
 
     return vec3f(out_r, out_g, out_b);
 }
@@ -216,9 +222,46 @@ fn apply_color_grading_pixel(r: f32, g: f32, b: f32) -> vec3f {
 // --- LUT ---
 
 fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
-    let coord = vec3f(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0));
-    let result = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
-    return vec3f(result.x, result.y, result.z);
+    // Input is gamma Rec.2020 (engine working space). LUTs are
+    // sRGB-gamma authored, so bracket the sample:
+    //   gamma Rec.2020 -> linear Rec.2020 -> linear sRGB -> gamma sRGB
+    //   -> LUT sample
+    //   -> gamma sRGB -> linear sRGB -> linear Rec.2020 -> gamma Rec.2020
+    // Mirrors crate::color_space::wrap_lut_lookup on the CPU side.
+
+    let lin_rec2020 = vec3f(
+        common::color::srgb_curve_signed_inverse(r),
+        common::color::srgb_curve_signed_inverse(g),
+        common::color::srgb_curve_signed_inverse(b),
+    );
+    let lin_srgb = common::color::LINEAR_REC2020_TO_LINEAR_SRGB * lin_rec2020;
+    let gamma_srgb = vec3f(
+        common::color::srgb_curve_signed(lin_srgb.x),
+        common::color::srgb_curve_signed(lin_srgb.y),
+        common::color::srgb_curve_signed(lin_srgb.z),
+    );
+
+    // LUT sampler requires [0, 1] coords -- domain-safety clamp on the
+    // gamma-sRGB intermediate, not on the engine buffer.
+    let coord = vec3f(
+        clamp(gamma_srgb.x, 0.0, 1.0),
+        clamp(gamma_srgb.y, 0.0, 1.0),
+        clamp(gamma_srgb.z, 0.0, 1.0),
+    );
+    let sampled = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
+
+    let out_lin_srgb = vec3f(
+        common::color::srgb_curve_signed_inverse(sampled.x),
+        common::color::srgb_curve_signed_inverse(sampled.y),
+        common::color::srgb_curve_signed_inverse(sampled.z),
+    );
+    let out_lin_rec2020 = common::color::LINEAR_SRGB_TO_LINEAR_REC2020 * out_lin_srgb;
+
+    return vec3f(
+        common::color::srgb_curve_signed(out_lin_rec2020.x),
+        common::color::srgb_curve_signed(out_lin_rec2020.y),
+        common::color::srgb_curve_signed(out_lin_rec2020.z),
+    );
 }
 
 @compute @workgroup_size(256)

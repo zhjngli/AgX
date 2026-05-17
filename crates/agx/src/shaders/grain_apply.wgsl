@@ -118,19 +118,19 @@ fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: 
     let n = noise[idx];
     let nws = n * luminance_weight * scale;
 
-    // Apply grain to each channel
+    // Apply grain to each channel; output unclamped — the final clamp is at encode.
     let additive_r = nws * 0.35;
     let multiplicative_r = r * (exp(nws) - 1.0);
     let delta_r = additive_r + (multiplicative_r - additive_r) * blend;
-    pixels[base_idx] = clamp(r + delta_r, 0.0, 1.0);
+    pixels[base_idx] = r + delta_r;
 
     let additive_g = nws * 0.35;
     let multiplicative_g = g * (exp(nws) - 1.0);
     let delta_g = additive_g + (multiplicative_g - additive_g) * blend;
-    pixels[base_idx + 1u] = clamp(g + delta_g, 0.0, 1.0);
+    pixels[base_idx + 1u] = g + delta_g;
 
     let additive_b = nws * 0.35;
     let multiplicative_b = b * (exp(nws) - 1.0);
     let delta_b = additive_b + (multiplicative_b - additive_b) * blend;
-    pixels[base_idx + 2u] = clamp(b + delta_b, 0.0, 1.0);
+    pixels[base_idx + 2u] = b + delta_b;
 }

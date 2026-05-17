@@ -2,14 +2,22 @@
 
 use crate::engine::gpu::runtime::GpuRuntime;
 
-/// Dispatch the linear-to-sRGB compute shader.
-pub fn dispatch_linear_to_srgb(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    dispatch_pixel_only(runtime, pipeline, "linear_to_srgb");
+/// Dispatch the linear-to-gamma compute shader.
+///
+/// Applies the sign-preserving sRGB transfer curve per channel to working-space
+/// (linear Rec.2020) pixels, producing gamma Rec.2020 values. The sign-preserving
+/// variant lets negative components from out-of-gamut math survive the transfer.
+pub fn dispatch_linear_to_gamma(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
+    dispatch_pixel_only(runtime, pipeline, "linear_to_gamma");
 }
 
-/// Dispatch the sRGB-to-linear compute shader.
-pub fn dispatch_srgb_to_linear(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
-    dispatch_pixel_only(runtime, pipeline, "srgb_to_linear");
+/// Dispatch the gamma-to-linear compute shader.
+///
+/// Inverse of [`dispatch_linear_to_gamma`]: applies the sign-preserving sRGB
+/// inverse transfer per channel to bring gamma Rec.2020 pixels back to linear
+/// Rec.2020 for further scene-referred processing.
+pub fn dispatch_gamma_to_linear(runtime: &GpuRuntime, pipeline: &wgpu::ComputePipeline) {
+    dispatch_pixel_only(runtime, pipeline, "gamma_to_linear");
 }
 
 /// Shared dispatch for shaders that only bind the pixel buffer.
@@ -49,7 +57,7 @@ mod tests {
     use crate::engine::gpu::shaders::ShaderCache;
 
     #[test]
-    fn gpu_linear_srgb_roundtrip() {
+    fn gpu_linear_gamma_roundtrip() {
         if !gpu_available() {
             eprintln!("skipping: no GPU adapter");
             return;
@@ -58,19 +66,20 @@ mod tests {
         let runtime = GpuRuntime::new(4, 2).unwrap();
         let shaders = ShaderCache::new(&runtime.device).unwrap();
 
+        // Range spans negative values to exercise the sign-preserving curve.
         let pixels: Vec<[f32; 3]> = (0..8)
             .map(|i| {
-                let t = i as f32 / 7.0;
+                let t = (i as f32 / 7.0) * 2.0 - 0.3; // range roughly -0.3 .. 1.7
                 [t, 1.0 - t, 0.5 * t]
             })
             .collect();
         runtime.upload_pixels(&pixels);
 
-        let to_srgb = shaders.get("linear_to_srgb").unwrap();
-        dispatch_linear_to_srgb(&runtime, to_srgb);
+        let to_gamma = shaders.get("linear_to_gamma").unwrap();
+        dispatch_linear_to_gamma(&runtime, to_gamma);
 
-        let to_linear = shaders.get("srgb_to_linear").unwrap();
-        dispatch_srgb_to_linear(&runtime, to_linear);
+        let to_linear = shaders.get("gamma_to_linear").unwrap();
+        dispatch_gamma_to_linear(&runtime, to_linear);
 
         let result = runtime.download_pixels();
         assert_eq!(result.len(), pixels.len());

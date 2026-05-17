@@ -24,11 +24,11 @@ impl Stage for DehazeStage {
     }
 
     fn input_color_space(&self) -> ColorSpace {
-        ColorSpace::LinearSrgb
+        ColorSpace::LinearRec2020
     }
 
     fn output_color_space(&self) -> ColorSpace {
-        ColorSpace::LinearSrgb
+        ColorSpace::LinearRec2020
     }
 
     fn is_active(&self, params: &Parameters) -> bool {
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn dehaze_color_space_is_linear() {
         let stage = DehazeStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::LinearSrgb);
-        assert_eq!(stage.output_color_space(), ColorSpace::LinearSrgb);
+        assert_eq!(stage.input_color_space(), ColorSpace::LinearRec2020);
+        assert_eq!(stage.output_color_space(), ColorSpace::LinearRec2020);
     }
 }

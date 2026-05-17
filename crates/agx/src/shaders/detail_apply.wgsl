@@ -85,8 +85,9 @@ fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: 
     // Masking not implemented in GPU path (TODO: edge map)
     let delta = params.detail_strength * high_freq;
 
+    // Output unclamped; the final clamp is at encode.
     let base = idx * 3u;
-    pixels[base]      = clamp(pixels[base]      + delta, 0.0, 1.0);
-    pixels[base + 1u] = clamp(pixels[base + 1u] + delta, 0.0, 1.0);
-    pixels[base + 2u] = clamp(pixels[base + 2u] + delta, 0.0, 1.0);
+    pixels[base]      = pixels[base]      + delta;
+    pixels[base + 1u] = pixels[base + 1u] + delta;
+    pixels[base + 2u] = pixels[base + 2u] + delta;
 }

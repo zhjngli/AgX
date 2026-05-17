@@ -87,7 +87,7 @@ These invariants must hold across the entire codebase. The [architecture explana
 
 1. **Always re-render from original** — the engine holds an immutable original and applies all adjustments from scratch on every render.
 2. **Declarative presets** — preset files declare parameter values, not operation sequences.
-3. **sRGB only** — no working-space conversion, no ICC profile handling.
+3. **Working space is linear Rec.2020** — stages 1–3 (WB + Exposure, Dehaze, Denoise) operate in linear Rec.2020; stages 5–8 (PerPixelAdjustments, Detail, Grain, Vignette) operate in gamma-encoded Rec.2020 (sRGB transfer curve applied to Rec.2020 linear values); stages 4 and 9 are the conversion stages. Decode converts inputs into linear Rec.2020; encode converts linear Rec.2020 to sRGB output. ICC profile handling remains out of scope at this revision (tracked in `docs/backlog/color-management.md`).
 4. **Fixed render order** — the engine applies adjustments in a hardcoded order regardless of preset key order.
 5. **Dual pipeline, same output** — CPU and GPU pipelines produce near-identical output; CPU is the canonical path.
 

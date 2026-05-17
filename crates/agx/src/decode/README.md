@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Decode image files into linear sRGB `Rgb32FImage` buffers for the engine.
+Decode image files into linear Rec.2020 `Rgb32FImage` buffers for the engine.
 
 ## Public API
 
 - `decode(path)` -- unified entry point; auto-detects format from extension
-- `decode_standard(path)` -- decode JPEG, PNG, TIFF, BMP, WebP via the `image` crate, converting from sRGB gamma to linear
+- `decode_standard(path)` -- decode JPEG, PNG, TIFF, BMP, WebP via the `image` crate, converting from sRGB gamma to linear, then matrix-converted to linear Rec.2020
 - `is_raw_extension(path)` -- check if a file extension is a known raw format
 - `raw::decode_raw(path)` -- decode raw files via LibRaw FFI (behind `raw` feature)
 - `raw::extract_raw_metadata(path)` -- extract synthetic EXIF from LibRaw parsed fields (behind `raw` feature)
@@ -29,7 +29,7 @@ Decode image files into linear sRGB `Rgb32FImage` buffers for the engine.
 
 ## Key Decisions
 
-- **Output is always linear sRGB f32.** Standard images are assumed sRGB gamma and converted to linear on decode. Raw images are demosaicked by LibRaw and converted to linear sRGB via its color pipeline.
+- **Output is always linear Rec.2020 f32.** Standard sRGB inputs and BT.709 are matrix-converted; Display P3 HEIC inputs are matrix-converted directly to Rec.2020 (preserving wide gamut); BT.2020 SDR primaries map identity. LibRaw stays in sRGB output mode then matrix-converts (native Rec.2020 path deferred as perf follow-up).
 - **Raw support is feature-gated.** The `raw` feature flag controls LibRaw FFI compilation. Without it, raw extensions produce an error message rather than a compile failure.
 - **HEIC support is feature-gated.** The `heic` feature flag controls libheif FFI compilation. Without it, HEIC/HEIF extensions produce an error message rather than a compile failure.
 - **Extension-based routing.** `decode()` checks the file extension to choose the decode path. This is simple and aligns with how camera files are named.

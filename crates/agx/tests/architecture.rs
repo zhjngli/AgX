@@ -259,3 +259,32 @@ fn preset_must_not_import_decode_encode_metadata() {
         format_violations("preset", forbidden, &violations)
     );
 }
+
+/// Asserts that the engine's source, decode README, and encode README all
+/// declare the working-space contract consistently. Catches future drift
+/// where one module's contract changes without the others being updated.
+///
+/// Will fail until module READMEs are updated in Phase H2 — by design.
+/// Committed red so the next commit's diff makes the missing docs obvious.
+#[test]
+fn engine_output_contract_matches_decode_output_and_encode_input() {
+    let engine_src = std::fs::read_to_string("src/engine/mod.rs").expect("read src/engine/mod.rs");
+    assert!(
+        engine_src.contains("linear Rec.2020"),
+        "engine/mod.rs docstring must declare the linear Rec.2020 working-space contract"
+    );
+
+    let decode_readme =
+        std::fs::read_to_string("src/decode/README.md").expect("read src/decode/README.md");
+    assert!(
+        decode_readme.contains("linear Rec.2020") || decode_readme.contains("Rec.2020"),
+        "decode/README.md must declare its output as linear Rec.2020"
+    );
+
+    let encode_readme =
+        std::fs::read_to_string("src/encode/README.md").expect("read src/encode/README.md");
+    assert!(
+        encode_readme.contains("linear Rec.2020") || encode_readme.contains("Rec.2020"),
+        "encode/README.md must declare its input as linear Rec.2020"
+    );
+}

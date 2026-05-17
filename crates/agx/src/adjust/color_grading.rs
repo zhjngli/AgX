@@ -3,7 +3,7 @@
 use super::{LUMA_B, LUMA_G, LUMA_R};
 use serde::{Deserialize, Serialize};
 
-// --- Color Grading (sRGB gamma space) ---
+// --- Color Grading (gamma Rec.2020 working space) ---
 
 /// A single color wheel with hue, saturation, and luminance.
 ///
@@ -115,8 +115,9 @@ impl ColorGradingPrecomputed {
 
 /// Apply 3-way color grading using precomputed invariants (hot path).
 ///
-/// Operates in sRGB gamma space. Uses Rec. 709 luminance coefficients on
-/// gamma-encoded values as a perceptual approximation for weight computation.
+/// Operates in the gamma Rec.2020 working space. Uses Rec. 709 luminance
+/// coefficients on gamma-encoded values as a perceptual approximation for
+/// weight computation.
 #[inline]
 pub fn apply_color_grading_pre(
     r: f32,
@@ -124,13 +125,24 @@ pub fn apply_color_grading_pre(
     b: f32,
     pre: &ColorGradingPrecomputed,
 ) -> (f32, f32, f32) {
-    // Pixel luminance (Rec. 709 on gamma-encoded values)
+    // Luminance weights (Rec.709) applied in the gamma-encoded working
+    // space — the perceptual approximation is the same as in the previous
+    // sRGB-only design (Rec.709 weights are exact for linear sRGB luma,
+    // not gamma-encoded Rec.2020, but perceptual usability matters more
+    // here than photometric accuracy). The tonal-region weight is clamped
+    // [0, 1] below as domain-safety; the underlying multiplier is
+    // unclamped so wide-gamut headroom survives.
     let lum = LUMA_R * r + LUMA_G * g + LUMA_B * b;
 
     // Balance remapping (skip powf when balance is neutral)
     let lum_adj = if pre.balance_active {
+        // Luma may be negative or > 1 for wide-gamut inputs. Clamp here is
+        // domain-safety: powf with negative base produces NaN.
         lum.clamp(0.0, 1.0).powf(pre.balance_factor)
     } else {
+        // Luma used as a weight for shadow/midtone/highlight contribution.
+        // Clamp here is domain-safety: weights would invert with negative luma
+        // or sum incorrectly above 1.
         lum.clamp(0.0, 1.0)
     };
 
@@ -155,19 +167,20 @@ pub fn apply_color_grading_pre(
     let combined_g = regional_g * pre.global_tint[1];
     let combined_b = regional_b * pre.global_tint[2];
 
-    // Multiply pixel by combined tint
-    let mut out_r = (r * combined_r).clamp(0.0, 1.0);
-    let mut out_g = (g * combined_g).clamp(0.0, 1.0);
-    let mut out_b = (b * combined_b).clamp(0.0, 1.0);
+    // Multiply pixel by combined tint; output unclamped — wide-gamut headroom
+    // survives this stage, final clamp is at encode.
+    let mut out_r = r * combined_r;
+    let mut out_g = g * combined_g;
+    let mut out_b = b * combined_b;
 
-    // Luminance shifts (weighted additive, pre-divided by 100)
+    // Luminance shifts (weighted additive, pre-divided by 100); unclamped.
     let adjustment = pre.shadow_lum * w_shadow
         + pre.midtone_lum * w_midtone
         + pre.highlight_lum * w_highlight
         + pre.global_lum;
-    out_r = (out_r + adjustment).clamp(0.0, 1.0);
-    out_g = (out_g + adjustment).clamp(0.0, 1.0);
-    out_b = (out_b + adjustment).clamp(0.0, 1.0);
+    out_r += adjustment;
+    out_g += adjustment;
+    out_b += adjustment;
 
     (out_r, out_g, out_b)
 }
@@ -324,6 +337,21 @@ mod tests {
                 lum
             );
         }
+    }
+
+    #[test]
+    fn color_grading_preserves_out_of_range_values() {
+        // OOG input (r=1.3) with a non-trivial highlight tint should not be
+        // clamped at output. Wide-gamut headroom must survive the tint multiply
+        // and luminance shift stages.
+        let mut params = ColorGradingParams::default();
+        params.highlights.hue = 30.0;
+        params.highlights.saturation = 20.0;
+        params.highlights.luminance = 10.0;
+        let pre = ColorGradingPrecomputed::new(&params);
+        let (r, _g, _b) = apply_color_grading_pre(1.3, 0.9, 0.8, &pre);
+        assert!(r > 1.0, "color_grading clamped OOG value: r={r}");
+        assert!(r.is_finite());
     }
 
     #[test]
