@@ -3,11 +3,15 @@
 use super::{LUMA_B, LUMA_G, LUMA_R};
 use serde::{Deserialize, Serialize};
 
-// --- Tone Curves ---
+// --- Tone Curves (gamma Rec.2020 working space) ---
 
 /// A single tone curve defined by control points.
 /// Points are (input, output) pairs in [0.0, 1.0], sorted by input.
 /// First point must have x=0.0, last must have x=1.0.
+///
+/// The (x, y) curve points live in the gamma-encoded working space; the
+/// perceptual meaning carries over from the previous sRGB-only design
+/// because the gamma transfer curve shape is unchanged on Rec.2020 values.
 #[cfg_attr(
     any(feature = "docgen", feature = "validate"),
     derive(schemars::JsonSchema)
@@ -199,6 +203,9 @@ pub(crate) fn build_tone_curve_lut(curve: &ToneCurve) -> [f32; 256] {
 /// Look up a value in a precomputed 256-entry LUT with linear interpolation.
 #[inline(always)]
 pub(crate) fn lut_lookup(lut: &[f32; 256], value: f32) -> f32 {
+    // LUT index domain [0, 255] is a domain-safety clamp on the lookup
+    // table; the value space underneath is the gamma Rec.2020 working
+    // space (256-entry sampling at i / 255.0 of the [0, 1] curve domain).
     let idx = value * 255.0;
     // Domain-safety: clamp index to valid array bounds. OOG inputs are handled
     // by returning the endpoint LUT value (nearest-boundary lookup, not

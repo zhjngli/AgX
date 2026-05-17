@@ -39,7 +39,7 @@ const CHANNEL_CENTERS: [f32; 8] = [0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 
 /// matching the Lightroom/Capture One approach with non-uniform spacing.
 const CHANNEL_HALF_WIDTHS: [f32; 8] = [30.0, 30.0, 30.0, 60.0, 60.0, 30.0, 30.0, 30.0];
 
-/// Apply per-channel HSL adjustments to an sRGB gamma pixel.
+/// Apply per-channel HSL adjustments to a pixel in the gamma Rec.2020 working space.
 ///
 /// Takes 3 arrays of 8 values each (one per channel, ordered Red through Magenta):
 /// - `hue_shifts`: degrees, -180 to +180
@@ -58,8 +58,14 @@ pub fn apply_hsl(
     luminance_shifts: &[f32; 8],
     weight_fn: WeightFn,
 ) -> (f32, f32, f32) {
-    // HSL works in [0, 1] RGB; wide-gamut headroom is lost here. OKHsl is
-    // the long-term fix tracked in docs/backlog/color-management.md.
+    // RGB ↔ HSL conversion via palette's Hsl<Srgb>. The palette type is
+    // named Srgb but the math only cares about [0, 1] RGB tuples — we
+    // feed it gamma Rec.2020 values. The [0, 1] domain clamp on the
+    // entry is required by palette's type; wide-gamut headroom is lost
+    // here. OKHsl is the long-term fix tracked in
+    // docs/backlog/color-management.md. The output saturation/lightness
+    // clamps below stay as domain-safety for the HSL space's [0, 1]
+    // convention.
     let r_in = r.clamp(0.0, 1.0);
     let g_in = g.clamp(0.0, 1.0);
     let b_in = b.clamp(0.0, 1.0);

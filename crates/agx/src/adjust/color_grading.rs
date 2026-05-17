@@ -3,7 +3,7 @@
 use super::{LUMA_B, LUMA_G, LUMA_R};
 use serde::{Deserialize, Serialize};
 
-// --- Color Grading (sRGB gamma space) ---
+// --- Color Grading (gamma Rec.2020 working space) ---
 
 /// A single color wheel with hue, saturation, and luminance.
 ///
@@ -115,8 +115,9 @@ impl ColorGradingPrecomputed {
 
 /// Apply 3-way color grading using precomputed invariants (hot path).
 ///
-/// Operates in sRGB gamma space. Uses Rec. 709 luminance coefficients on
-/// gamma-encoded values as a perceptual approximation for weight computation.
+/// Operates in the gamma Rec.2020 working space. Uses Rec. 709 luminance
+/// coefficients on gamma-encoded values as a perceptual approximation for
+/// weight computation.
 #[inline]
 pub fn apply_color_grading_pre(
     r: f32,
@@ -124,7 +125,13 @@ pub fn apply_color_grading_pre(
     b: f32,
     pre: &ColorGradingPrecomputed,
 ) -> (f32, f32, f32) {
-    // Pixel luminance (Rec. 709 on gamma-encoded values)
+    // Luminance weights (Rec.709) applied in the gamma-encoded working
+    // space — the perceptual approximation is the same as in the previous
+    // sRGB-only design (Rec.709 weights are exact for linear sRGB luma,
+    // not gamma-encoded Rec.2020, but perceptual usability matters more
+    // here than photometric accuracy). The tonal-region weight is clamped
+    // [0, 1] below as domain-safety; the underlying multiplier is
+    // unclamped so wide-gamut headroom survives.
     let lum = LUMA_R * r + LUMA_G * g + LUMA_B * b;
 
     // Balance remapping (skip powf when balance is neutral)

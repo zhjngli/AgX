@@ -1,12 +1,12 @@
 #![doc = include_str!("basic_tone.md")]
 
-// --- Contrast (sRGB gamma space) ---
+// --- Contrast (gamma Rec.2020 working space) ---
 
 // Midpoint 0.5 is "perceptual middle gray" in the gamma-encoded working
 // space — the sRGB transfer curve shape applied to Rec.2020 linear
 // values puts middle gray near 0.5 of the gamma-encoded range, same as
 // plain sRGB-gamma. Output is unclamped; the final clamp is at encode.
-/// Apply contrast adjustment to a single channel value in sRGB gamma space.
+/// Apply contrast adjustment to a single channel value in the gamma Rec.2020 working space.
 /// Contrast range: -100 to +100. 0 = no change.
 pub fn apply_contrast(value: f32, contrast: f32) -> f32 {
     if contrast == 0.0 {
@@ -16,9 +16,13 @@ pub fn apply_contrast(value: f32, contrast: f32) -> f32 {
     0.5 + (value - 0.5) * factor
 }
 
-// --- Highlights (sRGB gamma space) ---
+// --- Highlights (gamma Rec.2020 working space) ---
 
-/// Apply highlights adjustment to a single channel value in sRGB gamma space.
+// Anchor 0.5 splits the tone range at the perceptual midpoint of the
+// gamma-encoded working space, same meaning as in plain sRGB-gamma:
+// the sRGB transfer curve shape on Rec.2020 linear values puts middle
+// gray near 0.5. Output is unclamped; the final clamp is at encode.
+/// Apply highlights adjustment to a single channel value in the gamma Rec.2020 working space.
 /// Targets bright pixels (> 0.5). Range: -100 to +100.
 pub fn apply_highlights(value: f32, highlights: f32) -> f32 {
     if highlights == 0.0 || value <= 0.5 {
@@ -29,9 +33,13 @@ pub fn apply_highlights(value: f32, highlights: f32) -> f32 {
     value + adjustment
 }
 
-// --- Shadows (sRGB gamma space) ---
+// --- Shadows (gamma Rec.2020 working space) ---
 
-/// Apply shadows adjustment to a single channel value in sRGB gamma space.
+// Anchor 0.5 splits the tone range at the perceptual midpoint of the
+// gamma-encoded working space, same meaning as in plain sRGB-gamma:
+// the sRGB transfer curve shape on Rec.2020 linear values puts middle
+// gray near 0.5. Output is unclamped; the final clamp is at encode.
+/// Apply shadows adjustment to a single channel value in the gamma Rec.2020 working space.
 /// Targets dark pixels (< 0.5). Range: -100 to +100.
 pub fn apply_shadows(value: f32, shadows: f32) -> f32 {
     if shadows == 0.0 || value >= 0.5 {
@@ -42,9 +50,14 @@ pub fn apply_shadows(value: f32, shadows: f32) -> f32 {
     value + adjustment
 }
 
-// --- Whites (sRGB gamma space) ---
+// --- Whites (gamma Rec.2020 working space) ---
 
-/// Apply whites adjustment to a single channel value in sRGB gamma space.
+// Anchor 0.75 marks the bright shoulder of the tone range. The 0.25
+// width to 1.0 keeps the same perceptual meaning as in sRGB-gamma —
+// the gamma transfer curve shape is unchanged on Rec.2020 values, so
+// the shoulder lands at the same encoded position. Output is unclamped;
+// the final clamp is at encode.
+/// Apply whites adjustment to a single channel value in the gamma Rec.2020 working space.
 /// Targets upper-range pixels (> 0.75). Range: -100 to +100.
 pub fn apply_whites(value: f32, whites: f32) -> f32 {
     if whites == 0.0 || value <= 0.75 {
@@ -55,9 +68,14 @@ pub fn apply_whites(value: f32, whites: f32) -> f32 {
     value + adjustment
 }
 
-// --- Blacks (sRGB gamma space) ---
+// --- Blacks (gamma Rec.2020 working space) ---
 
-/// Apply blacks adjustment to a single channel value in sRGB gamma space.
+// Anchor 0.25 marks the dark toe of the tone range. The 0.25 width
+// from 0.0 keeps the same perceptual meaning as in sRGB-gamma — the
+// gamma transfer curve shape is unchanged on Rec.2020 values, so the
+// toe lands at the same encoded position. Output is unclamped; the
+// final clamp is at encode.
+/// Apply blacks adjustment to a single channel value in the gamma Rec.2020 working space.
 /// Targets lower-range pixels (< 0.25). Range: -100 to +100.
 pub fn apply_blacks(value: f32, blacks: f32) -> f32 {
     if blacks == 0.0 || value >= 0.25 {
