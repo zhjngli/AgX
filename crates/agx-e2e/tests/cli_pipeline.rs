@@ -147,6 +147,26 @@ fn cli_temple_blossoms_heic() {
 }
 
 #[test]
+fn cli_synthetic_p3_red() {
+    // Display P3 fixture exercising the wide-gamut decode path (matrix
+    // to linear Rec.2020 rather than the prior P3-to-sRGB squash). The
+    // synthetic red gradient lives outside the sRGB gamut, so the noop
+    // golden captures whether wide-gamut R survives the round trip,
+    // and the look goldens capture how each look handles wide-gamut R.
+    run_image_matrix(
+        "heic/synthetic_p3_red.heic",
+        "synthetic_p3_red",
+        "heic",
+        // Same tolerance as the other HEIC entry — libheif decode is
+        // mostly deterministic but cross-version noise can show up at
+        // the boundary, and the wide-gamut math amplifies tiny drifts.
+        10,
+        1.0,
+        ALL_LOOKS,
+    );
+}
+
+#[test]
 fn cli_night_city_blur() {
     run_image_matrix(
         "raw/night_city_blur.raf",
