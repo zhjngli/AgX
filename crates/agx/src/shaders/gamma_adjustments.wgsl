@@ -114,15 +114,15 @@ fn apply_tone_curves(r_in: f32, g_in: f32, b_in: f32) -> vec3f {
         b = tone_curve_lookup(1024u, b);
     }
 
-    // Step 3: Luminance curve (offset 256)
+    // Step 3: Luminance curve (offset 256); scale is unclamped.
     if params.tc_luma_active > 0.5 {
         let l = common::math::luminance(r, g, b);
         let l_new = tone_curve_lookup(256u, l);
         if l > 1e-6 {
             let scale = l_new / l;
-            r = clamp(r * scale, 0.0, 1.0);
-            g = clamp(g * scale, 0.0, 1.0);
-            b = clamp(b * scale, 0.0, 1.0);
+            r = r * scale;
+            g = g * scale;
+            b = b * scale;
         } else {
             r = l_new;
             g = l_new;
@@ -196,19 +196,20 @@ fn apply_color_grading_pixel(r: f32, g: f32, b: f32) -> vec3f {
     let combined_g = regional_g * params.cg_global_tint.y;
     let combined_b = regional_b * params.cg_global_tint.z;
 
-    // Multiply pixel by combined tint
-    var out_r = clamp(r * combined_r, 0.0, 1.0);
-    var out_g = clamp(g * combined_g, 0.0, 1.0);
-    var out_b = clamp(b * combined_b, 0.0, 1.0);
+    // Multiply pixel by combined tint; output unclamped — wide-gamut headroom
+    // survives this stage, final clamp is at encode.
+    var out_r = r * combined_r;
+    var out_g = g * combined_g;
+    var out_b = b * combined_b;
 
-    // Luminance shifts (weighted additive, pre-divided by 100 via the .w component)
+    // Luminance shifts (weighted additive, pre-divided by 100 via the .w component); unclamped.
     let adjustment = params.cg_shadow_tint.w * w_shadow
         + params.cg_midtone_tint.w * w_midtone
         + params.cg_highlight_tint.w * w_highlight
         + params.cg_global_tint.w;
-    out_r = clamp(out_r + adjustment, 0.0, 1.0);
-    out_g = clamp(out_g + adjustment, 0.0, 1.0);
-    out_b = clamp(out_b + adjustment, 0.0, 1.0);
+    out_r = out_r + adjustment;
+    out_g = out_g + adjustment;
+    out_b = out_b + adjustment;
 
     return vec3f(out_r, out_g, out_b);
 }

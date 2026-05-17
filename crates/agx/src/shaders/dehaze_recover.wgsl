@@ -51,18 +51,19 @@ fn main(@builtin(global_invocation_id) id: vec3u, @builtin(num_workgroups) nwg: 
     let ag = params.dehaze_airlight_g;
     let ab = params.dehaze_airlight_b;
 
+    // Output unclamped; the final clamp is at encode.
     if params.dehaze_mode < 0.5 {
         // Positive dehaze: scene recovery
         let t = max(transmission[idx], T_MIN);
-        r = clamp((r - ar) / t + ar, 0.0, 1.0);
-        g = clamp((g - ag) / t + ag, 0.0, 1.0);
-        b = clamp((b - ab) / t + ab, 0.0, 1.0);
+        r = (r - ar) / t + ar;
+        g = (g - ag) / t + ag;
+        b = (b - ab) / t + ab;
     } else {
         // Negative dehaze: add fog (blend toward airlight)
         let strength = params.dehaze_omega; // pre-computed as -amount/100
-        r = clamp(r * (1.0 - strength) + ar * strength, 0.0, 1.0);
-        g = clamp(g * (1.0 - strength) + ag * strength, 0.0, 1.0);
-        b = clamp(b * (1.0 - strength) + ab * strength, 0.0, 1.0);
+        r = r * (1.0 - strength) + ar * strength;
+        g = g * (1.0 - strength) + ag * strength;
+        b = b * (1.0 - strength) + ab * strength;
     }
 
     pixels[base] = r;

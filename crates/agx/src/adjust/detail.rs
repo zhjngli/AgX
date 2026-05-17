@@ -618,7 +618,7 @@ mod tests {
         }
         // OOG red should not be pinned to 1.0 by the detail pass
         assert!(
-            result[0][0] > 1.0 || result[0][0] < 1.0,
+            result[0][0] != 1.0,
             "detail pinned OOG input to exactly 1.0: {}",
             result[0][0]
         );

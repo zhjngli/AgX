@@ -671,7 +671,7 @@ mod tests {
         // OOG red + small grain: result should not be pinned to 1.0
         // (grain delta is small, so ~1.2 ± small perturbation)
         assert!(
-            buf[0][0] > 1.0 || buf[0][0] < 1.0,
+            buf[0][0] != 1.0,
             "grain pinned OOG input to exactly 1.0: {}",
             buf[0][0]
         );
