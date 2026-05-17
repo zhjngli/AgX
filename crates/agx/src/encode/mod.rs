@@ -1,4 +1,7 @@
 //! Image encoding: writing rendered output to JPEG, PNG, TIFF.
+//!
+//! Input contract: linear Rec.2020 `Rgb32FImage`. This module converts to
+//! 8-bit sRGB-encoded output via a fused matrix → curve → quantize pass.
 
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -7,8 +10,8 @@ use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::codecs::tiff::TiffEncoder;
 use image::{Rgb, Rgb32FImage, RgbImage};
-use palette::{LinSrgb, Srgb};
 
+use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
 use crate::error::Result;
 use crate::metadata::ImageMetadata;
 
@@ -118,28 +121,39 @@ fn quantize_u8(x: f32) -> u8 {
     (normalized * 255.0).round() as u8
 }
 
-/// Convert a linear sRGB f32 image to an 8-bit sRGB-encoded RGB image in a single pass.
+/// Encode a linear Rec.2020 f32 image to an 8-bit sRGB-encoded `RgbImage`
+/// in a single fused pass.
 ///
-/// Combines the gamma encoding (linear → sRGB) and the f32 → u8 quantization
-/// in one traversal. A two-step conversion via an intermediate f32 sRGB image
-/// would allocate a ~300MB extra buffer at 26MP; this avoids that.
-pub fn linear_to_srgb_rgb8(linear: &Rgb32FImage) -> RgbImage {
-    let (w, h) = linear.dimensions();
+/// Combines the Rec.2020 → sRGB matrix multiply, the sRGB transfer curve,
+/// and the f32 → u8 quantization in one traversal. A multi-step conversion
+/// via intermediate f32 buffers would allocate hundreds of MB at high
+/// resolutions; this avoids that.
+pub fn encode_linear_rec2020_to_srgb_rgb8(linear_rec2020: &Rgb32FImage) -> RgbImage {
+    let (w, h) = linear_rec2020.dimensions();
+    let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
     RgbImage::from_fn(w, h, |x, y| {
-        let p = linear.get_pixel(x, y);
-        let s: Srgb<f32> = LinSrgb::new(p.0[0], p.0[1], p.0[2]).into_encoding();
+        let p = linear_rec2020.get_pixel(x, y);
+        let r = p.0[0];
+        let g = p.0[1];
+        let b = p.0[2];
+        // linear Rec.2020 → linear sRGB
+        let r_s = m[0][0] * r + m[0][1] * g + m[0][2] * b;
+        let g_s = m[1][0] * r + m[1][1] * g + m[1][2] * b;
+        let b_s = m[2][0] * r + m[2][1] * g + m[2][2] * b;
+        // linear sRGB → sRGB gamma (sign-preserving) → clamp + quantize via quantize_u8
         Rgb([
-            quantize_u8(s.red),
-            quantize_u8(s.green),
-            quantize_u8(s.blue),
+            quantize_u8(srgb_curve_signed(r_s)),
+            quantize_u8(srgb_curve_signed(g_s)),
+            quantize_u8(srgb_curve_signed(b_s)),
         ])
     })
 }
 
-/// Encode a linear sRGB f32 image to a file with full options.
+/// Encode a linear Rec.2020 f32 image to a file with full options.
 ///
-/// Resolves the output format and path, encodes with the appropriate encoder,
-/// and optionally injects metadata. Returns the final output path (which may
+/// Converts to 8-bit sRGB via a fused matrix → curve → quantize pass; resolves
+/// the output format and path, encodes with the appropriate encoder, and
+/// optionally injects metadata. Returns the final output path (which may
 /// differ from the input path if an extension was appended).
 pub fn encode_to_file_with_options(
     linear: &Rgb32FImage,
@@ -149,7 +163,7 @@ pub fn encode_to_file_with_options(
 ) -> Result<PathBuf> {
     let (final_path, format) = resolve_output(path, options.format);
 
-    let rgb8 = linear_to_srgb_rgb8(linear);
+    let rgb8 = encode_linear_rec2020_to_srgb_rgb8(linear);
 
     // Encode to in-memory buffer with format-specific encoder
     let buf = match format {
@@ -196,7 +210,7 @@ pub fn encode_to_file_with_options(
     Ok(final_path)
 }
 
-/// Encode a linear sRGB f32 image to a file, converting to sRGB gamma space.
+/// Encode a linear Rec.2020 f32 image to a file, converting to 8-bit sRGB.
 ///
 /// Uses default options (JPEG quality 92, format inferred from extension).
 /// For more control, use `encode_to_file_with_options`.
@@ -266,9 +280,10 @@ mod tests {
 
     #[test]
     fn roundtrip_linear_to_srgb_pixel_values() {
-        // linear 0.2159 should round-trip to sRGB ~128
+        // linear 0.2159 should round-trip to sRGB ~128. Greyscale input is
+        // matrix-invariant (rows of LINEAR_REC2020_TO_LINEAR_SRGB sum to ~1.0).
         let linear: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([0.2159f32, 0.2159, 0.2159]));
-        let rgb8 = linear_to_srgb_rgb8(&linear);
+        let rgb8 = encode_linear_rec2020_to_srgb_rgb8(&linear);
         let pixel = rgb8.get_pixel(0, 0);
         assert!(
             (pixel.0[0] as i32 - 128).unsigned_abs() <= 1,
@@ -291,11 +306,13 @@ mod tests {
     }
 
     #[test]
-    fn linear_to_srgb_rgb8_quantization_table() {
+    fn encode_rec2020_to_srgb_rgb8_quantization_table() {
         // Hardcoded expected values pin the linear→sRGB→u8 conversion behavior
-        // against future drift in palette or quantize_u8. Computed from the
+        // against future drift in the curve or quantize_u8. Computed from the
         // pre-refactor `linear_to_srgb_dynamic + to_rgb8` path; updates here must
         // be deliberate decisions, not accidental regressions.
+        // why: greyscale is matrix-invariant (rows of LINEAR_REC2020_TO_LINEAR_SRGB
+        // sum to ~1.0), so this pinning table survives the working-space widening.
         let table: &[(f32, u8)] = &[
             (0.0, 0),
             (0.0001, 0),
@@ -316,13 +333,35 @@ mod tests {
 
         for &(linear, expected) in table {
             let img: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb([linear, linear, linear]));
-            let rgb8 = linear_to_srgb_rgb8(&img);
+            let rgb8 = encode_linear_rec2020_to_srgb_rgb8(&img);
             let actual = rgb8.get_pixel(0, 0).0[0];
             assert_eq!(
                 actual, expected,
                 "linear {linear} should encode to u8 {expected}, got {actual}"
             );
         }
+    }
+
+    #[test]
+    fn encode_rec2020_to_srgb_rgb8_preserves_pure_srgb_via_inverse_matrix() {
+        use crate::color_space::LINEAR_SRGB_TO_LINEAR_REC2020;
+
+        // Start with linear sRGB pure red, push it into linear Rec.2020
+        // (decode side), then encode. The encoder's matrix is the inverse;
+        // we should round-trip back to sRGB pure red (255, 0, 0).
+        let m_in = &LINEAR_SRGB_TO_LINEAR_REC2020;
+        let rec2020_red = [
+            m_in[0][0] * 1.0 + m_in[0][1] * 0.0 + m_in[0][2] * 0.0,
+            m_in[1][0] * 1.0 + m_in[1][1] * 0.0 + m_in[1][2] * 0.0,
+            m_in[2][0] * 1.0 + m_in[2][1] * 0.0 + m_in[2][2] * 0.0,
+        ];
+
+        let img: Rgb32FImage = ImageBuffer::from_pixel(1, 1, Rgb(rec2020_red));
+        let rgb8 = encode_linear_rec2020_to_srgb_rgb8(&img);
+        let px = rgb8.get_pixel(0, 0).0;
+        assert_eq!(px[0], 255, "sRGB red R: got {}", px[0]);
+        assert_eq!(px[1], 0, "sRGB red G: got {}", px[1]);
+        assert_eq!(px[2], 0, "sRGB red B: got {}", px[2]);
     }
 
     #[test]

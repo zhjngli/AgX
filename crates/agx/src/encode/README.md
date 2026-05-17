@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Encode rendered linear sRGB images to output files (JPEG, PNG, TIFF) with optional metadata injection.
+Encode rendered linear Rec.2020 images to 8-bit sRGB output files (JPEG, PNG, TIFF) with optional metadata injection.
 
 ## Public API
 
@@ -12,7 +12,7 @@ Encode rendered linear sRGB images to output files (JPEG, PNG, TIFF) with option
 - `encode_to_file(linear, path)` -- simple encode with defaults (format inferred from extension)
 - `encode_to_file_with_options(linear, path, options, metadata)` -- full-control encode with quality, format, and metadata injection; returns the final output path
 - `resolve_output(path, format)` -- determine final path and format from extension and optional override
-- `linear_to_srgb_rgb8(linear)` -- convert linear f32 buffer to 8-bit sRGB `RgbImage` in a single pass
+- `encode_linear_rec2020_to_srgb_rgb8(linear_rec2020)` -- convert linear Rec.2020 f32 buffer to 8-bit sRGB `RgbImage` in a single fused pass: matrix → curve → quantize
 
 ## Extension Guide
 
@@ -31,6 +31,6 @@ To add a new output format:
 
 ## Key Decisions
 
-- **Linear-to-sRGB conversion on encode.** The engine outputs linear sRGB; this module converts to gamma space and quantizes to 8-bit for file output.
+- **Rec.2020-to-sRGB conversion on encode.** The engine outputs linear Rec.2020; this module fuses the gamut conversion (matrix multiply), the sRGB transfer curve, and the f32 → u8 quantization into a single per-pixel pass.
 - **Path resolution rules.** If the requested format and extension match, use as-is. If they conflict, append the correct extension. Unknown extensions default to JPEG.
 - **Metadata injection is best-effort.** Uses `img_parts` for JPEG/PNG and `little_exif` for TIFF. Injection failures on TIFF are silent (best-effort).
