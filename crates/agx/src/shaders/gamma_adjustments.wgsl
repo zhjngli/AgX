@@ -222,9 +222,46 @@ fn apply_color_grading_pixel(r: f32, g: f32, b: f32) -> vec3f {
 // --- LUT ---
 
 fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
-    let coord = vec3f(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0));
-    let result = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
-    return vec3f(result.x, result.y, result.z);
+    // Input is gamma Rec.2020 (engine working space). LUTs are
+    // sRGB-gamma authored, so bracket the sample:
+    //   gamma Rec.2020 -> linear Rec.2020 -> linear sRGB -> gamma sRGB
+    //   -> LUT sample
+    //   -> gamma sRGB -> linear sRGB -> linear Rec.2020 -> gamma Rec.2020
+    // Mirrors crate::color_space::wrap_lut_lookup on the CPU side.
+
+    let lin_rec2020 = vec3f(
+        common::color::srgb_curve_signed_inverse(r),
+        common::color::srgb_curve_signed_inverse(g),
+        common::color::srgb_curve_signed_inverse(b),
+    );
+    let lin_srgb = common::color::LINEAR_REC2020_TO_LINEAR_SRGB * lin_rec2020;
+    let gamma_srgb = vec3f(
+        common::color::srgb_curve_signed(lin_srgb.x),
+        common::color::srgb_curve_signed(lin_srgb.y),
+        common::color::srgb_curve_signed(lin_srgb.z),
+    );
+
+    // LUT sampler requires [0, 1] coords -- domain-safety clamp on the
+    // gamma-sRGB intermediate, not on the engine buffer.
+    let coord = vec3f(
+        clamp(gamma_srgb.x, 0.0, 1.0),
+        clamp(gamma_srgb.y, 0.0, 1.0),
+        clamp(gamma_srgb.z, 0.0, 1.0),
+    );
+    let sampled = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
+
+    let out_lin_srgb = vec3f(
+        common::color::srgb_curve_signed_inverse(sampled.x),
+        common::color::srgb_curve_signed_inverse(sampled.y),
+        common::color::srgb_curve_signed_inverse(sampled.z),
+    );
+    let out_lin_rec2020 = common::color::LINEAR_SRGB_TO_LINEAR_REC2020 * out_lin_srgb;
+
+    return vec3f(
+        common::color::srgb_curve_signed(out_lin_rec2020.x),
+        common::color::srgb_curve_signed(out_lin_rec2020.y),
+        common::color::srgb_curve_signed(out_lin_rec2020.z),
+    );
 }
 
 @compute @workgroup_size(256)
