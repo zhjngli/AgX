@@ -348,6 +348,7 @@ Per the cross-cutting-change checklist established in `CLAUDE.md` (developer wor
 | `crates/agx/src/adjust/color_grading.md` | Note: gamma-encoded Rec.2020; lift/gamma/gain clamps removed. |
 | `crates/agx/src/adjust/tone_curves.md` | Note: gamma-encoded Rec.2020; tone-curve LUT index clamp documented as domain-safety; out-of-`[0,1]` extrapolation policy documented. |
 | `basic_tone.rs`, `color_grading.rs`, `tone_curves.rs`, `hsl.rs` | Inline comments where math anchors live: brief note "midpoint = 0.5 in gamma-encoded working space; transfer curve shape matches sRGB-gamma, so anchors carry over." |
+| `crates/agx/CHANGELOG.md` | `[Unreleased]` entry. Document every public-API rename and new public item under `### Changed (breaking)` / `### Added`. Cross-cutting renames (stage names, dispatcher fns, the encode helper, the `ColorSpace` enum variants) are easy to miss without a cross-crate `pub` diff. |
 
 The adversarial review at the end of implementation verifies each line of this table was followed.
 
