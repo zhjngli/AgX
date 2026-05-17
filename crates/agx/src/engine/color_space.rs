@@ -8,9 +8,9 @@
 ///
 /// Derived from BT.2020 and sRGB primaries plus the D65 white point.
 pub const LINEAR_REC2020_TO_LINEAR_SRGB: [[f32; 3]; 3] = [
-    [ 1.660491, -0.587641, -0.072850],
-    [-0.124550,  1.132899, -0.008349],
-    [-0.018151, -0.100579,  1.11873],
+    [1.660491, -0.587641, -0.072850],
+    [-0.124550, 1.132899, -0.008349],
+    [-0.018151, -0.100579, 1.11873],
 ];
 
 /// Linear sRGB → linear Rec.2020 (inverse of the above).
@@ -109,7 +109,9 @@ mod tests {
                 assert!(
                     (out[c] - v[c]).abs() < 1e-4,
                     "round-trip mismatch at channel {}: in={} out={}",
-                    c, v[c], out[c]
+                    c,
+                    v[c],
+                    out[c]
                 );
             }
         }
@@ -144,7 +146,9 @@ mod tests {
             let back = srgb_curve_signed_inverse(gamma);
             assert!(
                 (back - v).abs() < 1e-5,
-                "round-trip drift at v={}: got {}", v, back
+                "round-trip drift at v={}: got {}",
+                v,
+                back
             );
         }
     }
