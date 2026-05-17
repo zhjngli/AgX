@@ -7,6 +7,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 
 pub mod adjust;
+pub mod color_space;
 pub mod decode;
 pub mod encode;
 pub mod engine;

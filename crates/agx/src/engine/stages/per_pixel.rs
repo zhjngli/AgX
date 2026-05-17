@@ -1,5 +1,5 @@
 use crate::adjust;
-use crate::engine::color_space::wrap_lut_lookup;
+use crate::color_space::wrap_lut_lookup;
 use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
 use crate::error::AgxError;
 

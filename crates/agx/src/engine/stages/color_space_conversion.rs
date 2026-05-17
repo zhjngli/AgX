@@ -1,4 +1,4 @@
-use crate::engine::color_space::{srgb_curve_signed, srgb_curve_signed_inverse};
+use crate::color_space::{srgb_curve_signed, srgb_curve_signed_inverse};
 use crate::engine::{ColorSpace, RenderContext, Stage};
 use crate::error::AgxError;
 use rayon::prelude::*;

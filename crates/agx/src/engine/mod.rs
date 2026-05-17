@@ -15,9 +15,6 @@ pub mod gpu;
 /// Pluggable pipeline stages (white balance, dehaze, denoise, per-pixel, detail, grain, vignette, color-space conversions).
 pub mod stages;
 
-/// Color-space conversion matrices and transfer curves (Rec.2020 ↔ sRGB, P3 → Rec.2020).
-pub mod color_space;
-
 /// Timing data for a single render pass. Only available when compiled
 /// with the `profiling` feature.
 #[cfg(feature = "profiling")]
