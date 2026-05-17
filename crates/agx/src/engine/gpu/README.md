@@ -16,16 +16,18 @@ deliberately changed first.
 
 The GPU pipeline follows the same fixed stage order as the CPU pipeline:
 
-1. Linear adjustments: white balance and exposure.
-2. Dehaze.
-3. Denoise.
-4. Linear to sRGB conversion.
-5. Gamma-space adjustments: contrast, tone ranges, tone curves, HSL, color
-   grading, and LUT.
-6. Detail.
-7. Grain.
-8. Vignette.
-9. sRGB to linear conversion.
+1. Linear adjustments (linear Rec.2020): white balance and exposure.
+2. Dehaze (linear Rec.2020).
+3. Denoise (linear Rec.2020).
+4. Linear to gamma conversion (linear Rec.2020 → gamma Rec.2020 via the
+   sign-preserving sRGB transfer curve).
+5. Gamma-space adjustments (gamma Rec.2020): contrast, tone ranges, tone
+   curves, HSL, color grading, and LUT (sampled via an sRGB-gamma bracket
+   so existing sRGB-authored `.cube` LUTs remain portable).
+6. Detail (gamma Rec.2020).
+7. Grain (gamma Rec.2020).
+8. Vignette (gamma Rec.2020).
+9. Gamma to linear conversion (gamma Rec.2020 → linear Rec.2020).
 
 ## Dual-path principle
 

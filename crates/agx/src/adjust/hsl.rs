@@ -60,12 +60,14 @@ pub fn apply_hsl(
 ) -> (f32, f32, f32) {
     // RGB ↔ HSL conversion via palette's Hsl<Srgb>. The palette type is
     // named Srgb but the math only cares about [0, 1] RGB tuples — we
-    // feed it gamma Rec.2020 values. The [0, 1] domain clamp on the
-    // entry is required by palette's type; wide-gamut headroom is lost
-    // here. OKHsl is the long-term fix tracked in
-    // docs/backlog/color-management.md. The output saturation/lightness
-    // clamps below stay as domain-safety for the HSL space's [0, 1]
-    // convention.
+    // feed it gamma Rec.2020 values. The gamma transfer curve shape is
+    // unchanged from sRGB-gamma, so the perceptual saturation /
+    // lightness anchors used by the HSL math carry the same meaning on
+    // Rec.2020 values. The [0, 1] domain clamp on the entry is required
+    // by palette's type; wide-gamut headroom is lost here. OKHsl is the
+    // long-term fix tracked in docs/backlog/color-management.md. The
+    // output saturation/lightness clamps below stay as domain-safety
+    // for the HSL space's [0, 1] convention.
     let r_in = r.clamp(0.0, 1.0);
     let g_in = g.clamp(0.0, 1.0);
     let b_in = b.clamp(0.0, 1.0);

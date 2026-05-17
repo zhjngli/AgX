@@ -14,7 +14,7 @@ Each sub-project gets its own design doc (`docs/plans/`) and implementation plan
 
 ### 1. Wide working space (matrix-only)
 
-Widen the engine's internal working space beyond linear sRGB so wide-gamut inputs are preserved through editing. Handle the small set of well-known color spaces (sRGB, Display P3, Adobe RGB, Rec.2020) via hardcoded primary matrices — no general ICC profile parsing yet.
+Widened the engine's internal working space beyond linear sRGB to linear Rec.2020 so wide-gamut inputs are preserved through editing. Handles the small set of well-known color spaces (sRGB, Display P3, Adobe RGB, Rec.2020) via hardcoded primary matrices — no general ICC profile parsing yet.
 
 - [x] Pick the wider working space (candidates: linear Rec.2020, linear ACEScg, linear ProPhoto). Document the trade-offs in the design doc.
 - [x] Audit every adjust stage (`basic_tone`, `contrast`, `hsl`, `color_grading`, `tone_curves`, `detail`, `dehaze`, `denoise`, `grain`, `vignette`, LUT lookup) for tolerance to values outside `[0, 1]`.

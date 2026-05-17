@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// The (x, y) curve points live in the gamma-encoded working space; the
 /// perceptual meaning carries over from the previous sRGB-only design
-/// because the gamma transfer curve shape is unchanged on Rec.2020 values.
+/// because the gamma transfer curve shape (sRGB transfer applied to
+/// Rec.2020 linear values) is unchanged, so anchor positions on the
+/// curve domain land at the same perceptual stops as before.
 #[cfg_attr(
     any(feature = "docgen", feature = "validate"),
     derive(schemars::JsonSchema)
@@ -206,6 +208,9 @@ pub(crate) fn lut_lookup(lut: &[f32; 256], value: f32) -> f32 {
     // LUT index domain [0, 255] is a domain-safety clamp on the lookup
     // table; the value space underneath is the gamma Rec.2020 working
     // space (256-entry sampling at i / 255.0 of the [0, 1] curve domain).
+    // The gamma transfer curve shape is unchanged from sRGB-gamma, so a
+    // curve authored against sRGB-gamma values samples at the same
+    // perceptual positions when fed gamma Rec.2020 values.
     let idx = value * 255.0;
     // Domain-safety: clamp index to valid array bounds. OOG inputs are handled
     // by returning the endpoint LUT value (nearest-boundary lookup, not

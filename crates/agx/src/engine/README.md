@@ -60,7 +60,7 @@ Key GPU submodules:
 - `Parameters` -- all adjustment fields
 - `VignetteParams` -- vignette parameters: `amount` (f32) and `shape` (`VignetteShape`)
 - `PartialParameters` -- partial parameter set for preset composability
-- `ColorSpace` -- enum: `LinearSrgb`, `SrgbGamma`
+- `ColorSpace` -- enum: `LinearRec2020`, `GammaRec2020`, `LinearSrgb`, `SrgbGamma` (the first two are the engine's working spaces; the latter two are retained for encode-side intermediates and the LUT-wrap conversion bracket)
 - `Engine::new(image)` -- create engine (always CPU, canonical path)
 - `Engine::new_gpu_auto(image)` -- try GPU, fall back to CPU (opt-in)
 - `Engine::new_gpu(image)` -- force GPU pipeline (returns `Err` if unavailable)
