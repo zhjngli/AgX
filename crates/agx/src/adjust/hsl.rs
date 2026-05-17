@@ -58,7 +58,12 @@ pub fn apply_hsl(
     luminance_shifts: &[f32; 8],
     weight_fn: WeightFn,
 ) -> (f32, f32, f32) {
-    let srgb = Srgb::new(r, g, b);
+    // HSL works in [0, 1] RGB; wide-gamut headroom is lost here. OKHsl is
+    // the long-term fix tracked in docs/backlog/color-management.md.
+    let r_in = r.clamp(0.0, 1.0);
+    let g_in = g.clamp(0.0, 1.0);
+    let b_in = b.clamp(0.0, 1.0);
+    let srgb = Srgb::new(r_in, g_in, b_in);
     let hsl: Hsl = srgb.into_color();
     let pixel_hue = hsl.hue.into_positive_degrees();
     let pixel_sat = hsl.saturation;
@@ -84,6 +89,7 @@ pub fn apply_hsl(
     }
 
     let new_hue = (pixel_hue + total_hue_shift).rem_euclid(360.0);
+    // Domain-safety: HSL → RGB inverse requires saturation and lightness in [0, 1].
     let new_sat = (hsl.saturation + total_sat_shift).clamp(0.0, 1.0);
     let new_lum = (hsl.lightness + total_lum_shift).clamp(0.0, 1.0);
 
@@ -219,6 +225,23 @@ mod tests {
             (b - 0.5).abs() < 1e-3,
             "Gray should be unaffected, got b={b}"
         );
+    }
+
+    #[test]
+    fn hsl_clamps_oog_input_at_entry() {
+        // OOG red input (1.2) + neutral HSL adjustments: HSL clamps input to [0, 1]
+        // at the RGB → HSL conversion entry, so output is near the clamped value's
+        // pass-through, not the original 1.2.
+        let zeros = [0.0f32; 8];
+        let (r, _g, _b) = apply_hsl(1.2, 0.0, 0.0, &zeros, &zeros, &zeros, cosine_weight);
+        // After clamping 1.2 to 1.0 at entry, pure red [1.0, 0.0, 0.0] → HSL → RGB
+        // with neutral adjustments → [1.0, 0.0, 0.0]. Output should be ~1.0, not 1.2.
+        assert!(
+            r <= 1.01,
+            "HSL should clamp OOG input at RGB → HSL entry, got r={}",
+            r
+        );
+        assert!(r > 0.9, "Unexpected output for pure-red input: r={}", r);
     }
 
     #[test]
