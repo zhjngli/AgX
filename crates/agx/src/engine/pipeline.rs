@@ -28,12 +28,12 @@ impl CpuPipeline {
                 Box::new(stages::WhiteBalanceExposureStage::new()),
                 Box::new(stages::DehazeStage::new()),
                 Box::new(stages::DenoiseStage::new()),
-                Box::new(stages::LinearToSrgbStage::new()),
+                Box::new(stages::LinearToGammaStage::new()),
                 Box::new(stages::PerPixelAdjustmentsStage::new()),
                 Box::new(stages::DetailStage::new()),
                 Box::new(stages::GrainStage::new()),
                 Box::new(stages::VignetteStage::new()),
-                Box::new(stages::SrgbToLinearStage::new()),
+                Box::new(stages::GammaToLinearStage::new()),
             ],
         }
     }
@@ -74,7 +74,7 @@ impl CpuPipeline {
 
         // Execute stages in order, tracking color space in debug builds
         #[cfg(debug_assertions)]
-        let mut current_color_space = ColorSpace::LinearSrgb;
+        let mut current_color_space = ColorSpace::LinearRec2020;
 
         for stage in &self.stages {
             if !stage.is_active(params) {

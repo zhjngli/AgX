@@ -27,11 +27,11 @@ impl Stage for GrainStage {
     }
 
     fn input_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn output_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn is_active(&self, params: &Parameters) -> bool {
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn grain_color_space_is_srgb() {
         let stage = GrainStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::SrgbGamma);
-        assert_eq!(stage.output_color_space(), ColorSpace::SrgbGamma);
+        assert_eq!(stage.input_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(stage.output_color_space(), ColorSpace::GammaRec2020);
     }
 }

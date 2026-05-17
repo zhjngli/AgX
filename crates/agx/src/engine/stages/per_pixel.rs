@@ -31,11 +31,11 @@ impl Stage for PerPixelAdjustmentsStage {
     }
 
     fn input_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn output_color_space(&self) -> ColorSpace {
-        ColorSpace::SrgbGamma
+        ColorSpace::GammaRec2020
     }
 
     fn is_active(&self, _params: &Parameters) -> bool {
@@ -104,8 +104,8 @@ mod tests {
     #[test]
     fn per_pixel_stage_color_space_is_srgb() {
         let stage = PerPixelAdjustmentsStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::SrgbGamma);
-        assert_eq!(stage.output_color_space(), ColorSpace::SrgbGamma);
+        assert_eq!(stage.input_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(stage.output_color_space(), ColorSpace::GammaRec2020);
     }
 
     #[test]
