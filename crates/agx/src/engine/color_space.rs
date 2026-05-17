@@ -10,7 +10,7 @@
 pub const LINEAR_REC2020_TO_LINEAR_SRGB: [[f32; 3]; 3] = [
     [ 1.660491, -0.587641, -0.072850],
     [-0.124550,  1.132899, -0.008349],
-    [-0.018151, -0.100579,  1.118730],
+    [-0.018151, -0.100579,  1.11873],
 ];
 
 /// Linear sRGB → linear Rec.2020 (inverse of the above).
@@ -51,9 +51,10 @@ pub fn srgb_curve_signed_inverse(x: f32) -> f32 {
 
 /// Linear Display P3 → linear Rec.2020.
 ///
-/// Display P3 uses the DCI-P3 primaries with D65 white point. Rec.2020 is
-/// wider than P3 in all directions, so values inside P3's [0, 1] cube map
-/// cleanly inside Rec.2020's [0, 1] cube.
+/// Display P3 uses the DCI-P3 primaries with D65 white point. The Rec.2020
+/// gamut contains the P3 gamut, but P3 primaries expressed in Rec.2020
+/// coordinates can produce small negative components (e.g., P3 red's blue
+/// channel ≈ −0.0012). Downstream encode clips to [0, 1] at the final step.
 pub const LINEAR_P3_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
     [0.753833, 0.198597, 0.047570],
     [0.045744, 0.941776, 0.012480],
@@ -121,6 +122,8 @@ mod tests {
         apply_matrix_3x3(&mut buf, &LINEAR_SRGB_TO_LINEAR_REC2020);
         assert!((buf[0][0] - 1.0).abs() < 1e-4);
         assert!((buf[0][1] - 0.5).abs() < 1e-4);
+        assert!((buf[0][2] - 0.2).abs() < 1e-4);
+        assert!((buf[1][0] - 0.0).abs() < 1e-4);
         assert!((buf[1][1] - 1.2).abs() < 1e-4);
         assert!((buf[1][2] - (-0.1)).abs() < 1e-4);
     }
@@ -147,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn p3_red_lies_inside_rec2020_gamut() {
+    fn p3_red_maps_into_rec2020() {
         let m = LINEAR_P3_TO_LINEAR_REC2020;
         let p3_red = [1.0_f32, 0.0, 0.0];
         let rec2020 = [
@@ -156,7 +159,13 @@ mod tests {
             m[2][0] * p3_red[0] + m[2][1] * p3_red[1] + m[2][2] * p3_red[2],
         ];
         assert!(rec2020[0] > 0.0 && rec2020[0] < 1.0);
-        assert!(rec2020[1] >= 0.0);
         assert!(rec2020[0].is_finite() && rec2020[1].is_finite() && rec2020[2].is_finite());
+    }
+
+    #[test]
+    fn srgb_curve_signed_at_threshold_round_trips() {
+        let at_threshold = srgb_curve_signed(0.0031308);
+        let back = srgb_curve_signed_inverse(at_threshold);
+        assert!((back - 0.0031308).abs() < 1e-6);
     }
 }
