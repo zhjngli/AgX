@@ -129,8 +129,12 @@ pub fn apply_color_grading_pre(
 
     // Balance remapping (skip powf when balance is neutral)
     let lum_adj = if pre.balance_active {
+        // Luminance is non-negative by definition. Clamp here is domain-safety
+        // for the powf call, not aesthetic limiting.
         lum.clamp(0.0, 1.0).powf(pre.balance_factor)
     } else {
+        // Luminance is non-negative by definition. Clamp here is domain-safety
+        // for the powf call, not aesthetic limiting.
         lum.clamp(0.0, 1.0)
     };
 
@@ -155,19 +159,20 @@ pub fn apply_color_grading_pre(
     let combined_g = regional_g * pre.global_tint[1];
     let combined_b = regional_b * pre.global_tint[2];
 
-    // Multiply pixel by combined tint
-    let mut out_r = (r * combined_r).clamp(0.0, 1.0);
-    let mut out_g = (g * combined_g).clamp(0.0, 1.0);
-    let mut out_b = (b * combined_b).clamp(0.0, 1.0);
+    // Multiply pixel by combined tint; output unclamped — wide-gamut headroom
+    // survives this stage, final clamp is at encode.
+    let mut out_r = r * combined_r;
+    let mut out_g = g * combined_g;
+    let mut out_b = b * combined_b;
 
-    // Luminance shifts (weighted additive, pre-divided by 100)
+    // Luminance shifts (weighted additive, pre-divided by 100); unclamped.
     let adjustment = pre.shadow_lum * w_shadow
         + pre.midtone_lum * w_midtone
         + pre.highlight_lum * w_highlight
         + pre.global_lum;
-    out_r = (out_r + adjustment).clamp(0.0, 1.0);
-    out_g = (out_g + adjustment).clamp(0.0, 1.0);
-    out_b = (out_b + adjustment).clamp(0.0, 1.0);
+    out_r += adjustment;
+    out_g += adjustment;
+    out_b += adjustment;
 
     (out_r, out_g, out_b)
 }
@@ -324,6 +329,21 @@ mod tests {
                 lum
             );
         }
+    }
+
+    #[test]
+    fn color_grading_preserves_out_of_range_values() {
+        // OOG input (r=1.3) with a non-trivial highlight tint should not be
+        // clamped at output. Wide-gamut headroom must survive the tint multiply
+        // and luminance shift stages.
+        let mut params = ColorGradingParams::default();
+        params.highlights.hue = 30.0;
+        params.highlights.saturation = 20.0;
+        params.highlights.luminance = 10.0;
+        let pre = ColorGradingPrecomputed::new(&params);
+        let (r, _g, _b) = apply_color_grading_pre(1.3, 0.9, 0.8, &pre);
+        assert!(r > 1.0, "color_grading clamped OOG value: r={r}");
+        assert!(r.is_finite());
     }
 
     #[test]
