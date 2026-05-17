@@ -293,7 +293,7 @@ mod tests {
         assert!(img.width() > 0);
         assert!(img.height() > 0);
 
-        // Verify pixels are in a reasonable range (linear sRGB, mostly 0-1)
+        // Verify pixels are in a reasonable range (linear Rec.2020, mostly 0-1)
         let pixel = img.get_pixel(img.width() / 2, img.height() / 2);
         for i in 0..3 {
             assert!(
