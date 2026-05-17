@@ -1,9 +1,12 @@
 use crate::adjust;
+use crate::engine::color_space::wrap_lut_lookup;
 use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
 use crate::error::AgxError;
 
-/// Applies all per-pixel sRGB gamma-space adjustments: contrast, highlights,
-/// shadows, whites, blacks, tone curves, HSL, color grading, and LUT.
+/// Applies all per-pixel gamma-encoded adjustments to the gamma Rec.2020
+/// working buffer: contrast, highlights, shadows, whites, blacks, tone
+/// curves, HSL, color grading, and LUT (sampled in sRGB-gamma via a
+/// conversion bracket so existing sRGB-authored LUTs remain portable).
 pub struct PerPixelAdjustmentsStage {
     tone_curve_pre: Option<adjust::ToneCurvePrecomputed>,
     color_grading_pre: Option<adjust::ColorGradingPrecomputed>,
@@ -52,9 +55,7 @@ impl Stage for PerPixelAdjustmentsStage {
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         let lut_lookup = ctx.lut.map(|lut| {
             move |r: f32, g: f32, b: f32| {
-                crate::engine::color_space::wrap_lut_lookup(r, g, b, |rr, gg, bb| {
-                    lut.lookup(rr, gg, bb)
-                })
+                wrap_lut_lookup(r, g, b, |rr, gg, bb| lut.lookup(rr, gg, bb))
             }
         });
         let pp = adjust::PerPixelParams {
@@ -161,7 +162,7 @@ mod tests {
                 let got = ctx.buf[i][c];
                 let drift = (got - want).abs();
                 assert!(
-                    drift < 5e-3,
+                    drift < 1e-5,
                     "pixel[{i}][{c}] drift = {drift}: in={want} out={got}"
                 );
             }

@@ -231,11 +231,44 @@ mod tests {
     }
 
     #[test]
-    fn wrap_lut_lookup_constant_lut_returns_constant_in_rec2020_gamma() {
-        let constant_white = |_r: f32, _g: f32, _b: f32| (1.0, 1.0, 1.0);
-        let (or, og, ob) = wrap_lut_lookup(0.3, 0.4, 0.5, constant_white);
-        assert!((or - 1.0).abs() < 1e-3);
-        assert!((og - 1.0).abs() < 1e-3);
-        assert!((ob - 1.0).abs() < 1e-3);
+    fn wrap_lut_lookup_constant_non_white_lut_matches_hand_computed_round_trip() {
+        // A LUT that always returns a gamut-asymmetric gamma-sRGB triple. The
+        // post-LUT bracket converts that to gamma Rec.2020: a swapped matrix
+        // would break this assertion (unlike a constant-white case, which is
+        // invariant under both matrices because their rows sum to ~1.0).
+        let constant = |_: f32, _: f32, _: f32| (0.7_f32, 0.3, 0.5);
+
+        let (or, og, ob) = wrap_lut_lookup(0.1, 0.2, 0.3, constant);
+
+        let r_lin_s = srgb_curve_signed_inverse(0.7);
+        let g_lin_s = srgb_curve_signed_inverse(0.3);
+        let b_lin_s = srgb_curve_signed_inverse(0.5);
+
+        let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
+        let r_lin_r = m[0][0] * r_lin_s + m[0][1] * g_lin_s + m[0][2] * b_lin_s;
+        let g_lin_r = m[1][0] * r_lin_s + m[1][1] * g_lin_s + m[1][2] * b_lin_s;
+        let b_lin_r = m[2][0] * r_lin_s + m[2][1] * g_lin_s + m[2][2] * b_lin_s;
+
+        let expected = [
+            srgb_curve_signed(r_lin_r),
+            srgb_curve_signed(g_lin_r),
+            srgb_curve_signed(b_lin_r),
+        ];
+
+        assert!(
+            (or - expected[0]).abs() < 1e-6,
+            "r: got {or}, expected {}",
+            expected[0]
+        );
+        assert!(
+            (og - expected[1]).abs() < 1e-6,
+            "g: got {og}, expected {}",
+            expected[1]
+        );
+        assert!(
+            (ob - expected[2]).abs() < 1e-6,
+            "b: got {ob}, expected {}",
+            expected[2]
+        );
     }
 }
