@@ -11,6 +11,21 @@ Each wheel can push hue, saturation, and luminance independently, so the
 effect can stay subtle and neutral or move all the way into a stylized
 split-tone look.
 
+## Working space
+
+This stage runs in gamma-encoded Rec.2020 — the sRGB transfer curve
+applied to Rec.2020 linear values — alongside basic tone, HSL, tone
+curves, detail, grain, and vignette. The luminance crossover, balance
+exponent, and quadratic zone masks keep their perceptual meaning
+because the gamma curve shape is unchanged from the previous
+sRGB-only design; what's different is the wider gamut underneath, so
+wide-gamut headroom from Display P3 or other wide-gamut inputs
+survives the wheel math instead of being clamped at the boundary.
+The final clamp to display gamut happens only at encode. The Rec. 709
+luminance weights and the per-pixel `[0, 1]` clamp after the tint
+multiply stay as domain-safety bounds — the luminance proxy needs to
+sit on a defined range for the zone weights to behave.
+
 ## How it works
 
 The public data model is a `ColorWheel` for each tonal region. A wheel
@@ -43,7 +58,7 @@ effect is active. When the parameters are neutral, the CPU and GPU paths
 still run their shared per-pixel gamma-adjustment stage, but they skip
 the color-grading substep inside that stage.
 
-Per pixel, the algorithm first measures luminance in sRGB gamma space
+Per pixel, the algorithm first measures luminance in gamma Rec.2020
 with the Rec. 709 coefficients:
 
 `lum = 0.2126*r + 0.7152*g + 0.0722*b`

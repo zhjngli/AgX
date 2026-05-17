@@ -10,15 +10,30 @@ and magenta. Each band can shift hue, saturation, and luminance
 independently, so a preset can cool shadows, tame greens, or warm skin
 tones without forcing the user into a global color cast.
 
+## Working space
+
+This stage runs in gamma-encoded Rec.2020 — the sRGB transfer curve
+applied to Rec.2020 linear values — alongside basic tone, color
+grading, tone curves, detail, grain, and vignette. The HSL palette
+geometry (band centers, half-widths, cosine windows) keeps its
+perceptual meaning because the gamma curve shape is unchanged from the
+previous sRGB-only design; what's different is the wider gamut
+underneath, so wide-gamut headroom from Display P3 or other wide-gamut
+inputs survives the per-pixel math instead of being clamped at the
+boundary. The final clamp to display gamut happens only at encode. The
+`[0, 1]` clamp on the per-pixel RGB before entering the RGB↔HSL
+conversion stays as a domain-safety guard, because the HSL palette is
+only defined on that range.
+
 ## How it works
 
 HSL runs in the gamma-space per-pixel stage, after the basic tone curve
 controls and before color grading and the final LUT. That placement
 matters: HSL is a perceptual color tool, so it belongs with the other
-sRGB-space adjustments instead of the linear-light exposure and white
-balance work. On the GPU path, the shared gamma-adjustment stage still
-dispatches, but the shader skips the HSL substep entirely when no HSL
-channel is active.
+gamma-encoded adjustments instead of the linear-light exposure and
+white balance work. On the GPU path, the shared gamma-adjustment stage
+still dispatches, but the shader skips the HSL substep entirely when no
+HSL channel is active.
 
 The public data model is `HslChannels`, which stores one `HslChannel`
 for each of the 8 bands:
@@ -47,8 +62,8 @@ Each `HslChannel` stores three user-facing controls:
 - `saturation` in percent, from `-100` to `+100`
 - `luminance` in percent, from `-100` to `+100`
 
-The implementation first converts the pixel from sRGB into HSL, then
-accumulates weighted per-band deltas:
+The implementation first converts the pixel from gamma Rec.2020 RGB
+into HSL, then accumulates weighted per-band deltas:
 
 ```text
 if pixel_saturation < 1e-4:
@@ -78,9 +93,10 @@ that cutoff, the per-band weight is scaled by the pixel saturation, so
 low-chroma pixels fade toward neutrality instead of getting a strong
 band-specific shove.
 
-The final step converts the adjusted HSL value back to sRGB. Hue wraps
-around 360 degrees, saturation and luminance stay clamped to `[0, 1]`,
-and the RGB result returns to the rest of the gamma-space pipeline.
+The final step converts the adjusted HSL value back to gamma Rec.2020
+RGB. Hue wraps around 360 degrees, saturation and luminance stay
+clamped to `[0, 1]`, and the RGB result returns to the rest of the
+gamma-space pipeline.
 
 The cosine window is the key targeting function. `cosine_weight` is
 `1.0` at the band center and falls smoothly to `0.0` at the half-width.

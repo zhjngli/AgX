@@ -10,13 +10,27 @@
 The basic-tone sliders — contrast, highlights, shadows, whites, blacks
 — shape the brightness distribution of the image without re-introducing
 hue shifts. Each slider runs as a small piecewise-linear curve targeted
-at a specific part of the tone range, in sRGB gamma space so the
+at a specific part of the tone range, in the gamma-encoded working
+space (sRGB transfer curve applied to Rec.2020 linear values) so the
 adjustments track perceptual brightness rather than physical light
 energy.
 
+### Working space
+
+This stage runs in gamma-encoded Rec.2020 — the sRGB transfer curve
+applied to Rec.2020 linear values — alongside HSL, color grading, tone
+curves, detail, grain, and vignette. The `0.5` midpoint and the `0.25`
+/ `0.75` band anchors keep their perceptual meaning because the gamma
+curve shape is unchanged from the previous sRGB-only design; what's
+different is the wider gamut underneath, so wide-gamut headroom from
+Display P3 or other wide-gamut inputs survives the slider math instead
+of being clamped at the boundary. The final clamp to display gamut
+happens only at encode. The per-channel `[0, 1]` clamps inside each
+slider stay as domain-safety bounds.
+
 ### How it works
 
-The five sliders all run in sRGB gamma space, after the image has been
+The five sliders all run in gamma Rec.2020, after the image has been
 white-balanced and exposure-corrected in linear light. Each slider
 remaps a single channel value with a small piecewise-linear curve that
 targets a specific part of the tone range.
@@ -24,8 +38,8 @@ targets a specific part of the tone range.
 #### Contrast
 
 Contrast is the only truly global control here. The code pivots around
-`0.5`, the midpoint of normalized sRGB values, and scales the distance
-from that pivot:
+`0.5`, the midpoint of the normalized gamma-encoded range, and scales
+the distance from that pivot:
 
 ```text
 factor = (100 + contrast) / 100
@@ -102,9 +116,9 @@ The implementation deliberately stays piecewise-linear and gamma-space
 rather than reaching for a smooth global tone curve. That keeps each
 slider's effect localized and predictable for batch-applied presets,
 makes the math cheap on both CPU and GPU, and leaves global re-shaping
-for the dedicated `tone_curves` stage downstream. Working in sRGB gamma
-space is the standard choice for these sliders because it matches the
-"perceptual brightness" mental model the controls are named for —
+for the dedicated `tone_curves` stage downstream. Working in gamma
+Rec.2020 is the standard choice for these sliders because it matches
+the "perceptual brightness" mental model the controls are named for —
 running them in linear light would make the slider behave differently
 in shadows than in highlights.
 
