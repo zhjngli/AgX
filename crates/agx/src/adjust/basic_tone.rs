@@ -2,6 +2,10 @@
 
 // --- Contrast (sRGB gamma space) ---
 
+// Midpoint 0.5 is "perceptual middle gray" in the gamma-encoded working
+// space — the sRGB transfer curve shape applied to Rec.2020 linear
+// values puts middle gray near 0.5 of the gamma-encoded range, same as
+// plain sRGB-gamma. Output is unclamped; the final clamp is at encode.
 /// Apply contrast adjustment to a single channel value in sRGB gamma space.
 /// Contrast range: -100 to +100. 0 = no change.
 pub fn apply_contrast(value: f32, contrast: f32) -> f32 {
@@ -9,7 +13,7 @@ pub fn apply_contrast(value: f32, contrast: f32) -> f32 {
         return value;
     }
     let factor = (100.0 + contrast) / 100.0;
-    (0.5 + (value - 0.5) * factor).clamp(0.0, 1.0)
+    0.5 + (value - 0.5) * factor
 }
 
 // --- Highlights (sRGB gamma space) ---
@@ -22,7 +26,7 @@ pub fn apply_highlights(value: f32, highlights: f32) -> f32 {
     }
     let weight = (value - 0.5) / 0.5; // 0 at 0.5, 1 at 1.0
     let adjustment = weight * (highlights / 100.0) * 0.5;
-    (value + adjustment).clamp(0.0, 1.0)
+    value + adjustment
 }
 
 // --- Shadows (sRGB gamma space) ---
@@ -35,7 +39,7 @@ pub fn apply_shadows(value: f32, shadows: f32) -> f32 {
     }
     let weight = 1.0 - value / 0.5; // 1 at 0.0, 0 at 0.5
     let adjustment = weight * (shadows / 100.0) * 0.5;
-    (value + adjustment).clamp(0.0, 1.0)
+    value + adjustment
 }
 
 // --- Whites (sRGB gamma space) ---
@@ -48,7 +52,7 @@ pub fn apply_whites(value: f32, whites: f32) -> f32 {
     }
     let weight = (value - 0.75) / 0.25; // 0 at 0.75, 1 at 1.0
     let adjustment = weight * (whites / 100.0) * 0.25;
-    (value + adjustment).clamp(0.0, 1.0)
+    value + adjustment
 }
 
 // --- Blacks (sRGB gamma space) ---
@@ -61,7 +65,7 @@ pub fn apply_blacks(value: f32, blacks: f32) -> f32 {
     }
     let weight = 1.0 - value / 0.25; // 1 at 0.0, 0 at 0.25
     let adjustment = weight * (blacks / 100.0) * 0.25;
-    (value + adjustment).clamp(0.0, 1.0)
+    value + adjustment
 }
 
 #[cfg(test)]
@@ -91,9 +95,43 @@ mod tests {
     }
 
     #[test]
-    fn contrast_output_clamped() {
-        assert!(apply_contrast(1.0, 100.0) <= 1.0);
-        assert!(apply_contrast(0.0, 100.0) >= 0.0);
+    fn contrast_output_finite() {
+        assert!(apply_contrast(1.0, 100.0).is_finite());
+        assert!(apply_contrast(0.0, 100.0).is_finite());
+    }
+
+    #[test]
+    fn contrast_preserves_out_of_range_values() {
+        // Input 1.2 with contrast factor that produces 1.5x ramp.
+        // Math: 0.5 + (1.2 - 0.5) * factor — output may exceed 1.0.
+        // Verify output is NOT clamped.
+        // factor = (100.0 + 50.0) / 100.0 = 1.5; result = 0.5 + 0.7 * 1.5 = 1.55
+        let out = apply_contrast(1.2, 50.0);
+        assert!(out > 1.0, "contrast clamped OOG: {}", out);
+        assert!(out.is_finite());
+    }
+
+    #[test]
+    fn highlights_preserves_out_of_range_values() {
+        let out = apply_highlights(1.2, 0.3);
+        // highlights >= 0.5, weight = (1.2 - 0.5) / 0.5 = 1.4, adjustment = 1.4 * 0.003 * 0.5
+        // The value stays above 1.0
+        assert!(out > 1.0, "highlights clamped OOG: {}", out);
+        assert!(out.is_finite());
+    }
+
+    #[test]
+    fn shadows_preserves_out_of_range_values() {
+        // Input -0.1, shadows positive lifts darks; but value < 0.5 so shadows apply
+        // For value=-0.1: weight = 1.0 - (-0.1) / 0.5 = 1.2, adjustment = 1.2 * 0.05 * 0.5 > 0
+        // output = -0.1 + positive, which might still be negative or not, depending on adjustment
+        // But the key check: value -0.1 < 0.0, adjustment is positive but small, verify it's finite
+        // and that negative input doesn't get clamped at 0.0
+        let out = apply_shadows(-0.1, 0.05);
+        assert!(out.is_finite());
+        // With weight=1.2, adjustment=1.2*(0.05/100)*0.5=0.0003, so out = -0.1 + 0.0003 ≈ -0.0997
+        // Still negative, not clamped to 0.0
+        assert!(out < 0.0, "shadows clamped negative input: {}", out);
     }
 
     // --- Highlights tests ---
