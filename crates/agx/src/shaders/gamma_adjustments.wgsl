@@ -136,7 +136,12 @@ fn apply_tone_curves(r_in: f32, g_in: f32, b_in: f32) -> vec3f {
 // --- HSL ---
 
 fn apply_hsl_pixel(r: f32, g: f32, b: f32) -> vec3f {
-    let hsl = common::color::rgb_to_hsl(vec3f(r, g, b));
+    // HSL works in [0, 1] RGB; wide-gamut headroom is lost here.
+    // OKHsl is the long-term fix tracked in docs/backlog/color-management.md.
+    let r_in = clamp(r, 0.0, 1.0);
+    let g_in = clamp(g, 0.0, 1.0);
+    let b_in = clamp(b, 0.0, 1.0);
+    let hsl = common::color::rgb_to_hsl(vec3f(r_in, g_in, b_in));
     let pixel_hue = hsl.x;
     let pixel_sat = hsl.y;
 

@@ -129,12 +129,13 @@ pub fn apply_color_grading_pre(
 
     // Balance remapping (skip powf when balance is neutral)
     let lum_adj = if pre.balance_active {
-        // Luminance is non-negative by definition. Clamp here is domain-safety
-        // for the powf call, not aesthetic limiting.
+        // Luma may be negative or > 1 for wide-gamut inputs. Clamp here is
+        // domain-safety: powf with negative base produces NaN.
         lum.clamp(0.0, 1.0).powf(pre.balance_factor)
     } else {
-        // Luminance is non-negative by definition. Clamp here is domain-safety
-        // for the powf call, not aesthetic limiting.
+        // Luma used as a weight for shadow/midtone/highlight contribution.
+        // Clamp here is domain-safety: weights would invert with negative luma
+        // or sum incorrectly above 1.
         lum.clamp(0.0, 1.0)
     };
 

@@ -416,14 +416,43 @@ mod tests {
     }
 
     #[test]
-    fn tone_curve_extrapolates_outside_unit_interval() {
-        // Identity curve (all LUTs are None): OOG input passes through unchanged.
+    fn tone_curve_identity_passes_through_oog_input() {
+        // Identity curve (all LUTs are None): OOG input passes through unchanged
+        // via the identity fast path — no LUT lookup occurs.
         // Input 1.2 should return 1.2, not clamped to 1.0.
         let params = ToneCurveParams::default();
         let pre = ToneCurvePrecomputed::new(&params);
         let (r, _g, _b) = apply_tone_curves_pre(1.2, 0.5, 0.5, &pre);
         assert!(r > 1.0, "tone curve clamped OOG: {}", r);
         assert!(r.is_finite());
+    }
+
+    #[test]
+    fn lut_lookup_clamps_index_returns_endpoint_value() {
+        // Build a non-identity LUT and feed it OOG values.
+        // Verify: the function does not panic; OOG inputs get the endpoint LUT
+        // value (nearest-boundary clamping of the index, not extrapolation).
+        // The LUT value at the endpoint itself propagates unclamped as output.
+        let curve = ToneCurve {
+            points: vec![(0.0, 0.2), (0.5, 0.6), (1.0, 0.8)],
+        };
+        let lut = build_tone_curve_lut(&curve);
+
+        // Above-range input should return the same value as input=1.0
+        let out_oog_high = lut_lookup(&lut, 1.2);
+        let out_endpoint_high = lut_lookup(&lut, 1.0);
+        assert_eq!(
+            out_oog_high, out_endpoint_high,
+            "OOG high value should map to endpoint LUT value"
+        );
+
+        // Below-range input should return the same value as input=0.0
+        let out_oog_low = lut_lookup(&lut, -0.3);
+        let out_endpoint_low = lut_lookup(&lut, 0.0);
+        assert_eq!(
+            out_oog_low, out_endpoint_low,
+            "negative input should map to zero endpoint LUT value"
+        );
     }
 
     #[test]
