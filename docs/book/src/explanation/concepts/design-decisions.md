@@ -6,7 +6,7 @@ This page collects the load-bearing invariants of AgX and the choices that produ
 
 - [Always re-render from original](#always-re-render-from-original) — the engine holds an immutable original image and replays all adjustments from scratch on every render.
 - [Declarative presets](#declarative-presets) — a preset declares parameter values, not an operation sequence.
-- [sRGB-only working space](#srgb-only-working-space) — no wide-gamut, no ICC profile handling.
+- [Wide working space (linear Rec.2020)](#wide-working-space-linear-rec2020) — wider than P3 and Adobe RGB, ICC profile handling deferred.
 - [Fixed render order](#fixed-render-order) — the engine applies adjustments in a fixed, hardcoded order.
 - [Dual pipeline, CPU canonical](#dual-pipeline-cpu-canonical) — CPU and GPU pipelines produce near-identical output; CPU is the deterministic source of truth.
 - [Partial-parameter merge semantics](#partial-parameter-merge-semantics) — recursive through composite sections, last-write-wins at the leaf.
@@ -49,29 +49,29 @@ The choice follows directly from the always-re-render-from-original invariant. I
 
 The engine cannot represent any edit whose meaning depends on its position in a sequence. This precludes order-sensitive features that other editors offer naturally: a per-preset override of pipeline order, or a custom "this, then that" sequence. It also constrains how local adjustments (masks, brushes) would have to work if added — they have to be portable parameter values, not hand-placed strokes that survive only in the editor that made them. The recipe model is what makes presets shareable, and any feature that breaks the recipe loses that property.
 
-## sRGB-only working space
+## Wide working space (linear Rec.2020)
 
 ### What we chose
 
-All internal processing uses the sRGB color space. The engine works in two related encodings — linear sRGB for physical operations, sRGB gamma for perceptual operations — but the gamut boundary is sRGB throughout. There is no working-space conversion, no ICC profile reading or embedding, and no support for wider gamut spaces.
+The engine works in linear Rec.2020 for physical-light operations (white balance, exposure, dehaze, denoise) and gamma-encoded Rec.2020 — the sRGB transfer curve applied to Rec.2020 linear values — for perceptual operations (contrast, tonal sliders, HSL, color grading, LUT, detail, grain, vignette). Decode converts every input format (sRGB / BT.709 matrix, Display P3 matrix, BT.2020 SDR identity, RAW via LibRaw's sRGB output then matrix) into linear Rec.2020 at the boundary; encode converts linear Rec.2020 to 8-bit sRGB at output. The sRGB transfer-curve shape is reused on Rec.2020 linear values, with a sign-preserving variant that handles the small negative components that arise from wide-gamut matrix output without corrupting them. ICC profile reading, wide-gamut output, and HDR transfer curves are intentionally out of scope at this revision.
 
 ### What we considered
 
-The obvious alternative is a wider working space — Adobe RGB, ProPhoto RGB, or Display P3 — used internally regardless of input format, with conversion at the input and output boundaries. ProPhoto RGB is what Lightroom uses internally; Adobe RGB covers most professional print pipelines; Display P3 covers Apple's wide-gamut displays. A second alternative is partial color management: keep the math in sRGB but read and embed ICC profiles so input and output colors are correct on non-sRGB displays.
+The obvious sub-option is **sRGB-only**, which was AgX's previous working space — narrow enough to fit on any consumer display, with no gamut-mapping decisions to make, but it squashes Display P3 (iPhone HEIC) and BT.2020 inputs at the decode boundary, discarding wide-gamut information before any edits. **Adobe RGB** is wider than sRGB and covers most professional print pipelines, but is narrower than Rec.2020 and would still squash some Display P3 colors. **ProPhoto RGB** is what Lightroom uses internally — wider than Rec.2020, but its primaries fall outside the visible spectrum, which means many in-gamut values map to non-physical negative tristimulus components and the inverse transfer curve has stability issues around those negatives. **Display P3** matches iPhone-native captures exactly but is narrower than Rec.2020. **Full color management** — wide working space plus ICC parsing on input plus profile-embedded output — adds gamut handling at every output decision and is much more design surface than the working-space choice itself.
 
 ### Why we chose this
 
-AgX scopes its working space to sRGB only and treats this as a deliberate omission of the entire color-management subsystem rather than a temporary placeholder. Wide-gamut working spaces require gamut-aware math at every stage, profile embedding on output, cross-profile clipping policies for out-of-gamut values, and ICC parsing on input. Each is its own design space, and adding any one changes how every adjustment has to behave. Most consumer photography is sRGB end-to-end — JPEGs are sRGB, web display is sRGB, the screens most photographers grade on are sRGB — so the cost of the omission is concentrated on the professional print and log-video workflows AgX is not trying to serve.
+Rec.2020 is wide enough to contain Display P3, Adobe RGB, sRGB, BT.709, and BT.2020 without clipping at the working-space boundary, so wide-gamut inputs survive the entire edit pipeline. It's narrower than ProPhoto RGB, avoiding the negative-tristimulus stability problems that ProPhoto introduces. Reusing the sRGB transfer-curve shape on Rec.2020 linear values means existing sRGB-tuned anchor points (0.5 midpoint, 0.25/0.75 splits) keep their perceptual meaning — preset values calibrated against the old sRGB-only design carry over without re-tuning. The sign-preserving curve handles the small negative components that arise from matrix-converting saturated colors. Scoping ICC profile handling separately (deferred to a later sub-project) keeps the working-space change tractable and unblocks the headline Display P3 win for iPhone HEIC users without requiring the full color-management subsystem.
 
 ### What this costs
 
-Adobe RGB print pipelines, log video footage, and Display P3 displays are unreachable as inputs and outputs. A user with a wide-gamut camera will have their colors clipped to sRGB at the decode boundary. Adding wider gamuts later is not a drop-in change — every adjustment has to be revisited for gamut correctness, and the LUT pipeline has to grow a way to declare each LUT's own input space. The color spaces explanation page covers which math currently runs in linear sRGB versus sRGB gamma.
+Wide-gamut inputs flow unclamped through the entire pipeline, which means heavy edits — high contrast, aggressive saturation — can produce out-of-gamut intermediate values; the final clamp to display gamut at encode catches them, but a wide-gamut output (Rec.2020 JPEG, P3 PNG) would preserve them. That output path is deferred. ICC profile reading from input images is also deferred — files that declare a non-standard primaries triple via ICC fall back to "treat as sRGB" rather than reading the profile. HDR HEIC sources (PQ / HLG transfer curves) similarly fall back to "treat as sRGB" with a stderr warning, because the BT.2020 transfer-curve work is its own design surface. The wider working space also means small float-rounding noise from the matrix conversions is unavoidable at the decode and encode boundaries — within tolerance for the existing golden tests, but visible when comparing exact byte-equal output across the migration boundary.
 
 ## Fixed render order
 
 ### What we chose
 
-The engine applies adjustments in a fixed, hardcoded order. Exposure and white balance run first in linear space; dehaze and denoise follow, also in linear; the buffer is converted to sRGB gamma; the gamma-space adjustments (contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT) run in one per-pixel pass; detail, grain, and vignette run last. The order in which fields appear in a preset, in the `Parameters` struct, or in API calls has no effect on output.
+The engine applies adjustments in a fixed, hardcoded order. Exposure and white balance run first in linear Rec.2020; dehaze and denoise follow, also in linear Rec.2020; the buffer is converted to gamma Rec.2020; the gamma-space adjustments (contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT) run in one per-pixel pass; detail, grain, and vignette run last. The order in which fields appear in a preset, in the `Parameters` struct, or in API calls has no effect on output.
 
 ### What we considered
 
@@ -79,7 +79,7 @@ The alternative is user-reorderable stages: a preset can declare "run dehaze aft
 
 ### Why we chose this
 
-Each stage is designed to run in the color space and pipeline position where its math is correct: exposure is a linear scaling and must precede the gamma conversion; dehaze and denoise both operate on physical light and stay in linear; contrast and tonal sliders reshape perceptual brightness and require the sRGB-gamma encoding; LUTs apply in the gamma space colorists author them in; grain and vignette are surface effects that should not be re-modified by upstream stages. Reordering any of these breaks an assumption a downstream stage depends on. The render pipeline explanation page walks through the worked examples. Hiding the order from users is also what makes the declarative-preset model work: a preset produces the same output regardless of how it was authored.
+Each stage is designed to run in the color space and pipeline position where its math is correct: exposure is a linear scaling and must precede the gamma conversion; dehaze and denoise both operate on physical light and stay in linear Rec.2020; contrast and tonal sliders reshape perceptual brightness and require the gamma-Rec.2020 encoding; LUTs apply in the sRGB-gamma space colorists author them in (the engine brackets the lookup with conversions so existing `.cube` LUTs work unchanged); grain and vignette are surface effects that should not be re-modified by upstream stages. Reordering any of these breaks an assumption a downstream stage depends on. The render pipeline explanation page walks through the worked examples. Hiding the order from users is also what makes the declarative-preset model work: a preset produces the same output regardless of how it was authored.
 
 ### What this costs
 
@@ -137,7 +137,7 @@ AgX treats LUTs as opaque numeric mappings whose correct input space is determin
 
 ### What this costs
 
-Log-input LUTs (S-Log3, LogC, ACEScct) used in video grading workflows are not directly supported. A colorist who wants to apply a log-to-Rec709 conversion LUT cannot use AgX's LUT pipeline as is — the input the LUT expects is not the input it receives. The fix is the per-LUT declared input space, which is on the long-term map but blocked on the wider-gamut and log-color work the sRGB-only invariant defers.
+Log-input LUTs (S-Log3, LogC, ACEScct) used in video grading workflows are not directly supported. A colorist who wants to apply a log-to-Rec709 conversion LUT cannot use AgX's LUT pipeline as is — the input the LUT expects is not the input it receives. The fix is the per-LUT declared input space, which is on the long-term map but blocked on the log-color and HDR-transfer-curve work AgX currently defers.
 
 ## Preset-first scope
 

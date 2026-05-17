@@ -44,19 +44,17 @@ The declarative shape is what makes presets portable, composable, and inspectabl
 
 The alternative considered was an operation log, which is what most photo editors use under the hood. That model was rejected because it ties presets to engine version (operation names, parameter shapes, and ordering rules become part of the preset's contract) and reintroduces the order-sensitivity that the always-re-render-from-original invariant exists to remove.
 
-### sRGB only
+### Wide working space (linear Rec.2020)
 
-All internal processing uses the sRGB color space. There is no working-space conversion, no ICC profile reading or embedding, and no wide-gamut support.
+All internal processing uses linear Rec.2020 for physical operations and gamma-encoded Rec.2020 (the sRGB transfer curve applied to Rec.2020 linear values) for perceptual operations. The sRGB transfer curve shape carries over, so anchor points like the 0.5 midtone keep their perceptual meaning; what's different is the wider gamut underneath. Decode converts inputs (sRGB / BT.709 matrix, Display P3 matrix, BT.2020 SDR identity) into linear Rec.2020; encode converts linear Rec.2020 to 8-bit sRGB at output.
 
-What this avoids is an entire subsystem of color management. Wide-gamut working spaces require gamut-aware math at every stage, profile embedding on output, cross-profile clipping policies for out-of-gamut values, and ICC parsing. Each is its own design space, and adding any one changes how every adjustment has to behave.
-
-The cost is that some professional workflows are out of scope: Adobe RGB print pipelines, log video footage, and Apple's Display P3 are unreachable. The [color spaces](color-spaces.md) page goes deeper on which math runs in linear sRGB versus sRGB gamma.
+What this avoids is squashing wide-gamut inputs at the decode boundary. iPhone HEIC photos tagged Display P3 keep their vivid reds and saturated greens through every edit; the final clamp to display gamut happens only at encode. ICC profile reading from input images, wide-gamut output, and HDR transfer curves (PQ/HLG) are intentionally out of scope at this revision; HDR HEIC sources fall back to "treat as sRGB" with a stderr warning. The [color spaces](color-spaces.md) page covers the per-stage placement and the conversion matrices.
 
 ### Fixed render order
 
 The engine applies adjustments in a fixed, hardcoded order. The order in which fields appear in a preset, in `Parameters`, or in API calls has no effect on the output. Render order is an engine implementation detail, not a user-facing concept.
 
-This works because each stage is designed to run in the color space and pipeline position where its math is correct. Exposure runs first, in linear space, before any tonal stage that operates on perceptual values; dehaze runs before denoise so denoise can clean up artifacts dehaze has amplified; LUTs apply inside the per-pixel pass on sRGB-gamma values, after grading and before detail. Moving a stage breaks an assumption a downstream stage depends on. The [render pipeline](render-pipeline.md) page walks through the worked examples.
+This works because each stage is designed to run in the color space and pipeline position where its math is correct. Exposure runs first, in linear space, before any tonal stage that operates on perceptual values; dehaze runs before denoise so denoise can clean up artifacts dehaze has amplified; LUTs apply inside the per-pixel pass on sRGB-gamma values (the engine brackets the lookup with conversions so existing sRGB-authored `.cube` LUTs remain portable), after grading and before detail. Moving a stage breaks an assumption a downstream stage depends on. The [render pipeline](render-pipeline.md) page walks through the worked examples.
 
 The cost is that stages are not user-reorderable. The trade-off was made for predictability: a preset produces the same output regardless of how it was authored.
 
@@ -88,5 +86,5 @@ The rules are not eternal. When a new feature genuinely needs a boundary change,
 
 - [Design decisions](design-decisions.md) — the cross-cutting decisions that produced these invariants.
 - [Render pipeline](render-pipeline.md) — why the pipeline order is fixed.
-- [Color spaces](color-spaces.md) — why sRGB-only is the working space.
+- [Color spaces](color-spaces.md) — why linear Rec.2020 is the working space.
 - [Preset model](preset-model.md) — how presets fit into the layered design.
