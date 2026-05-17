@@ -20,6 +20,17 @@ pub const LINEAR_SRGB_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
     [0.016391, 0.088013, 0.895595],
 ];
 
+/// Linear Display P3 → linear Rec.2020.
+///
+/// Display P3 uses the DCI-P3 primaries with D65 white point. Rec.2020 is
+/// wider than P3 in all directions, so values inside P3's [0, 1] cube map
+/// cleanly inside Rec.2020's [0, 1] cube.
+pub const LINEAR_P3_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
+    [0.753833, 0.198597, 0.047570],
+    [0.045744, 0.941776, 0.012480],
+    [-0.001210, 0.017601, 0.983610],
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,5 +68,19 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn p3_red_lies_inside_rec2020_gamut() {
+        let m = LINEAR_P3_TO_LINEAR_REC2020;
+        let p3_red = [1.0_f32, 0.0, 0.0];
+        let rec2020 = [
+            m[0][0] * p3_red[0] + m[0][1] * p3_red[1] + m[0][2] * p3_red[2],
+            m[1][0] * p3_red[0] + m[1][1] * p3_red[1] + m[1][2] * p3_red[2],
+            m[2][0] * p3_red[0] + m[2][1] * p3_red[1] + m[2][2] * p3_red[2],
+        ];
+        assert!(rec2020[0] > 0.0 && rec2020[0] < 1.0);
+        assert!(rec2020[1] >= 0.0);
+        assert!(rec2020[0].is_finite() && rec2020[1].is_finite() && rec2020[2].is_finite());
     }
 }
