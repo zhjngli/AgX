@@ -11,6 +11,7 @@ pub mod heic;
 use image::Rgb32FImage;
 use palette::{LinSrgb, Srgb};
 
+use crate::color_space::LINEAR_SRGB_TO_LINEAR_REC2020;
 use crate::error::{AgxError, Result};
 
 /// Known raw file extensions supported via LibRaw.
@@ -37,12 +38,17 @@ pub fn is_heic_extension(path: &std::path::Path) -> bool {
         .is_some_and(|ext| HEIC_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()))
 }
 
-/// Decode any supported image file into linear sRGB f32.
+/// Decode any supported image file into linear Rec.2020 f32.
 ///
 /// Auto-detects format from file extension:
 /// - Standard formats (JPEG, PNG, TIFF, BMP, WebP): decoded via the `image` crate
 /// - Raw formats (CR2, CR3, NEF, ARW, RAF, DNG, etc.): decoded via LibRaw (requires `raw` feature)
 /// - HEIF container formats (HEIC, HEIF): decoded via libheif (requires `heic` feature)
+///
+/// All back-ends land in the engine working space (linear Rec.2020). Note:
+/// during the wide-working-space migration, only the standard-format back-end
+/// produces linear Rec.2020 today; RAW and HEIC will follow in subsequent
+/// sub-projects.
 pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
     if is_raw_extension(path) {
         #[cfg(feature = "raw")]
@@ -71,10 +77,13 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
     decode_standard(path)
 }
 
-/// Decode a standard image file (JPEG, PNG, TIFF) into a linear sRGB f32 buffer.
+/// Decode a standard image file (JPEG, PNG, TIFF, BMP, WebP) into a linear
+/// Rec.2020 f32 buffer.
 ///
-/// The input image is assumed to be in sRGB gamma space. Each pixel is converted
-/// to linear sRGB for internal processing.
+/// The input image is assumed to be in sRGB gamma space (ICC parsing is
+/// deferred). Each pixel is converted from sRGB gamma to linear sRGB and then
+/// matrix-converted into the engine working space (linear Rec.2020) in a
+/// single fused per-pixel pass.
 pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let img = image::ImageReader::open(path)
         .map_err(AgxError::Io)?
@@ -83,9 +92,14 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let orientation = orientation::read_orientation(path);
     let img = orientation.apply(img);
     let mut buf = img.into_rgb32f();
+    let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
     for px in buf.pixels_mut() {
         let lin: LinSrgb<f32> = Srgb::new(px.0[0], px.0[1], px.0[2]).into_linear();
-        px.0 = [lin.red, lin.green, lin.blue];
+        px.0 = [
+            m[0][0] * lin.red + m[0][1] * lin.green + m[0][2] * lin.blue,
+            m[1][0] * lin.red + m[1][1] * lin.green + m[1][2] * lin.blue,
+            m[2][0] * lin.red + m[2][1] * lin.green + m[2][2] * lin.blue,
+        ];
     }
     Ok(buf)
 }
@@ -106,7 +120,8 @@ mod tests {
         assert_eq!(result.width(), 2);
         assert_eq!(result.height(), 2);
 
-        // sRGB 128/255 ≈ 0.502 → linear ≈ 0.2159
+        // sRGB 128/255 ≈ 0.502 → linear ≈ 0.2159. Grey is invariant under
+        // sRGB↔Rec.2020 (rows of LINEAR_SRGB_TO_LINEAR_REC2020 sum to ~1).
         let pixel = result.get_pixel(0, 0);
         assert!(
             (pixel.0[0] - 0.2159).abs() < 0.01,
@@ -136,23 +151,76 @@ mod tests {
         let p01 = result.get_pixel(0, 1).0;
         let p11 = result.get_pixel(1, 1).0;
 
-        // sRGB 255 → linear 1.0; sRGB 0 → linear 0.0
-        assert!(
-            (p00[0] - 1.0).abs() < 0.001 && p00[1] < 0.001 && p00[2] < 0.001,
-            "red pixel: {p00:?}"
-        );
-        assert!(
-            p10[0] < 0.001 && (p10[1] - 1.0).abs() < 0.001 && p10[2] < 0.001,
-            "green pixel: {p10:?}"
-        );
-        assert!(
-            p01[0] < 0.001 && p01[1] < 0.001 && (p01[2] - 1.0).abs() < 0.001,
-            "blue pixel: {p01:?}"
-        );
-        assert!(
-            p11[0] < 0.001 && p11[1] < 0.001 && p11[2] < 0.001,
-            "black pixel: {p11:?}"
-        );
+        // sRGB pure-channel inputs → linear sRGB unit vectors → linear
+        // Rec.2020 columns of LINEAR_SRGB_TO_LINEAR_REC2020.
+        let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
+        let red_expected = [m[0][0], m[1][0], m[2][0]];
+        let green_expected = [m[0][1], m[1][1], m[2][1]];
+        let blue_expected = [m[0][2], m[1][2], m[2][2]];
+        let black_expected = [0.0_f32, 0.0, 0.0];
+
+        let approx_eq = |a: f32, b: f32| (a - b).abs() < 1e-3;
+        for c in 0..3 {
+            assert!(
+                approx_eq(p00[c], red_expected[c]),
+                "red[{c}]: got {} expected {}",
+                p00[c],
+                red_expected[c]
+            );
+        }
+        for c in 0..3 {
+            assert!(
+                approx_eq(p10[c], green_expected[c]),
+                "green[{c}]: got {} expected {}",
+                p10[c],
+                green_expected[c]
+            );
+        }
+        for c in 0..3 {
+            assert!(
+                approx_eq(p01[c], blue_expected[c]),
+                "blue[{c}]: got {} expected {}",
+                p01[c],
+                blue_expected[c]
+            );
+        }
+        for c in 0..3 {
+            assert!(
+                approx_eq(p11[c], black_expected[c]),
+                "black[{c}]: got {} expected {}",
+                p11[c],
+                black_expected[c]
+            );
+        }
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn decode_standard_round_trips_to_srgb_via_inverse_matrix() {
+        use crate::color_space::LINEAR_REC2020_TO_LINEAR_SRGB;
+        // Decode a known sRGB pure-red sample; the matrix multiply means the
+        // decoded value is in linear Rec.2020 rather than linear sRGB. Applying
+        // the inverse matrix should recover linear sRGB ≈ (1, 0, 0).
+
+        let temp_path = std::env::temp_dir().join("agx_test_decode_round_trip.png");
+        let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(1, 1);
+        img.put_pixel(0, 0, Rgb([255, 0, 0]));
+        img.save(&temp_path).unwrap();
+
+        let result = decode_standard(&temp_path).unwrap();
+        let p = result.get_pixel(0, 0).0;
+
+        let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
+        let back = [
+            m[0][0] * p[0] + m[0][1] * p[1] + m[0][2] * p[2],
+            m[1][0] * p[0] + m[1][1] * p[1] + m[1][2] * p[2],
+            m[2][0] * p[0] + m[2][1] * p[1] + m[2][2] * p[2],
+        ];
+
+        assert!((back[0] - 1.0).abs() < 1e-4, "red: got {}", back[0]);
+        assert!(back[1].abs() < 1e-4, "green: got {}", back[1]);
+        assert!(back[2].abs() < 1e-4, "blue: got {}", back[2]);
 
         let _ = std::fs::remove_file(&temp_path);
     }
