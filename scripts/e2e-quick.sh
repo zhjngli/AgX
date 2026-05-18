@@ -16,8 +16,8 @@ echo "=== Building agx-cli (release) ==="
 cargo build --release -p agx-cli
 
 echo ""
-echo "=== E2E Quick: JPEG matrix (temple_blossoms) ==="
-cargo test -p agx-e2e --release -- cli_temple_blossoms --test-threads=4
+echo "=== E2E Quick: JPEG matrix (cinque_terre_window) ==="
+cargo test -p agx-e2e --release -- cli_cinque_terre_window --test-threads=4
 
 echo ""
 echo "=== E2E Quick: error cases + batch ==="
