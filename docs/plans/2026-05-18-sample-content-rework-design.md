@@ -116,7 +116,9 @@ HEIC weighting is intentional. The Display P3 → Rec.2020 path is AgX's newest 
 
 ## Cascade — surfaces touched
 
-Single coordinated PR. All of these update together so no surface ends up referencing a deleted filename:
+Single coordinated PR. All of these update together so no surface ends up referencing a deleted filename. Stale golden files (named `<old-scene>_<look>.png`) are removed as part of regenerating the golden directory.
+
+### Content and documentation
 
 - `example/images/` — replace 3 PNGs with 13 native-format originals.
 - `example/README.md` — full rewrite of Images and Quick start sections.
@@ -124,15 +126,27 @@ Single coordinated PR. All of these update together so no surface ends up refere
 - `crates/agx-e2e/fixtures/raw/` — drop all 4 current RAFs, add 2 new.
 - `crates/agx-e2e/fixtures/jpeg/` — drop both current, add 2 new.
 - `crates/agx-e2e/fixtures/heic/` — drop `temple_blossoms.heic`, add 4 new (keep `synthetic_p3_red.heic`).
-- `crates/agx-e2e/fixtures/golden/` — regenerate against new fixtures via `GOLDEN_UPDATE=1 cargo test -p agx-e2e`.
+- `crates/agx-e2e/fixtures/golden/` — delete all stale goldens, regenerate against new fixtures via `GOLDEN_UPDATE=1 cargo test -p agx-e2e`.
 - `README.md` — update Sample Images table (filenames, descriptions, preset pairings).
-- `docs/book/src/introduction.md` — sample filename references.
+- `docs/book/src/introduction.md` — sample filename references in image embeds.
+- `docs/book/src/images/` — replace the 3 PNG copies that `introduction.md` embeds (this is a separate set from `example/images/`, scoped to the book build).
 - `docs/book/src/tutorials/getting-started.md` — `agx apply` example commands.
-- `docs/book/src/how-to/{write-preset,extend-preset,compose-looks,multi-apply,custom-lut}.md` — filename refs.
-- `docs/book/src/assets/tutorials/` + `docs/book/src/assets/how-to/` — regenerate embedded thumbnails against new sources.
+- `docs/book/src/how-to/{write-preset,extend-preset,compose-looks,multi-apply,custom-lut}.md` — filename refs in commands and prose.
+- `docs/book/src/assets/tutorials/` + `docs/book/src/assets/how-to/` — regenerate embedded thumbnails (before/after, multi-apply grid, batch-apply grid) against new sources.
 - `docs/backlog/sample-content-rework.md` — check off sub-tasks, then delete the file per `docs/backlog/README.md` convention.
 
 Architecture-level docs (`ARCHITECTURE.md`, per-module `README.md` files) need no updates. No module contracts, dependencies, or invariants change.
+
+### Code, tests, CI, scripts
+
+Filename changes ripple into hardcoded references in test code, CI matrix, and helper scripts. These must update in the same PR or the build breaks.
+
+- `crates/agx-e2e/tests/cli_pipeline.rs` — rename per-scene test functions (`cli_temple_blossoms`, `cli_sunset_river`, `cli_foggy_forest`, `cli_dusk_cityscape`, `cli_night_city_blur`, `cli_night_architecture`, `cli_temple_blossoms_heic`) to match the new fixture set. Update the hardcoded fixture path and the scene identifier (golden filename prefix) inside each.
+- `crates/agx-e2e/tests/library_pipeline.rs` — hardcoded `fixture_path("jpeg/temple_blossoms.jpg")`, `fixture_path("raw/night_city_blur.raf")`, `fixture_path("heic/temple_blossoms.heic")` calls. Repoint to surviving fixtures.
+- `crates/agx-cli/tests/validate.rs` — `apply_with_unknown_field_prints_warning_to_stderr` references `example/images/sunset_river.png` to copy as a real-image test input. Repoint to a new sample (`cinque_terre_window.jpg` is the simplest substitute — sRGB JPEG, no HEIC decode dependency for the cli crate's test). Adjust the temp-file extension to match.
+- `scripts/e2e-quick.sh` — hardcoded `cli_temple_blossoms` test name in the JPEG-matrix smoke. Repoint to the new JPEG test name (likely `cli_cinque_terre_window` or `cli_geisel_library_bw`).
+- `scripts/profile.sh` — hardcoded fixture paths `sunset_river.raf`, `dusk_cityscape.raf`, `foggy_forest.raf`, `temple_blossoms.jpg`, plus the golden filename `golden/raw/sunset_river_noop.png`. Repoint to surviving fixtures and golden names.
+- `.github/workflows/ci.yml` — the per-scene matrix in the e2e job lists test function names (`cli_temple_blossoms`, `cli_night_city_blur`, `cli_sunset_river`, `cli_foggy_forest`, `cli_dusk_cityscape`, `cli_night_architecture`). Update the matrix to the new test names so each surviving fixture stays in the per-scene CI shard.
 
 ## Trade-offs
 
@@ -155,23 +169,35 @@ Considered and rejected: pre-converting HEICs to sRGB PNG. Smaller, but defeats 
 
 **Two Grand Canyon raws.** `grand_canyon_overlook.raf` and `grand_canyon_rainbow.raf` are the same general scene but cover different demos: the first has visible atmospheric haze for dehaze testing, the second has a sky-spanning rainbow for color preservation. Keeping both costs ~30 MB extra. Worth it.
 
-## Documentation updates
+## Documentation and code-surface updates
 
-Per CLAUDE.md, cross-cutting changes enumerate doc updates as a checklist:
+Per CLAUDE.md, cross-cutting changes enumerate updates as a checklist. Adversarial review at end of implementation can verify against this.
+
+### Docs and content
 
 - [ ] `example/README.md` — full rewrite of Images and Quick start sections
 - [ ] `README.md` — Sample Images table (filenames, descriptions, preset pairings)
-- [ ] `docs/book/src/introduction.md` — sample filename references
+- [ ] `docs/book/src/introduction.md` — sample filename references in image embeds
+- [ ] `docs/book/src/images/` — replace 3 PNG copies embedded by `introduction.md`
 - [ ] `docs/book/src/tutorials/getting-started.md` — `agx apply` example commands
 - [ ] `docs/book/src/how-to/write-preset.md` — input file refs
 - [ ] `docs/book/src/how-to/extend-preset.md` — input file refs
 - [ ] `docs/book/src/how-to/compose-looks.md` — input file refs
 - [ ] `docs/book/src/how-to/multi-apply.md` — input file refs
 - [ ] `docs/book/src/how-to/custom-lut.md` — input file refs
-- [ ] `docs/book/src/assets/tutorials/*.png` — regenerate against new images
-- [ ] `docs/book/src/assets/how-to/*.png` — regenerate against new images
-- [ ] `crates/agx-e2e/fixtures/golden/*` — regenerate via `GOLDEN_UPDATE=1 cargo test -p agx-e2e`
+- [ ] `docs/book/src/assets/tutorials/*.jpg` — regenerate against new images
+- [ ] `docs/book/src/assets/how-to/*.jpg` — regenerate against new images
+- [ ] `crates/agx-e2e/fixtures/golden/*` — delete stale, regenerate via `GOLDEN_UPDATE=1 cargo test -p agx-e2e`
 - [ ] `docs/backlog/sample-content-rework.md` — check off + delete when complete
+
+### Code, tests, CI, scripts
+
+- [ ] `crates/agx-e2e/tests/cli_pipeline.rs` — rename per-scene test functions, update fixture paths and golden prefixes
+- [ ] `crates/agx-e2e/tests/library_pipeline.rs` — repoint hardcoded `fixture_path(...)` calls
+- [ ] `crates/agx-cli/tests/validate.rs` — repoint `example/images/sunset_river.png` reference to a new sample
+- [ ] `scripts/e2e-quick.sh` — repoint `cli_temple_blossoms` test name
+- [ ] `scripts/profile.sh` — repoint hardcoded fixture paths and golden filename
+- [ ] `.github/workflows/ci.yml` — update e2e per-scene CI matrix to new test names
 
 ## Verification
 
