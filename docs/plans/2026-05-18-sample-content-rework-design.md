@@ -9,7 +9,7 @@ The current sample image set was assembled ad-hoc before AgX's HEIC support and 
 - The current set leans Fuji-only and moody-only. Tonal-range diversity and capability showcase are weak.
 - `README.md`, `example/README.md`, and the doc-book tutorial / how-to pages all reference these filenames.
 
-Backlog entry: [`docs/backlog/sample-content-rework.md`](../backlog/sample-content-rework.md). This design doc implements that backlog item.
+Backlog entry: `docs/backlog/sample-content-rework.md` (retired — implemented by this work). This design doc implements that backlog item.
 
 ## Goals
 
@@ -209,6 +209,6 @@ Per CLAUDE.md, cross-cutting changes enumerate updates as a checklist. Adversari
 
 ## Related
 
-- [`docs/backlog/sample-content-rework.md`](../backlog/sample-content-rework.md) — backlog item this implements
+- `docs/backlog/sample-content-rework.md` (retired) — backlog item this implements
 - [`docs/plans/2026-05-16-wide-working-space-design.md`](2026-05-16-wide-working-space-design.md) — sub-project 1, prerequisite (delivered the Display P3 → Rec.2020 decode this rework now showcases)
 - [`docs/plans/2026-05-13-heic-support-design.md`](2026-05-13-heic-support-design.md) — HEIC support design (provides the format this rework leans on for showcase content)
