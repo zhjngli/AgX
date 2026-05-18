@@ -43,7 +43,7 @@ Apply the variant:
 
 ```bash ignore
 agx apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_window.jpg \
   -p looks/warm-bright.toml \
   -o /tmp/warm-bright.png
 ```

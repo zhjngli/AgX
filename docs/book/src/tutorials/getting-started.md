@@ -12,7 +12,7 @@ Run:
 
 ```bash
 agx apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_window.jpg \
   -p example/presets/golden-hour.toml \
   -o golden-hour.png
 ```
@@ -28,7 +28,7 @@ Try a different preset by swapping `-p`:
 
 ```bash
 agx apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_window.jpg \
   -p example/presets/moody-dark.toml \
   -o moody-dark.png
 ```
@@ -41,7 +41,7 @@ A preset is just a saved bundle of parameters. To see the parameters themselves,
 
 ```bash
 agx edit \
-  -i example/images/sunset_river.png \
+  -i example/images/marina_sunset.heic \
   -o tweaked.png \
   --exposure 0.5 \
   --shadows 30 \
