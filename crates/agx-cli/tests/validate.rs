@@ -115,14 +115,14 @@ fn validate_quiet_still_shows_errors_for_broken_files() {
 fn apply_with_unknown_field_prints_warning_to_stderr() {
     use std::path::PathBuf;
     let tmp = tempfile::tempdir().unwrap();
-    let img_path = tmp.path().join("test.png");
+    let img_path = tmp.path().join("test.jpg");
     // Create a minimal image fixture by copying from example/images
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .parent()
         .unwrap()
-        .join("example/images/sunset_river.png");
+        .join("example/images/cinque_terre_window.jpg");
     if !example.exists() {
         // Skip the test if the example image isn't available
         eprintln!("skipping: example image not found at {}", example.display());

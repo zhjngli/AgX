@@ -105,12 +105,14 @@ jobs:
       fail-fast: false
       matrix:
         suite:
-          - cli_temple_blossoms
-          - cli_night_city_blur
-          - cli_sunset_river
-          - cli_foggy_forest
-          - cli_dusk_cityscape
-          - cli_night_architecture
+          - cli_marina_sunset
+          - cli_concert_hall
+          - cli_mountain_valley
+          - cli_sky_moon_wires
+          - cli_cinque_terre_manarola
+          - cli_grand_canyon_overlook
+          - cli_cinque_terre_window
+          - cli_geisel_library_bw
           - misc
     steps:
       - uses: actions/checkout@v4

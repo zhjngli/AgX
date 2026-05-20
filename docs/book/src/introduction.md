@@ -2,11 +2,11 @@
 
 AgX is an open-source preset-first photo editing library and command-line tool, written in Rust. It edits raw and JPEG images using portable, human-readable TOML presets — designed for batch processing, reproducible looks, and integration into automated pipelines, not as a Lightroom replacement.
 
-![Sunset over a river](images/sunset_river.png)
+![Sunset over a marina with birds in flight](images/marina_sunset.png)
 
-![Temple at blossom season](images/temple_blossoms.png)
+![Cinque Terre Manarola — colorful houses on the Ligurian coast](images/cinque_terre_manarola.png)
 
-![Architecture at night](images/night_architecture.png)
+![Mountain valley at twilight, silhouettes against fading sky](images/mountain_valley.png)
 
 ## Where to start
 

@@ -16,7 +16,7 @@ fn process_with_params(input: &Path, output: &Path, configure: impl FnOnce(&mut 
 
 #[test]
 fn library_jpeg_noop_roundtrip() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let input = fixture_path("jpeg/cinque_terre_window.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -26,7 +26,7 @@ fn library_jpeg_noop_roundtrip() {
 
 #[test]
 fn library_raw_noop_roundtrip() {
-    let input = fixture_path("raw/night_city_blur.raf");
+    let input = fixture_path("raw/cinque_terre_manarola.raf");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -36,7 +36,7 @@ fn library_raw_noop_roundtrip() {
 
 #[test]
 fn library_heic_noop_roundtrip() {
-    let input = fixture_path("heic/temple_blossoms.heic");
+    let input = fixture_path("heic/marina_sunset.heic");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -46,7 +46,7 @@ fn library_heic_noop_roundtrip() {
 
 #[test]
 fn library_apply_preset() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let input = fixture_path("jpeg/cinque_terre_window.jpg");
     let preset_path = fixture_path("looks/portra_400.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
@@ -63,7 +63,7 @@ fn library_apply_preset() {
 
 #[test]
 fn library_direct_params() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let input = fixture_path("jpeg/cinque_terre_window.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -77,7 +77,7 @@ fn library_direct_params() {
 
 #[test]
 fn library_lut_load_and_apply() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let input = fixture_path("jpeg/cinque_terre_window.jpg");
     let lut_path = fixture_path("looks/luts/portra_400.cube");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
@@ -94,7 +94,7 @@ fn library_lut_load_and_apply() {
 
 #[test]
 fn library_vignette_via_params() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let input = fixture_path("jpeg/cinque_terre_window.jpg");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");
 
@@ -106,7 +106,7 @@ fn library_vignette_via_params() {
 
 #[test]
 fn library_preset_with_extends() {
-    let input = fixture_path("jpeg/temple_blossoms.jpg");
+    let input = fixture_path("jpeg/cinque_terre_window.jpg");
     let preset_path = fixture_path("looks/blade_runner.toml");
     let dir = TempDir::new().unwrap();
     let output = dir.path().join("output.png");

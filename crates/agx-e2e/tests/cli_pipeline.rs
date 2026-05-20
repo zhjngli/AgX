@@ -120,10 +120,10 @@ fn run_image_matrix(
 // --- Color images: noop + all looks (color + B&W conversion) ---
 
 #[test]
-fn cli_temple_blossoms() {
+fn cli_cinque_terre_window() {
     run_image_matrix(
-        "jpeg/temple_blossoms.jpg",
-        "temple_blossoms",
+        "jpeg/cinque_terre_window.jpg",
+        "cinque_terre_window",
         "jpeg",
         2,
         0.0,
@@ -131,16 +131,54 @@ fn cli_temple_blossoms() {
     );
 }
 
+// HEIC tests share a tolerance of (10, 1.0). libheif/libde265 decode is
+// mostly deterministic, but cross-platform version jitter shows up at
+// LUT-amplified boundary pixels (~0.07% of pixels, max channel diff ~4 in
+// practice). Tighter than the raw path (which absorbs LibRaw demosaicing
+// variance).
+
 #[test]
-fn cli_temple_blossoms_heic() {
+fn cli_marina_sunset() {
     run_image_matrix(
-        "heic/temple_blossoms.heic",
-        "temple_blossoms",
+        "heic/marina_sunset.heic",
+        "marina_sunset",
         "heic",
-        // Moderate tolerance: libheif/libde265 decode is mostly deterministic,
-        // but cross-platform version jitter shows up at LUT-amplified boundary
-        // pixels (~0.07% of pixels, max channel diff ~4 in practice). Tighter
-        // than the raw path (which absorbs LibRaw demosaicing variance).
+        10,
+        1.0,
+        ALL_LOOKS,
+    );
+}
+
+#[test]
+fn cli_concert_hall() {
+    run_image_matrix(
+        "heic/concert_hall.heic",
+        "concert_hall",
+        "heic",
+        10,
+        1.0,
+        ALL_LOOKS,
+    );
+}
+
+#[test]
+fn cli_mountain_valley() {
+    run_image_matrix(
+        "heic/mountain_valley.heic",
+        "mountain_valley",
+        "heic",
+        10,
+        1.0,
+        ALL_LOOKS,
+    );
+}
+
+#[test]
+fn cli_sky_moon_wires() {
+    run_image_matrix(
+        "heic/sky_moon_wires.heic",
+        "sky_moon_wires",
+        "heic",
         10,
         1.0,
         ALL_LOOKS,
@@ -158,9 +196,8 @@ fn cli_synthetic_p3_red() {
         "heic/synthetic_p3_red.heic",
         "synthetic_p3_red",
         "heic",
-        // Same tolerance as the other HEIC entry — libheif decode is
-        // mostly deterministic but cross-version noise can show up at
-        // the boundary, and the wide-gamut math amplifies tiny drifts.
+        // Same shared HEIC tolerance — wide-gamut math amplifies tiny
+        // cross-version libheif drifts further on this synthetic fixture.
         10,
         1.0,
         ALL_LOOKS,
@@ -168,10 +205,10 @@ fn cli_synthetic_p3_red() {
 }
 
 #[test]
-fn cli_night_city_blur() {
+fn cli_cinque_terre_manarola() {
     run_image_matrix(
-        "raw/night_city_blur.raf",
-        "night_city_blur",
+        "raw/cinque_terre_manarola.raf",
+        "cinque_terre_manarola",
         "raw",
         100,
         25.0,
@@ -180,34 +217,10 @@ fn cli_night_city_blur() {
 }
 
 #[test]
-fn cli_sunset_river() {
+fn cli_grand_canyon_overlook() {
     run_image_matrix(
-        "raw/sunset_river.raf",
-        "sunset_river",
-        "raw",
-        100,
-        25.0,
-        ALL_LOOKS,
-    );
-}
-
-#[test]
-fn cli_foggy_forest() {
-    run_image_matrix(
-        "raw/foggy_forest.raf",
-        "foggy_forest",
-        "raw",
-        100,
-        25.0,
-        ALL_LOOKS,
-    );
-}
-
-#[test]
-fn cli_dusk_cityscape() {
-    run_image_matrix(
-        "raw/dusk_cityscape.raf",
-        "dusk_cityscape",
+        "raw/grand_canyon_overlook.raf",
+        "grand_canyon_overlook",
         "raw",
         100,
         25.0,
@@ -218,10 +231,10 @@ fn cli_dusk_cityscape() {
 // --- B&W images: noop + B&W looks only (color looks are meaningless on B&W) ---
 
 #[test]
-fn cli_night_architecture() {
+fn cli_geisel_library_bw() {
     run_image_matrix(
-        "jpeg/night_architecture.jpg",
-        "night_architecture",
+        "jpeg/geisel_library_bw.jpg",
+        "geisel_library_bw",
         "jpeg",
         2,
         0.0,
@@ -238,8 +251,8 @@ fn cli_batch_edit_mixed_dir() {
     let output_dir = dir.path().join("output");
     std::fs::create_dir(&input_dir).unwrap();
 
-    let jpeg_src = fixture_path("jpeg/temple_blossoms.jpg");
-    std::fs::copy(&jpeg_src, input_dir.join("temple_blossoms.jpg")).unwrap();
+    let jpeg_src = fixture_path("jpeg/cinque_terre_window.jpg");
+    std::fs::copy(&jpeg_src, input_dir.join("cinque_terre_window.jpg")).unwrap();
 
     let status = cli_bin()
         .args([
@@ -258,7 +271,7 @@ fn cli_batch_edit_mixed_dir() {
 
     assert!(status.success(), "batch-edit should succeed");
     assert!(
-        output_dir.join("temple_blossoms.jpg").exists(),
+        output_dir.join("cinque_terre_window.jpg").exists(),
         "Output file should exist"
     );
 }

@@ -31,7 +31,7 @@ tint = 5.0
 Apply it:
 
 ```bash ignore
-agx apply -i example/images/sunset_river.png -p my-look.toml -o /tmp/my-look.png
+agx apply -i example/images/cinque_terre_window.jpg -p my-look.toml -o /tmp/my-look.png
 ```
 
 Open `/tmp/my-look.png`. Tweak any value — re-run — see the change.

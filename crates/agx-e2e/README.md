@@ -8,13 +8,13 @@ End-to-end test suite for AgX. Tests the full pipeline from decode through engin
 
 Data-driven matrix testing every image against every applicable look preset via CLI subprocess calls. Each image is its own test function, enabling Cargo to parallelize across images.
 
-- **Color images** (5): noop + 11 curated looks = 12 goldens each
+- **Color images** (8): noop + 12 curated looks = 13 goldens each
 - **B&W images** (1): noop + 4 B&W looks = 5 goldens
-- **Total**: 65 golden file comparisons + batch test + 2 error cases
+- **Total**: 109 golden file comparisons + batch test + 2 error cases
 
 ### Library Pipeline (`tests/library_pipeline.rs`)
 
-Slim API smoke tests (6 tests) covering: noop roundtrip (JPEG + RAW), preset application, direct params, LUT loading, and preset `extends`.
+Slim API smoke tests (8 tests) covering: noop roundtrip (JPEG + RAW + HEIC), preset application, direct params, LUT loading, and preset `extends`.
 
 ### Golden Comparison
 
@@ -26,7 +26,7 @@ Slim API smoke tests (6 tests) covering: noop roundtrip (JPEG + RAW), preset app
 
 ## Performance
 
-The suite does heavy pixel processing (decode + render + encode for 65 images). Key optimizations:
+The suite does heavy pixel processing (decode + render + encode for 109 image × look combinations). Key optimizations:
 
 - **`[profile.test] opt-level = 2`** in workspace `Cargo.toml` — debug builds are ~14x slower for pixel math (37.7s vs 2.6s per JPEG measured). This applies to the test binary and its dependencies.
 - **Release CLI binary** — `scripts/e2e.sh` builds `agx-cli` with `--release`. The test helper `cli_bin()` prefers the release binary at `target/release/agx`, falling back to debug.
@@ -55,7 +55,9 @@ GOLDEN_UPDATE=1 cargo test -p agx-e2e
 |-----------|----------|
 | `fixtures/jpeg/` | JPEG test images |
 | `fixtures/raw/` | RAF (Fujifilm RAW) test images |
-| `fixtures/looks/` | Preset TOML files (7 color + 4 B&W + 1 base) |
+| `fixtures/heic/` | HEIC test images (iPhone Display P3 + synthetic OOG sanity check) |
+| `fixtures/looks/` | Preset TOML files (8 color + 4 B&W + 1 base) |
 | `fixtures/looks/luts/` | Generated 33x33x33 .cube LUT files |
 | `fixtures/golden/jpeg/` | JPEG golden reference images |
 | `fixtures/golden/raw/` | RAW golden reference images |
+| `fixtures/golden/heic/` | HEIC golden reference images |

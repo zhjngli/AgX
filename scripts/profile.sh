@@ -21,11 +21,10 @@ FIXTURES="crates/agx-e2e/fixtures"
 
 # Test images — mix of RAW and JPEG at different sizes
 IMAGES=(
-    "$FIXTURES/raw/sunset_river.raf"
-    "$FIXTURES/raw/dusk_cityscape.raf"
-    "$FIXTURES/raw/foggy_forest.raf"
-    "$FIXTURES/jpeg/temple_blossoms.jpg"
-    "$FIXTURES/golden/raw/sunset_river_noop.png"
+    "$FIXTURES/raw/cinque_terre_manarola.raf"
+    "$FIXTURES/raw/grand_canyon_overlook.raf"
+    "$FIXTURES/jpeg/cinque_terre_window.jpg"
+    "$FIXTURES/golden/raw/cinque_terre_manarola_noop.png"
 )
 
 # Presets — from light to heavy pipeline usage
@@ -40,8 +39,8 @@ PRESETS=(
 
 # Also run a noop (no preset) for baseline
 NOOP_IMAGES=(
-    "$FIXTURES/raw/sunset_river.raf"
-    "$FIXTURES/golden/raw/sunset_river_noop.png"
+    "$FIXTURES/raw/cinque_terre_manarola.raf"
+    "$FIXTURES/golden/raw/cinque_terre_manarola_noop.png"
 )
 
 # Clean output

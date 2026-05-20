@@ -48,40 +48,40 @@ These before/after pairs are from the e2e test suite — each processed through 
 
 | Original | Look | Result |
 |:--:|:--:|:--:|
-| ![sunset](example/images/sunset_river.png) | Portra 400 | ![sunset-portra](example/outputs/sunset_river_portra_400.png) |
-| ![temple](example/images/temple_blossoms.png) | Neo Noir | ![temple-noir](example/outputs/temple_blossoms_neo_noir.png) |
-| ![architecture](example/images/night_architecture.png) | B&W High Contrast | ![architecture-bw](example/outputs/night_architecture_bw_high_contrast.png) |
+| ![marina sunset](docs/book/src/images/marina_sunset.png) | Portra 400 | ![marina-portra](example/outputs/marina_sunset_portra_400.png) |
+| ![cinque terre](docs/book/src/images/cinque_terre_manarola.png) | Kodachrome 64 | ![cinque-kodachrome](example/outputs/cinque_terre_manarola_kodachrome_64.png) |
+| ![mountain valley](docs/book/src/images/mountain_valley.png) | B&W High Contrast | ![valley-bw](example/outputs/mountain_valley_high_contrast_bw.png) |
 
 ## Quick Start
 
 ```bash
 # Apply a preset to an image
 agx apply \
-  -i example/images/temple_blossoms.png \
+  -i example/images/cinque_terre_window.jpg \
   -p example/presets/golden-hour.toml \
   -o edited.jpg
 
 # Edit with inline parameters
 agx edit \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_window.jpg \
   -o edited.jpg \
   --exposure 1.0 --contrast 25 --temperature 30
 
 # Apply a .cube LUT
 agx edit \
-  -i example/images/temple_blossoms.png \
+  -i example/images/marina_sunset.heic \
   -o graded.jpg \
   --lut film-emulation.cube
 
 # Combine adjustments with a LUT
 agx edit \
-  -i example/images/sunset_river.png \
+  -i example/images/marina_sunset.heic \
   -o graded.jpg \
   --exposure 0.5 --contrast 10 --lut film-emulation.cube
 
-# Process a raw file (CR2, NEF, ARW, DNG, etc.)
+# Process a raw file (RAF, CR2, NEF, ARW, DNG, etc.)
 agx edit \
-  -i photo.dng \
+  -i example/images/cinque_terre_manarola.raf \
   -o edited.jpg \
   --exposure 0.5 --contrast 15
 
@@ -99,7 +99,7 @@ agx edit \
 
 # Specify output format explicitly
 agx edit \
-  -i photo.jpg \
+  -i example/images/cinque_terre_manarola.raf \
   -o output.tiff \
   --format tiff
 ```
@@ -190,14 +190,14 @@ For the contract (dependency rules, invariants, structural tests), see [ARCHITEC
 # Fast checks (format, clippy, unit tests, architecture tests, doc links)
 ./scripts/verify.sh
 
-# Full e2e suite (builds CLI in release, runs 54 golden comparisons)
+# Full e2e suite (builds CLI in release, runs 109 golden comparisons)
 ./scripts/e2e.sh
 
 # Regenerate golden files
 GOLDEN_UPDATE=1 cargo test -p agx-e2e
 ```
 
-The e2e suite tests every fixture image against 9 film-inspired look presets (6 color + 3 B&W), each combining parameter adjustments with generated 33x33x33 `.cube` LUTs. See `crates/agx-e2e/README.md` for details.
+The e2e suite tests every fixture image against 12 film-inspired look presets (8 color + 4 B&W), each combining parameter adjustments with generated 33x33x33 `.cube` LUTs. See `crates/agx-e2e/README.md` for details.
 
 ## Building with Raw Support
 

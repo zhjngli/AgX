@@ -6,9 +6,19 @@ Sample images, presets, and LUTs for trying out AgX. The CLI tutorial under [`do
 
 | Image | Description |
 |-------|-------------|
-| `sunset_river.png` | Warm-light landscape over a river — dynamic range across sky and water |
-| `temple_blossoms.png` | Soft-light scene with cherry blossoms framing a temple roofline |
-| `night_architecture.png` | High-contrast night architecture with strong artificial light |
+| `marina_sunset.heic` | Marina sunset with birds in V-formation — vivid orange-to-blue gradient, Display P3 source |
+| `grand_canyon_overlook.raf` | Grand Canyon overlook with atmospheric haze and snow patches — wide dynamic range, dehaze demo |
+| `cinque_terre_manarola.raf` | Iconic colorful cliffside houses in daylight — vivid texture, complementary color |
+| `concert_hall.heic` | Concert hall steps lit by warm wood + teal spotlight — soft complementary color |
+| `mountain_valley.heic` | Mountain valley stream silhouette at twilight — deep shadow, near-monochrome |
+| `sky_moon_wires.heic` | Crossing power lines against a P3 blue sky with the moon — minimal pattern |
+| `geisel_library_bw.jpg` | Geisel Library brutalist architecture, B&W — mono source |
+| `cinque_terre_window.jpg` | Window-framed view of the Ligurian coast at sunset — soft golden hour |
+| `film_beach.jpg` | Beach scene scanned from Gold 200 film — gentle film aesthetic |
+| `ranunculus_field.heic` | Pink and orange ranunculus field under blue sky — saturated floral |
+| `stairwell_silhouette.heic` | Silhouette on a dark escalator with pinpoint doorway light — extreme DR |
+| `foggy_sintra.heic` | Moorish castle ramparts emerging from fog at Sintra — atmospheric haze |
+| `grand_canyon_rainbow.raf` | Grand Canyon with sky-spanning rainbow — soft pastel sky, alt scenic |
 
 ## Presets
 
@@ -36,7 +46,7 @@ Apply a preset to one image:
 
 ```bash
 agx apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_window.jpg \
   -p example/presets/golden-hour.toml \
   -o /tmp/out.png
 ```

@@ -11,7 +11,7 @@ Render one image through several presets in a single command. Useful when you're
 
 ```bash
 agx multi-apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_manarola.raf \
   -p example/presets/golden-hour.toml \
      example/presets/moody-dark.toml \
      example/presets/cool-blue.toml \
@@ -28,7 +28,7 @@ Include an unprocessed reference render alongside the preset results:
 
 ```bash
 agx multi-apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_manarola.raf \
   -p example/presets/golden-hour.toml \
      example/presets/moody-dark.toml \
   -o /tmp/looks \
@@ -41,7 +41,7 @@ Run preset renders in parallel (default is `1`, since each render is already int
 
 ```bash
 agx multi-apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_manarola.raf \
   -p example/presets/golden-hour.toml \
      example/presets/moody-dark.toml \
      example/presets/cool-blue.toml \

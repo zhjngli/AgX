@@ -29,7 +29,7 @@ Apply it via `--lut`:
 
 ```bash ignore
 agx edit \
-  -i example/images/sunset_river.png \
+  -i example/images/marina_sunset.heic \
   -o /tmp/lifted.png \
   --lut lift-shadows.cube
 ```

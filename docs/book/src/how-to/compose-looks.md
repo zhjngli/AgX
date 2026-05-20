@@ -12,7 +12,7 @@ Use `--presets` (note the plural) on `agx apply`:
 
 ```bash
 agx apply \
-  -i example/images/sunset_river.png \
+  -i example/images/cinque_terre_manarola.raf \
   --presets example/presets/golden-hour.toml \
             example/presets/high-contrast.toml \
   -o /tmp/composed.png
