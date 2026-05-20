@@ -23,7 +23,10 @@ Current cascade order:
 2. `img_parts` for PNG (EXIF + ICC)
 3. `kamadak-exif` for TIFF-based raw files (behind `raw` feature)
 4. LibRaw parsed fields for non-TIFF raw files (behind `raw` feature)
-5. Return `None`
+5. `libheif` for HEIC/HEIF containers (behind `heic` feature)
+6. Return `None`
+
+After any successful extraction, the EXIF `Orientation` tag (0x0112) is rewritten to `1` (Normal) — see Key Decisions.
 
 ## Does NOT
 
@@ -36,3 +39,4 @@ Current cascade order:
 - **Raw bytes, not parsed structures.** EXIF and ICC profiles are stored as opaque `Vec<u8>` for lossless round-tripping. No field-level parsing means no data loss.
 - **Best-effort extraction.** `extract_metadata` returns `Option` and never errors. Metadata is valuable but not essential -- missing metadata should never prevent image processing.
 - **Cascading strategies.** Different file types need different extraction approaches. The cascade tries format-specific parsers in order and stops at the first success.
+- **Orientation tag normalized to 1.** Decoders apply EXIF orientation to pixel data during decode, leaving the engine's pixels in canonical form. The returned EXIF blob has its `Orientation` tag (0x0112) rewritten to `1` (Normal) so that EXIF-aware viewers do not rotate the already-canonical output a second time. This is the only field-level mutation made to the otherwise opaque EXIF bytes.
