@@ -20,8 +20,10 @@ echo "=== E2E Quick: JPEG matrix (cinque_terre_window) ==="
 cargo test -p agx-e2e --release -- cli_cinque_terre_window --test-threads=4
 
 echo ""
-echo "=== E2E Quick: error cases + batch ==="
-cargo test -p agx-e2e --release -- "cli_corrupt|cli_nonexistent|cli_batch" --test-threads=4
+echo "=== E2E Quick: error cases + batch + exif preservation ==="
+# cargo test takes multiple positional patterns as substring OR filters
+# (a single "a|b" string is matched literally and would skip everything).
+cargo test -p agx-e2e --release -- cli_corrupt cli_nonexistent cli_batch cli_exif --test-threads=4
 
 echo ""
 echo "=== E2E Quick: library pipeline ==="
