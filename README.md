@@ -50,7 +50,7 @@ These before/after pairs are from the e2e test suite — each processed through 
 |:--:|:--:|:--:|
 | ![marina sunset](docs/book/src/images/marina_sunset.png) | Portra 400 | ![marina-portra](example/outputs/marina_sunset_portra_400.png) |
 | ![cinque terre](docs/book/src/images/cinque_terre_manarola.png) | Kodachrome 64 | ![cinque-kodachrome](example/outputs/cinque_terre_manarola_kodachrome_64.png) |
-| ![mountain valley](docs/book/src/images/mountain_valley.png) | B&W High Contrast | ![valley-bw](example/outputs/mountain_valley_bw_high_contrast.png) |
+| ![mountain valley](docs/book/src/images/mountain_valley.png) | B&W High Contrast | ![valley-bw](example/outputs/mountain_valley_high_contrast_bw.png) |
 
 ## Quick Start
 
@@ -190,14 +190,14 @@ For the contract (dependency rules, invariants, structural tests), see [ARCHITEC
 # Fast checks (format, clippy, unit tests, architecture tests, doc links)
 ./scripts/verify.sh
 
-# Full e2e suite (builds CLI in release, runs 54 golden comparisons)
+# Full e2e suite (builds CLI in release, runs 109 golden comparisons)
 ./scripts/e2e.sh
 
 # Regenerate golden files
 GOLDEN_UPDATE=1 cargo test -p agx-e2e
 ```
 
-The e2e suite tests every fixture image against 9 film-inspired look presets (6 color + 3 B&W), each combining parameter adjustments with generated 33x33x33 `.cube` LUTs. See `crates/agx-e2e/README.md` for details.
+The e2e suite tests every fixture image against 12 film-inspired look presets (8 color + 4 B&W), each combining parameter adjustments with generated 33x33x33 `.cube` LUTs. See `crates/agx-e2e/README.md` for details.
 
 ## Building with Raw Support
 
