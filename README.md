@@ -67,13 +67,13 @@ agx edit \
   -o edited.jpg \
   --exposure 1.0 --contrast 25 --temperature 30
 
-# Apply a .cube LUT to a vivid wide-gamut HEIC
+# Apply a .cube LUT
 agx edit \
   -i example/images/marina_sunset.heic \
   -o graded.jpg \
   --lut film-emulation.cube
 
-# Combine adjustments with a LUT on a wide-gamut source
+# Combine adjustments with a LUT
 agx edit \
   -i example/images/marina_sunset.heic \
   -o graded.jpg \

@@ -135,9 +135,7 @@ fn cli_cinque_terre_window() {
 // mostly deterministic, but cross-platform version jitter shows up at
 // LUT-amplified boundary pixels (~0.07% of pixels, max channel diff ~4 in
 // practice). Tighter than the raw path (which absorbs LibRaw demosaicing
-// variance). The synthetic_p3_red fixture amplifies tiny drifts further
-// via wide-gamut math, so it carries the same tolerance for the same
-// reason.
+// variance).
 
 #[test]
 fn cli_marina_sunset() {
@@ -198,6 +196,8 @@ fn cli_synthetic_p3_red() {
         "heic/synthetic_p3_red.heic",
         "synthetic_p3_red",
         "heic",
+        // Same shared HEIC tolerance — wide-gamut math amplifies tiny
+        // cross-version libheif drifts further on this synthetic fixture.
         10,
         1.0,
         ALL_LOOKS,
