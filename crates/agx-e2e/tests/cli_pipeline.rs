@@ -278,6 +278,73 @@ fn cli_batch_edit_mixed_dir() {
 
 // --- Error cases ---
 
+// --- EXIF orientation preservation ---
+
+/// Returns the EXIF Orientation tag (0x0112) from an image file, or `None`
+/// if the tag is absent / file has no EXIF. Used to verify that AgX
+/// rewrites the source orientation to `1` (Normal) on output, matching
+/// the canonical post-decode pixel data.
+fn read_orientation_tag(path: &std::path::Path) -> Option<u16> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    let exif = exif::Reader::new().read_from_container(&mut reader).ok()?;
+    let field = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY)?;
+    field.value.get_uint(0).map(|v| v as u16)
+}
+
+/// Regression test for the EXIF orientation double-application bug: rotated
+/// iPhone HEICs decoded by AgX have their pixels rotated to canonical
+/// orientation during decode, so the output's preserved EXIF Orientation
+/// tag must read `1` (Normal). Otherwise EXIF-aware viewers (browser,
+/// macOS Preview) rotate the already-canonical pixels a second time.
+///
+/// Fixture `heic/marina_sunset.heic` carries source orientation `Rotate 90
+/// CW` (sensor frame 4032×3024); the output JPEG must carry orientation 1
+/// with dimensions matching the rotated canonical frame.
+#[test]
+fn cli_exif_orientation_normalized_on_heic_output() {
+    let dir = TempDir::new().unwrap();
+    let input = fixture_path("heic/marina_sunset.heic");
+
+    // Sanity-check the fixture: if the source no longer carries a non-Normal
+    // orientation tag, this test is no longer exercising the regression.
+    let source_orient = read_orientation_tag(&input);
+    assert!(
+        matches!(source_orient, Some(o) if o != 1),
+        "fixture must carry non-Normal orientation to exercise this test, got {source_orient:?}"
+    );
+
+    let output = dir.path().join("out.jpg");
+    let status = cli_bin()
+        .args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ])
+        .status()
+        .expect("failed to run CLI");
+    assert!(status.success(), "edit should succeed");
+
+    let output_orient = read_orientation_tag(&output);
+    assert_eq!(
+        output_orient,
+        Some(1),
+        "output EXIF orientation must be 1 (Normal), got {output_orient:?}"
+    );
+
+    // Output pixel dimensions should match the rotated canonical frame
+    // (3024×4032 for a Rotate-90-CW 4032×3024 source). Cheap check that the
+    // decode-side rotation actually ran.
+    let img = image::open(&output).expect("output should decode");
+    assert_eq!(
+        (img.width(), img.height()),
+        (3024, 4032),
+        "output dimensions should match rotated canonical frame"
+    );
+}
+
 #[test]
 fn cli_corrupt_file_fails_gracefully() {
     let dir = TempDir::new().unwrap();
