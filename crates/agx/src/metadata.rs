@@ -92,19 +92,22 @@ fn extract_metadata_raw(path: &Path) -> Option<ImageMetadata> {
     None
 }
 
-/// Rewrite the EXIF Orientation tag (0x0112) in `bytes` to `1` (Normal).
+/// Rewrite the EXIF Orientation tag (0x0112) to `1` (Normal) in every IFD of
+/// the TIFF chain (IFD0 main, IFD1 thumbnail, etc.).
 ///
 /// AgX decoders apply EXIF orientation to pixel data during decode, leaving
 /// the engine's working pixels in canonical (top-left, no rotation) form.
 /// Without this normalization, copying the source EXIF blob to the output
 /// would tell viewers to rotate the already-canonical pixels a second time.
+/// IFD1 carries thumbnail metadata; tools that prefer the embedded thumbnail
+/// (Bridge, Lightroom) read its Orientation independently from IFD0.
 ///
 /// Best-effort: silently leaves `bytes` unchanged on any parse failure
-/// (unknown byte order, bad TIFF magic, truncated buffer, missing tag).
+/// (unknown byte order, bad TIFF magic, truncated buffer, missing tag, or
+/// an Orientation entry whose declared type/count doesn't match the spec).
 /// Handles both raw TIFF buffers and the `Exif\0\0`-prefixed form that
 /// `img-parts` and most JPEG/HEIC pipelines hand around.
 pub(crate) fn normalize_orientation_in_exif(bytes: &mut [u8]) {
-    // Strip "Exif\0\0" prefix if present — the TIFF header starts after it.
     let tiff_start = if bytes.starts_with(b"Exif\0\0") { 6 } else { 0 };
     if bytes.len() < tiff_start + 8 {
         return;
@@ -137,29 +140,44 @@ pub(crate) fn normalize_orientation_in_exif(bytes: &mut [u8]) {
         return;
     }
 
-    let ifd0_abs = tiff_start + read_u32(bytes, tiff_start + 4) as usize;
-    if bytes.len() < ifd0_abs + 2 {
-        return;
-    }
-    let num_entries = read_u16(bytes, ifd0_abs) as usize;
-
-    for i in 0..num_entries {
-        let entry_abs = ifd0_abs + 2 + i * 12;
-        if bytes.len() < entry_abs + 12 {
+    // Cap chain traversal at 4 IFDs — guards against malformed files with
+    // circular next-IFD pointers. Real-world files have IFD0 + optional IFD1.
+    let mut next_ifd_rel = read_u32(bytes, tiff_start + 4) as usize;
+    for _ in 0..4 {
+        if next_ifd_rel == 0 {
+            break;
+        }
+        let ifd_abs = tiff_start + next_ifd_rel;
+        if bytes.len() < ifd_abs + 2 {
             return;
         }
-        if read_u16(bytes, entry_abs) == 0x0112 {
-            // Orientation is SHORT (type 3), count 1; the value occupies the
-            // low 2 bytes of the 4-byte value field. Overwrite all 4 so any
-            // stale padding clears.
+        let num_entries = read_u16(bytes, ifd_abs) as usize;
+        let next_ptr_abs = ifd_abs + 2 + num_entries * 12;
+        if bytes.len() < next_ptr_abs + 4 {
+            return;
+        }
+
+        for i in 0..num_entries {
+            let entry_abs = ifd_abs + 2 + i * 12;
+            if read_u16(bytes, entry_abs) != 0x0112 {
+                continue;
+            }
+            // Skip if the field shape doesn't match the EXIF spec (type
+            // SHORT, count 1). For type LONG or count > 1, a blind 4-byte
+            // SHORT write would either encode the wrong value or follow an
+            // out-of-line offset and corrupt unrelated entries.
+            if read_u16(bytes, entry_abs + 2) != 3 || read_u32(bytes, entry_abs + 4) != 1 {
+                continue;
+            }
             let value_abs = entry_abs + 8;
             let (b0, b1) = if big_endian { (0u8, 1u8) } else { (1u8, 0u8) };
             bytes[value_abs] = b0;
             bytes[value_abs + 1] = b1;
             bytes[value_abs + 2] = 0;
             bytes[value_abs + 3] = 0;
-            return;
         }
+
+        next_ifd_rel = read_u32(bytes, next_ptr_abs) as usize;
     }
 }
 
@@ -411,6 +429,83 @@ mod tests {
         let mut bytes = Vec::new();
         normalize_orientation_in_exif(&mut bytes);
         assert!(bytes.is_empty());
+    }
+
+    /// Build a big-endian TIFF with Orientation entries in both IFD0 and
+    /// IFD1. Layout follows EXIF: header → IFD0 → next-IFD pointer to IFD1 →
+    /// IFD1 → terminating zero.
+    fn build_tiff_with_ifd0_and_ifd1(ifd0_value: u16, ifd1_value: u16) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"Exif\0\0"); // 0..6
+        out.extend_from_slice(b"MM"); // 6..8 — big-endian
+        out.extend_from_slice(&42u16.to_be_bytes()); // 8..10 — magic
+        out.extend_from_slice(&8u32.to_be_bytes()); // 10..14 — IFD0 rel = 8 → abs 14
+        out.extend_from_slice(&1u16.to_be_bytes()); // 14..16 — IFD0 num_entries
+        out.extend_from_slice(&0x0112u16.to_be_bytes()); // 16..18 — tag = Orientation
+        out.extend_from_slice(&3u16.to_be_bytes()); // 18..20 — type = SHORT
+        out.extend_from_slice(&1u32.to_be_bytes()); // 20..24 — count = 1
+        out.extend_from_slice(&ifd0_value.to_be_bytes()); // 24..26 — value
+        out.extend_from_slice(&[0u8, 0u8]); // 26..28 — value-field padding
+        out.extend_from_slice(&26u32.to_be_bytes()); // 28..32 — next IFD rel = 26 → abs 32
+        out.extend_from_slice(&1u16.to_be_bytes()); // 32..34 — IFD1 num_entries
+        out.extend_from_slice(&0x0112u16.to_be_bytes()); // 34..36
+        out.extend_from_slice(&3u16.to_be_bytes()); // 36..38
+        out.extend_from_slice(&1u32.to_be_bytes()); // 38..42
+        out.extend_from_slice(&ifd1_value.to_be_bytes()); // 42..44
+        out.extend_from_slice(&[0u8, 0u8]); // 44..46
+        out.extend_from_slice(&0u32.to_be_bytes()); // 46..50 — chain terminator
+        out
+    }
+
+    #[test]
+    fn normalize_orientation_rewrites_ifd1_too() {
+        let mut bytes = build_tiff_with_ifd0_and_ifd1(6, 6);
+        normalize_orientation_in_exif(&mut bytes);
+        let ifd0_value_abs = 6 + 8 + 2 + 8; // prefix + header + num_entries + entry header
+        let ifd1_value_abs = 6 + 26 + 2 + 8;
+        assert_eq!((bytes[ifd0_value_abs], bytes[ifd0_value_abs + 1]), (0, 1));
+        assert_eq!((bytes[ifd1_value_abs], bytes[ifd1_value_abs + 1]), (0, 1));
+    }
+
+    #[test]
+    fn normalize_orientation_skips_non_short_type() {
+        // Type = LONG (4) instead of SHORT (3). Writing 1 as SHORT into a
+        // LONG field would read back as 0x00010000 = 65536. The walker must
+        // refuse to touch the entry.
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"Exif\0\0");
+        bytes.extend_from_slice(b"MM");
+        bytes.extend_from_slice(&42u16.to_be_bytes());
+        bytes.extend_from_slice(&8u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&0x0112u16.to_be_bytes());
+        bytes.extend_from_slice(&4u16.to_be_bytes()); // type = LONG
+        bytes.extend_from_slice(&1u32.to_be_bytes());
+        bytes.extend_from_slice(&6u32.to_be_bytes()); // value as LONG = 6
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        let before = bytes.clone();
+        normalize_orientation_in_exif(&mut bytes);
+        assert_eq!(bytes, before);
+    }
+
+    #[test]
+    fn normalize_orientation_skips_count_not_one() {
+        // Count = 2 means the 4-byte field is an *offset* into the buffer,
+        // not the value. Writing into it would corrupt unrelated bytes.
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"Exif\0\0");
+        bytes.extend_from_slice(b"MM");
+        bytes.extend_from_slice(&42u16.to_be_bytes());
+        bytes.extend_from_slice(&8u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&0x0112u16.to_be_bytes());
+        bytes.extend_from_slice(&3u16.to_be_bytes());
+        bytes.extend_from_slice(&2u32.to_be_bytes()); // count = 2
+        bytes.extend_from_slice(&0u32.to_be_bytes()); // value field as offset
+        bytes.extend_from_slice(&0u32.to_be_bytes());
+        let before = bytes.clone();
+        normalize_orientation_in_exif(&mut bytes);
+        assert_eq!(bytes, before);
     }
 
     #[test]
