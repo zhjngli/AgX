@@ -116,59 +116,42 @@ pub(crate) fn normalize_orientation_in_exif(bytes: &mut [u8]) {
         _ => return,
     };
 
-    let read_u16 = |b: &[u8], off: usize| -> Option<u16> {
-        let s = b.get(off..off + 2)?;
-        let arr = [s[0], s[1]];
-        Some(if big_endian {
+    let read_u16 = |b: &[u8], off: usize| -> u16 {
+        let arr = [b[off], b[off + 1]];
+        if big_endian {
             u16::from_be_bytes(arr)
         } else {
             u16::from_le_bytes(arr)
-        })
+        }
     };
-    let read_u32 = |b: &[u8], off: usize| -> Option<u32> {
-        let s = b.get(off..off + 4)?;
-        let arr = [s[0], s[1], s[2], s[3]];
-        Some(if big_endian {
+    let read_u32 = |b: &[u8], off: usize| -> u32 {
+        let arr = [b[off], b[off + 1], b[off + 2], b[off + 3]];
+        if big_endian {
             u32::from_be_bytes(arr)
         } else {
             u32::from_le_bytes(arr)
-        })
+        }
     };
 
-    // Validate TIFF magic (42).
-    if read_u16(bytes, tiff_start + 2) != Some(42) {
+    if read_u16(bytes, tiff_start + 2) != 42 {
         return;
     }
 
-    // IFD0 offset is relative to the start of the TIFF header.
-    let ifd0_rel = match read_u32(bytes, tiff_start + 4) {
-        Some(o) => o as usize,
-        None => return,
-    };
-    let ifd0_abs = tiff_start + ifd0_rel;
+    let ifd0_abs = tiff_start + read_u32(bytes, tiff_start + 4) as usize;
     if bytes.len() < ifd0_abs + 2 {
         return;
     }
+    let num_entries = read_u16(bytes, ifd0_abs) as usize;
 
-    let num_entries = match read_u16(bytes, ifd0_abs) {
-        Some(n) => n as usize,
-        None => return,
-    };
-
-    // Each IFD entry is 12 bytes: tag (2) + type (2) + count (4) + value/offset (4).
     for i in 0..num_entries {
         let entry_abs = ifd0_abs + 2 + i * 12;
         if bytes.len() < entry_abs + 12 {
             return;
         }
-        let tag = match read_u16(bytes, entry_abs) {
-            Some(t) => t,
-            None => return,
-        };
-        if tag == 0x0112 {
-            // Orientation is SHORT (type 3), count 1; value lives in the low 2
-            // bytes of the 4-byte value field. Overwrite all 4 bytes so any
-            // stale padding clears too.
+        if read_u16(bytes, entry_abs) == 0x0112 {
+            // Orientation is SHORT (type 3), count 1; the value occupies the
+            // low 2 bytes of the 4-byte value field. Overwrite all 4 so any
+            // stale padding clears.
             let value_abs = entry_abs + 8;
             let (b0, b1) = if big_endian { (0u8, 1u8) } else { (1u8, 0u8) };
             bytes[value_abs] = b0;

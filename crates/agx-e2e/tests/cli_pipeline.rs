@@ -280,10 +280,7 @@ fn cli_batch_edit_mixed_dir() {
 
 // --- EXIF orientation preservation ---
 
-/// Returns the EXIF Orientation tag (0x0112) from an image file, or `None`
-/// if the tag is absent / file has no EXIF. Used to verify that AgX
-/// rewrites the source orientation to `1` (Normal) on output, matching
-/// the canonical post-decode pixel data.
+/// Read the EXIF Orientation tag (0x0112) from an image, or `None` if absent.
 fn read_orientation_tag(path: &std::path::Path) -> Option<u16> {
     let file = std::fs::File::open(path).ok()?;
     let mut reader = std::io::BufReader::new(file);
@@ -292,15 +289,10 @@ fn read_orientation_tag(path: &std::path::Path) -> Option<u16> {
     field.value.get_uint(0).map(|v| v as u16)
 }
 
-/// Regression test for the EXIF orientation double-application bug: rotated
-/// iPhone HEICs decoded by AgX have their pixels rotated to canonical
-/// orientation during decode, so the output's preserved EXIF Orientation
-/// tag must read `1` (Normal). Otherwise EXIF-aware viewers (browser,
-/// macOS Preview) rotate the already-canonical pixels a second time.
-///
-/// Fixture `heic/marina_sunset.heic` carries source orientation `Rotate 90
-/// CW` (sensor frame 4032×3024); the output JPEG must carry orientation 1
-/// with dimensions matching the rotated canonical frame.
+/// Source `heic/marina_sunset.heic` carries orientation `Rotate 90 CW`
+/// (sensor frame 4032×3024). After the fix, the output must carry
+/// orientation 1 with dimensions matching the rotated canonical frame —
+/// otherwise EXIF-aware viewers rotate the already-canonical pixels again.
 #[test]
 fn cli_exif_orientation_normalized_on_heic_output() {
     let dir = TempDir::new().unwrap();
