@@ -131,6 +131,14 @@ fn cli_cinque_terre_window() {
     );
 }
 
+// HEIC tests share a tolerance of (10, 1.0). libheif/libde265 decode is
+// mostly deterministic, but cross-platform version jitter shows up at
+// LUT-amplified boundary pixels (~0.07% of pixels, max channel diff ~4 in
+// practice). Tighter than the raw path (which absorbs LibRaw demosaicing
+// variance). The synthetic_p3_red fixture amplifies tiny drifts further
+// via wide-gamut math, so it carries the same tolerance for the same
+// reason.
+
 #[test]
 fn cli_marina_sunset() {
     run_image_matrix(
@@ -190,9 +198,6 @@ fn cli_synthetic_p3_red() {
         "heic/synthetic_p3_red.heic",
         "synthetic_p3_red",
         "heic",
-        // Same tolerance as the other HEIC entry — libheif decode is
-        // mostly deterministic but cross-version noise can show up at
-        // the boundary, and the wide-gamut math amplifies tiny drifts.
         10,
         1.0,
         ALL_LOOKS,
