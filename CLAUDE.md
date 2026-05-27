@@ -88,9 +88,9 @@ The backlog in `docs/backlog/` tracks future work. See [`docs/backlog/README.md`
 
 Quick reference for any backlog touch during other work — adding, completing, removing, reworking, promoting/demoting, splitting:
 
-1. **Scope test** — does this modification stay inside the current PR's mental scope? If yes, do it and mention in the commit. If no, defer.
+1. **Scope test** — if a modification would expand the current PR's mental scope (significant prose rewrite, multi-file move), defer to deliberate triage. See the knock-out heuristic in the README.
 2. **For adding:** search for an existing item first. Then pick section (`## Bug fixes` / `## Sub-tasks` / `## Parked`), pick size (fleeting / standard / deep), and write **problem-framed, not solution-framed**. Epic-sized? File as `## Parked` with `(epic candidate)` marker — do not create new epic files mid-PR.
-3. **For completing:** check `[x]` on Sub-tasks items (they are arc); delete the line on Bug fixes (negative space) or Parked (future intent).
+3. **For completing:** check `[x]` on Sub-tasks items (checked items stay as arc); delete the line on Bug fixes (negative space) or Parked (future intent).
 4. **For reworking:** rewrite in place. No layered `Edit:` notes — they age worst. Git history holds the prior.
 5. **For cross-cutting items:** inline link plus back-link:
 

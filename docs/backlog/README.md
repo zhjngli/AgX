@@ -6,7 +6,7 @@ Some epics have detailed sub-task docs (e.g., `grain-size-algorithm.md` is a sub
 
 ## Modifying the backlog
 
-When you spot something during other work (a new item, a completed sub-task, an obsoleted entry, a reframing), use the procedure below. The goal is **at-touch triage**: items get filed, checked, moved, or removed in the right place when they surface, not later. After `/clear`, "what's in the backlog?" is answerable by scanning epic checkboxes — no recency index, no inbox, no hunting through git log.
+When you spot something during other work (a new item, a completed sub-task, an obsoleted entry, a reframing), use the procedure below. The goal is for items to get filed, checked, moved, or removed in the right place when they surface — not later. After `/clear`, "what's in the backlog?" is answerable by scanning epic checkboxes; no recency index, no inbox, no hunting through git log.
 
 ### Where items live (sections within each epic)
 
@@ -54,7 +54,7 @@ Mid-PR you're already in solution-headspace. Capturing a speculative fix calcifi
 - [ ] Switch HSL to OKHsl polar OKLab. Convert via OKLab matrices and redo per-channel hue/saturation/luminance math.
 ```
 
-Capture the problem; let the solution be decided when the item is worked.
+The bad version starts with a technology decision, not the symptom. Capture the problem; let the solution be decided when the item is worked.
 
 ### Modification procedure
 
@@ -95,19 +95,9 @@ If no duplicate exists:
    2. Add a back-link in the other epic's `## Related` section. ← easy to forget; this is where it lives.
 6. **Commit** with `docs(backlog):` prefix.
 
-#### Completing
+#### Completing and removing items
 
-When your work resolves an existing item:
-
-- `## Sub-tasks` item → check `[x]`, keep on the list (sub-tasks are arc)
-- `## Bug fixes` item → **delete the line** (the bug is gone)
-- `## Parked` item → **delete the line** (intent is fulfilled)
-
-Mention in the commit. The PR captures the why.
-
-#### Removing items
-
-Item is obsolete (no longer relevant, superseded, not going to happen): delete the line. Don't add "deprecated" markers; git diff captures the removal. Mention in commit if non-obvious.
+Check or delete per the operations table above. Mention in the commit if the removal isn't self-explanatory — the PR captures the why.
 
 #### Reworking
 
