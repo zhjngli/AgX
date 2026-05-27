@@ -108,6 +108,7 @@ The procedure covers any backlog modification triggered by other work — not ju
 The **scope test** (see knock-out heuristic below) applies to all operations. A modification that turns into significant work (30-min wordsmith, multi-file move) is scope creep; defer to deliberate triage.
 
 The section-as-type mapping disambiguates check-off vs delete:
+
 - `## Sub-tasks` is **arc** — checked items stay; they show what the epic accomplished.
 - `## Bug fixes` is **negative space** — gone when fixed.
 - `## Parked` is **future intent** — gone when picked up or dropped.
@@ -127,7 +128,12 @@ If no duplicate exists:
 3. **Pick size.** Nameable in 10 words → fleeting. Needs 1–3 sentences (problem only) → standard. Already investigated with refs and tradeoffs → deep file.
 4. **Epic-sized?** Park in `## Parked` of the most-relevant existing epic with an inline `(epic candidate)` marker. **Do not create a new epic file mid-PR.** Promotion happens when picked up — see Promoting / demoting.
 5. **Cross-cutting?** If the item touches other epics:
-   1. Add an inline `→ [other-epic.md](other-epic.md)` link on the item
+   1. Add an inline link to the other epic on the item:
+
+      ```markdown
+      - [ ] Item description → [other-epic.md](other-epic.md)
+      ```
+
    2. Add a back-link in the other epic's `## Related` section ← easy to forget
 6. **Commit** with `docs(backlog):` prefix.
 
