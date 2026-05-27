@@ -20,7 +20,7 @@ The current `docs/backlog/README.md` has format guidance ("Adding New Items") bu
 ## Goals
 
 - Normalize section headings inside each epic so item type is encoded in **where it lives**, not in a tag prefix.
-- Spell out an **add-time procedure** that fits on the back of a postcard: scope test → pick section → pick size → write → commit.
+- Spell out a **modification procedure** for backlog touches during other work — adding, completing, removing, reworking, promoting/demoting, splitting. The procedure fits on the back of a postcard and applies the scope test uniformly.
 - Define a **knock-out-vs-backlog heuristic** so mid-PR decisions don't stall on time-estimation.
 - Define **size tiers** with the discipline that standard items capture the problem, not a speculative fix.
 - Define **cross-cutting handling** that uses single-home + opportunistic back-link, no duplication.
@@ -92,22 +92,92 @@ This is the most-likely-to-drift rule. Mid-PR you're already in solution-headspa
 
 The bad version commits to a fix mid-PR. When picked up six months later, OKHsl might not be the right call (a simpler decompose-and-recombine approach might suit, or the requirement might have shifted), but the framing pulls implementation toward it anyway. Capture the problem; let the solution be decided when the item is worked.
 
-### Add-time procedure
+### Modification procedure (during other work)
 
-This is the back-of-postcard checklist that goes in `docs/backlog/README.md`:
+The procedure covers any backlog modification triggered by other work — not just adding. Six operations:
+
+| Operation | Trigger | Action |
+|---|---|---|
+| **Add** | New item surfaced | Run the Adding sub-procedure below |
+| **Complete** | Existing item resolved by your work | Check `[x]` (Sub-tasks) or delete the line (Bug fixes / Parked) |
+| **Remove** | Existing item is now obsolete | Delete the line — no "deprecated" marker; git diff captures it |
+| **Rework** | Existing item's framing has shifted | Rewrite in place; **no notes** (see Reworking) |
+| **Promote / demote** | Item changes status (Parked↔Sub-tasks, or epic graduation) | Move the line; if graduation, follow the Promoting steps |
+| **Split** | One item partially completed and the rest is its own thing | Edit original to match what you did, check it off, add a new line for the rest |
+
+The **scope test** (see knock-out heuristic below) applies to all operations. A modification that turns into significant work (30-min wordsmith, multi-file move) is scope creep; defer to deliberate triage.
+
+The section-as-type mapping disambiguates check-off vs delete:
+- `## Sub-tasks` is **arc** — checked items stay; they show what the epic accomplished.
+- `## Bug fixes` is **negative space** — gone when fixed.
+- `## Parked` is **future intent** — gone when picked up or dropped.
+
+#### Adding
+
+**Step 0: search for an existing item first.** Before writing a new line, grep or eyeball-scan the relevant epic(s) to confirm no existing item already covers this. Duplicates accumulate quickly otherwise.
+
+If no duplicate exists:
 
 1. **Scope test.** Does this expand the current PR's mental scope? See knock-out heuristic below. If no, knock it out, mention in commit.
-2. **Pick section.** Which heading in which epic does it belong under?
+2. **Pick section.**
    - Defect in shipped feature → `## Bug fixes`
    - New thing in the epic's active scope → `## Sub-tasks`
    - Follow-on from current work OR explicitly out of current scope → `## Parked`
    - Doesn't fit any epic → see step 4
-3. **Pick size.** Nameable in 10 words → fleeting. Need 1–3 sentences (problem only) → standard. Already investigated with refs and tradeoffs → deep file.
-4. **Epic-sized?** If the item feels epic-sized when adding (own file, own roadmap entry, multiple sub-tasks), park it in `## Parked` of the most-relevant existing epic with an inline `(epic candidate)` marker. **Do not create a new epic file mid-PR.** Promotion to its own file happens when someone deliberately picks it up.
+3. **Pick size.** Nameable in 10 words → fleeting. Needs 1–3 sentences (problem only) → standard. Already investigated with refs and tradeoffs → deep file.
+4. **Epic-sized?** Park in `## Parked` of the most-relevant existing epic with an inline `(epic candidate)` marker. **Do not create a new epic file mid-PR.** Promotion happens when picked up — see Promoting / demoting.
 5. **Cross-cutting?** If the item touches other epics:
    1. Add an inline `→ [other-epic.md](other-epic.md)` link on the item
-   2. Add a back-link in the other epic's `## Related` section ← easy to forget; this is where it lives
-6. **Commit.** Conventional commit prefix `docs(backlog):` so it's findable via git log.
+   2. Add a back-link in the other epic's `## Related` section ← easy to forget
+6. **Commit** with `docs(backlog):` prefix.
+
+#### Completing
+
+When your work resolves an existing item:
+
+- `## Sub-tasks` item → check `[x]`, keep on the list (sub-tasks are arc)
+- `## Bug fixes` item → **delete the line** (the bug is gone)
+- `## Parked` item → **delete the line** (intent is fulfilled)
+
+Mention in the commit. The PR captures the why.
+
+#### Removing items
+
+Item is obsolete (no longer relevant, superseded, not going to happen): delete the line. Don't add "deprecated" markers; git diff captures the removal. Mention in commit if non-obvious.
+
+#### Reworking
+
+Item's framing has shifted because of what you learned. Rewrite the body in place; **do not add notes**.
+
+Layered `Edit YYYY-MM-DD:` notes age worst — readers absorb the original premise first, then have to mentally subtract the corrections. Two notes deep an item is unparseable. Commit to one version of the framing; let git history hold the prior.
+
+Three sub-cases:
+
+- **Minor correction** (typo, clearer phrasing): rewrite in place
+- **Substantial reframing** (problem turned out different): rewrite; git captures prior
+- **Item belongs in a different epic now**: delete and re-add in the correct epic. Don't keep a "moved" tombstone.
+
+If you're not confident in the new framing, **don't touch it mid-PR**. Defer to deliberate triage. The scope test applies here as everywhere.
+
+#### Promoting / demoting
+
+- **Parked → Sub-tasks** (item becomes in active scope): move the line. No body rewrite needed.
+- **Sub-tasks → Parked** (item leaves scope this round): move the line, add a 1-sentence reason in the body.
+- **`(epic candidate)` → own epic file**: graduation. Done only when someone deliberately picks the item up.
+  1. Create the new epic file with proper-epic shape (overview, sub-tasks, considerations, related)
+  2. Use the parked item's body as the basis, rewriting to fit the epic format
+  3. Add the new epic to `docs/backlog/README.md` roadmap and by-category tables
+  4. Delete the line from the original epic's `## Parked`
+
+#### Splitting
+
+One item, partially completed, with the remainder naturally separate work:
+
+- Edit the original to describe only what you did
+- Check it off `[x]`
+- Add a new line for the remaining work, sized and sectioned per the Adding procedure
+
+If the parts of the item are inseparable (same root cause), don't split — leave the checkbox unchecked and edit the body to reflect the partial state. A multi-part item isn't done until all parts are.
 
 ### Knock-out heuristic
 
@@ -123,6 +193,16 @@ Time estimates are unreliable. The real test is scope creep:
 
 If **all** signals point to the left column, knock it out and mention in the commit message. If **any one** signal lands in the right column, backlog it. The asymmetry is intentional — false positives ("I should have just done that") are cheap; false negatives ("this exploded the PR") are expensive.
 
+### Removing epics
+
+When all `## Sub-tasks` are done and no `## Bug fixes` or `## Parked` items remain, **delete the epic file.** The design doc in `docs/plans/` and the PR commits preserve everything that matters; the backlog epic was scaffolding for tracking, and tracking is done.
+
+Edge cases:
+
+- **Sub-tasks done, Parked items remain.** Move the parked items to the most-relevant other epic (with `(epic candidate)` markers if any feel epic-sized), then delete the file.
+- **Substantially complete with optional remainder.** Leave the file in the directory but remove it from the priority tables in `docs/backlog/README.md` so it no longer competes for attention. Delete once the optional work is done or dropped.
+- **Individual item becomes stale or no longer relevant.** Just delete the checkbox line. No "obsoleted" marker needed; git diff captures the removal.
+
 ## Documentation Updates
 
 This change touches three surfaces; all three must update in the implementation PR.
@@ -130,10 +210,11 @@ This change touches three surfaces; all three must update in the implementation 
 - **`docs/backlog/README.md`** — replace the current "Adding New Items" prose with:
   - Section taxonomy table (5 standard headings)
   - Size tier table with examples
-  - The numbered add-time procedure (6 steps)
+  - The modification procedure (6 operations, with sub-procedures for each)
   - The knock-out heuristic table
   - "Good vs bad framing" example for the problem-not-solution rule
   - Cross-cutting handling block (inline link + back-link instructions)
+  - Removing-epics rule (when to delete the file entirely)
 - **`docs/backlog/*.md`** (14 files) — one-shot migration:
   - Rename `## Known gaps`, `## Deferred / out of scope for this epic`, `## Deferred`, `## Followups (post-MVP follow-up)` → `## Parked`
   - Keep `## Sub-tasks`, `## Bug fixes`, `## Considerations`, `## Related` as-is where present
