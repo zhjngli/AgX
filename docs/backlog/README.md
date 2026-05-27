@@ -18,7 +18,9 @@ When you spot something during other work (a new item, a completed sub-task, an 
 | `## Considerations` | Cross-cutting concerns, constraints, decisions | When the epic warrants it |
 | `## Related` | Back-links to intersecting epics | When applicable |
 
-The section heading **is** the type — no per-item tag prefix needed.
+The section heading **is** the type — no per-item tag prefix needed. Where used below, `## Sub-tasks` means either the standard heading or the `## Sub-projects` variant.
+
+Epic-specific operational sections (e.g. `## Status` in `color-management.md`, `## How to Re-Profile` in `performance.md`) are fine when the epic genuinely needs them. They are not item containers and don't participate in the taxonomy; treat them as epic-level prose.
 
 Section-as-type also disambiguates check-off vs delete on completion:
 
@@ -113,9 +115,11 @@ If you're not confident in the new framing, **don't touch it mid-PR**. Defer to 
 
 #### Promoting / demoting
 
+Graduation and demotion are deliberate triage steps, not mid-PR actions. The scope test applies — if it doesn't fit in the current PR's mental scope, defer.
+
 - **Parked → Sub-tasks** (item becomes in active scope): move the line. No body rewrite needed.
-- **Sub-tasks → Parked** (item leaves scope this round): move the line, add a 1-sentence reason in the body.
-- **`(epic candidate)` → own epic file**: graduation. Done only when someone deliberately picks the item up.
+- **Sub-tasks → Parked** (item leaves scope this round): move the line, add a 1-sentence reason in the body. If the line was already checked `[x]`, this is a reframing rather than a demotion — uncheck it and rewrite the body to match the new scope.
+- **`(epic candidate)` → own epic file**: graduation.
   1. Create the new epic file with proper-epic shape (overview, sub-tasks, considerations, related)
   2. Use the parked item's body as the basis, rewriting to fit the epic format
   3. Add the new epic to the roadmap and by-category tables below

@@ -100,6 +100,8 @@ Quick reference for any backlog touch during other work — adding, completing, 
 
    Add the back-link in the other epic's `## Related` section.
 
+For removing items, promoting/demoting between sections, splitting partially-completed items, and graduating an `(epic candidate)` to its own file — see the operations table in the README.
+
 Commit prefix `docs(backlog):` for findability. When all `## Sub-tasks` are done and no `## Bug fixes` or `## Parked` items remain, delete the epic file. All markdown links in backlog files are validated by `verify.sh`.
 
 ## Key Docs

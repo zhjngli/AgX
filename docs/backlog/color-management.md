@@ -79,7 +79,7 @@ Let the user pick the output color space at apply time (default sRGB, with Displ
 
 ## Related
 
-- [HEIC Support](heic-support.md) — multiple known gaps explicitly wait for sub-project 1 (P3/BT.2020 fixtures, BT.2020 transfer handling, out-of-gamut clamping audit).
+- [HEIC Support](heic-support.md) — multiple parked items explicitly wait for sub-project 1 (P3/BT.2020 fixtures, BT.2020 transfer handling, out-of-gamut clamping audit).
 - [Pluggable Pipeline](pluggable-pipeline.md) — `Stage` trait + `ColorSpace` enum already exists; the `color-space-aware stage insertion` sub-task there gates on sub-project 1.
 - [Processing Parity](processing-parity.md) — per-camera DCP profiles tracked under that epic's raw processing section.
 - [Ecosystem Interop](ecosystem-interop.md) — ICC profiles matter for cross-tool compatibility.

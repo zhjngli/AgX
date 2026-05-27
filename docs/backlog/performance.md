@@ -72,3 +72,8 @@ The scripts output to `profile_results.json` (gitignored). Compare against the b
 - `rayon` is already a dependency of `agx-cli` (for batch parallelism). Adding it to the `agx` library crate would make it a hard dependency — consider a feature flag so library consumers can opt out.
 - Batch processing already parallelizes across images. Per-image parallelization (P1-P4) helps most for few-large-image workloads. For many-small-image workloads, cross-image parallelism may already saturate cores.
 - P1 and P2 together should reduce typical 26MP render times by 50-60%. Re-profile before deciding whether P3-P6 are worth the complexity.
+
+## Related
+
+- [Pluggable Pipeline](pluggable-pipeline.md) — stage caching is a future-work item there that affects render performance
+- [Platform and Distribution](platform-and-distribution.md) — back-links here re: GPU and interactive preview latency
