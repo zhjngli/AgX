@@ -4,25 +4,158 @@ Future work for AgX — epics, sub-tasks, and bugs. Each file is an "epic" with 
 
 Some epics have detailed sub-task docs (e.g., `grain-size-algorithm.md` is a sub-task of `processing-parity.md`). These live as their own files when the investigation is deep enough to warrant it, but are tracked under their parent epic in the roadmap.
 
-## Adding New Items
+## Modifying the backlog
 
-Items come in different sizes. Use the right level for what you're capturing:
+When you spot something during other work (a new item, a completed sub-task, an obsoleted entry, a reframing), use the procedure below. The goal is for items to get filed, checked, moved, or removed in the right place when they surface — not later. After `/clear`, "what's in the backlog?" is answerable by scanning epic checkboxes; no recency index, no inbox, no hunting through git log.
 
-### Epic (top-level idea file)
+### Where items live (sections within each epic)
 
-A broad feature area with multiple sub-tasks. Create a new `<name>.md` file and add it to the roadmap and category tables.
+| Section | Purpose | When used |
+|---|---|---|
+| `## Sub-tasks` | Active in-scope work, checkboxes in priority order | Always (or `## Sub-projects` for epics that sequence multiple design-doc-warranting work units, e.g. `color-management.md`) |
+| `## Bug fixes` | Defects in shipped features | When the epic has known bugs |
+| `## Parked` | Surfaced during other work or explicitly out of current scope | When the epic has any |
+| `## Considerations` | Cross-cutting concerns, constraints, decisions | When the epic warrants it |
+| `## Related` | Back-links to intersecting epics | When applicable |
 
-**Format:** overview, sub-tasks checklist, considerations, related links. See any existing file for the template.
+The section heading **is** the type — no per-item tag prefix needed. Where used below, `## Sub-tasks` means either the standard heading or the `## Sub-projects` variant.
 
-### Sub-task (checklist item in an epic)
+Epic-specific operational sections exist today as `## Status` (`color-management.md`), `## How to Re-Profile` (`performance.md`), and `## Problem` (`grain-size-algorithm.md`). These are not item containers and don't participate in the taxonomy; treat them as epic-level prose. New idiosyncratic sections should be the exception, not the norm — extend this list deliberately.
 
-A concrete work item within an existing epic. Add a `- [ ]` checkbox line to the parent epic's Sub-tasks section.
+Section-as-type also disambiguates check-off vs delete on completion:
 
-If a sub-task has enough depth to warrant detailed investigation (proposed fixes, code analysis, test plans), give it its own `.md` file and link to it from the parent epic. Add a "Parent epic" blockquote at the top linking back to the parent. See [grain-size-algorithm.md](grain-size-algorithm.md) for an example.
+- `## Sub-tasks` is **arc** — checked items stay; they show what the epic accomplished.
+- `## Bug fixes` is **negative space** — gone when fixed.
+- `## Parked` is **future intent** — gone when picked up or dropped.
 
-### Bug (sub-task of an epic)
+### Sizes
 
-A known defect in an existing feature. Add it under a **Bug fixes** heading in the relevant epic's sub-tasks. If the bug needs investigation notes, give it its own file linked from the epic (same as a detailed sub-task).
+Three tiers, picked at add time based on **how much context future-readers will need to recognize the item**:
+
+| Tier | Trigger | Shape |
+|---|---|---|
+| **fleeting** | Nameable in <10 words; recognizable from the name alone | One-line checkbox, no body |
+| **standard** | Needs 1–3 sentences of context (where it surfaces, why it matters) | Checkbox + 1–3 sentence body — **describe the problem, not the solution** |
+| **deep** | Investigation already exists (alternatives weighed, code refs, tradeoffs documented) | Own file under `docs/backlog/<name>.md`, linked from parent epic with a "Parent epic" blockquote |
+
+`deep` is rare. Items earn their own file by being investigated — you do not promote an item to `deep` mid-PR.
+
+### Describe the problem, not the solution
+
+Mid-PR you're already in solution-headspace. Capturing a speculative fix calcifies it; months later the picker reads the solution suggestion and works toward it even if the right answer has shifted.
+
+**Good (problem-framed):**
+
+```markdown
+- [ ] HSL adjustment loses wide-gamut headroom. Out-of-sRGB values get clipped at the RGB→HSL entry conversion, so this stage doesn't benefit from the wider working space the rest of the engine uses.
+```
+
+**Bad (solution-framed):**
+
+```markdown
+- [ ] Switch HSL to OKHsl polar OKLab. Convert via OKLab matrices and redo per-channel hue/saturation/luminance math.
+```
+
+The bad version starts with a technology decision, not the symptom. Capture the problem; let the solution be decided when the item is worked.
+
+### Modification procedure
+
+The procedure covers any backlog touch triggered by other work. Six operations:
+
+| Operation | Trigger | Action |
+|---|---|---|
+| **Add** | New item surfaced | Run the Adding sub-procedure below |
+| **Complete** | Existing item resolved by your work | Check `[x]` (Sub-tasks) or delete the line (Bug fixes / Parked) |
+| **Remove** | Existing item obsolete | Delete the line — no "deprecated" marker; git diff captures it |
+| **Rework** | Existing item's framing has shifted | Rewrite in place; **no notes** (see Reworking) |
+| **Promote / demote** | Item changes status (Parked↔Sub-tasks, or epic graduation) | Move the line; for graduation, follow the Promoting steps |
+| **Split** | One item partially completed, the rest is its own thing | Edit original to match what you did, check it off, add a new line for the rest |
+
+The **scope test** (see knock-out heuristic below) applies to all operations. A modification that turns into significant work (30-min wordsmith, multi-file move) is scope creep; defer to deliberate triage.
+
+#### Adding
+
+**Step 0: search first.** Before writing a new item, grep or eyeball-scan the relevant epic(s) to confirm no existing item already covers this. Duplicates accumulate quickly otherwise.
+
+If no duplicate exists:
+
+1. **Scope test.** Does this expand the current PR's mental scope? See the knock-out heuristic below. If no, knock it out and mention in the commit.
+2. **Pick section.**
+   - Defect in shipped feature → `## Bug fixes`
+   - New thing in the epic's active scope → `## Sub-tasks`
+   - Follow-on from current work OR explicitly out of current scope → `## Parked`
+   - Doesn't fit any epic → see step 4
+3. **Pick size.** Nameable in 10 words → fleeting. Needs 1–3 sentences (problem only) → standard. Already investigated with refs and tradeoffs → deep file.
+4. **Epic-sized?** Park it in `## Parked` of the most-relevant existing epic with an inline `(epic candidate)` marker. **Do not create a new epic file mid-PR.** Promotion happens when picked up — see Promoting / demoting.
+5. **Cross-cutting?** If the item touches other epics:
+   1. Add an inline link to the other epic on the item:
+
+      ```markdown
+      - [ ] Item description → [other-epic.md](other-epic.md)
+      ```
+
+   2. Add a back-link in the other epic's `## Related` section. ← easy to forget; this is where it lives.
+6. **Commit** with `docs(backlog):` prefix.
+
+#### Completing and removing items
+
+Check or delete per the operations table above. Mention in the commit if the removal isn't self-explanatory — the PR captures the why.
+
+#### Reworking
+
+Item's framing has shifted. Rewrite the body in place; **do not add notes**.
+
+Layered `Edit YYYY-MM-DD:` notes age worst — readers absorb the original premise first, then have to mentally subtract corrections. Two notes deep and the item is unparseable. Commit to one version of the framing; let git history hold the prior.
+
+- **Minor correction** (typo, clearer phrasing): rewrite in place
+- **Substantial reframing** (problem turned out different): rewrite; git captures prior
+- **Item belongs in a different epic now**: delete and re-add in the correct epic. Don't keep a "moved" tombstone.
+
+If you're not confident in the new framing, **don't touch it mid-PR**. Defer to deliberate triage.
+
+#### Promoting / demoting
+
+- **Parked → Sub-tasks** (item becomes in active scope): move the line. No body rewrite needed. Light enough to do mid-PR if the item is genuinely now in scope.
+- **Sub-tasks → Parked** (item leaves scope this round): move the line, add a 1-sentence reason in the body. If the line was already checked `[x]`, this is a reframing rather than a demotion — uncheck it and rewrite the body to match the new scope.
+- **`(epic candidate)` → own epic file**: graduation. This is a deliberate triage step, not a mid-PR action — the multi-step file creation + roadmap update easily fails the scope test.
+  1. Create the new epic file with proper-epic shape (overview, sub-tasks, considerations, related)
+  2. Use the parked item's body as the basis, rewriting to fit the epic format
+  3. Add the new epic to the roadmap and by-category tables below
+  4. Delete the line from the original epic's `## Parked`
+
+#### Splitting
+
+One item, partially completed, with the remainder naturally separate work:
+
+- Edit the original to describe only what you did
+- Check it off `[x]`
+- Add a new line for the remaining work, sized and sectioned per the Adding procedure
+
+If the parts are inseparable (same root cause), don't split — leave the checkbox unchecked and edit the body to reflect the partial state. A multi-part item isn't done until all parts are.
+
+### Knock-out vs backlog heuristic
+
+| Knock it out | Backlog it |
+|---|---|
+| Fix is in a file already being edited | Touches files outside the current PR |
+| Purely mechanical (typo, dead import, obvious lint, missing bound check) | Requires a design decision |
+| Tests already need regenerating anyway | Would force a separate test/golden regen pass |
+| Single line or single function | Multi-file change |
+| Don't need to read more code to understand it | Need to investigate before fixing |
+
+If **all** signals point left, knock it out and mention in the commit message. If **any one** signal lands right, backlog it. The asymmetry is intentional — false positives ("I should have just done that") are cheap; false negatives ("this exploded the PR") are expensive.
+
+### Removing epics
+
+When all `## Sub-tasks` are done and no `## Bug fixes` or `## Parked` items remain, **delete the epic file** from `docs/backlog/`. The design doc in `docs/plans/` and the PR commits preserve everything that matters — the backlog epic was scaffolding for tracking, and tracking is done.
+
+Edge cases:
+
+- **Sub-tasks done, Parked items remain.** Move the parked items to the most-relevant other epic (with `(epic candidate)` markers if any feel epic-sized), then delete the file.
+- **Substantially complete with optional remainder.** Leave the file but remove it from the priority tables below so it doesn't compete for attention. Delete once the optional work is done or dropped.
+- **Individual item becomes stale.** Just delete the checkbox line. No "obsoleted" marker; git diff captures the removal.
+
+All markdown links in backlog files are validated by `verify.sh`.
 
 ## Roadmap
 

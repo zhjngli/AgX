@@ -19,9 +19,9 @@ Add decoding support for HEIC/HEIF images (`.heic`, `.heif`), the default photo 
 - HEIF is a container format that can hold HEVC or AV1 (AVIF) encoded images.
 - `libheif` is the most mature option but adds an FFI dependency (similar to LibRaw for RAW).
 
-## Known gaps (post-MVP follow-up)
+## Parked
 
-These were surfaced during the initial HEIC support adversarial review and deliberately deferred. Each is a real concern but doesn't block initial decode shipping.
+Items surfaced during the initial HEIC support adversarial review and deliberately deferred. Each is a real concern but doesn't block initial decode shipping.
 
 - **End-to-end coverage for Display P3 and 10-bit branches.** Display P3 synthetic fixture (`synthetic_p3_red.heic`) shipped with the wide-working-space migration; the 10-bit (`heif-enc -b 10 ...`) fixture is still pending. The 10-bit decode code path is reachable only by local manual testing until a synthetic 10-bit fixture lands, with noop-only goldens to keep repo size in check.
 - **BT.2020 transfer curve handling.** After SP1 the matrix path for BT.2020 primaries exists (identity matrix to Rec.2020), but `probe_source_color_space` still routes BT.2020 inputs to the sRGB fallback with a warning because the BT.2020-specific OETF (and PQ/HLG HDR variants) requires separate transfer-curve handling. Track under the color-management epic's HDR sub-project.

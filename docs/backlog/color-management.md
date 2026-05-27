@@ -62,11 +62,11 @@ Let the user pick the output color space at apply time (default sRGB, with Displ
 
 **Acceptance:** `agx apply --output-gamut p3 ...` produces a Display P3 JPEG that Preview / Photoshop identifies correctly. Default behavior unchanged (sRGB output). Wide-gamut e2e goldens added.
 
-## Deferred / out of scope for this epic
+## Parked
 
 - **Out-of-gamut-tolerant HSL.** The wide working space sub-project (sub-project 1) clamps RGB → HSL conversion at entry; the HSL adjustment loses wide-gamut headroom for its stage specifically (every other stage benefits from the wider working space). The fix is a perceptually-uniform color space defined over the full positive RGB range — **OKHsl** (polar OKLab) is the modern industry answer; IPT and JzAzBz are alternatives. Cost: OKLab ↔ linear RGB conversions, OKHsl ↔ OKLab polar form, redo of the per-channel hue / saturation / luminance math in OK-space, golden regeneration for HSL-using presets. A simpler decompose-and-recombine approach (apply HSL to the clamped in-gamut portion of each pixel, add the out-of-gamut residual back unchanged) was considered during the SP1 brainstorm and rejected: it produces semantically wrong output for hue shifts, because the OOG residual still carries the original hue direction, which shouldn't survive a hue rotation.
 - **Gamut compression on encode** ("smart clip" instead of hard clip). Once the working space widens (sub-project 1), values that exceed the output gamut get hard-clipped to `[0, 1]` at encode. On saturated regions (vivid sunsets, brake-light reds, peak-sky cyans) this produces flat-mesa artifacts where a smooth gradient collapses to a constant boundary value. A smoother projection — Reinhard `x / (1 + x)`, Hable filmic, ACES gamut compression, or OKLab-based chromaticity compression — trades a small global desaturation for smooth gradients into the peak. Most relevant when sub-project 1 has shipped but output is still sRGB; sub-project 4 partially mitigates by letting users pick a wider output gamut for wide-gamut sources. Defer to its own design doc when first user reports a banding artifact, or when SP1 reveals the cases are common enough to justify the work.
-- **BT.2020 / HDR transfer curves.** iPhone HDR HEIC uses BT.2020 primaries with PQ or HLG transfer curves. Handling HDR correctly requires scene-vs-display-referred semantics, tone mapping, and possibly a separate HDR output format. Initial HEIC support already falls back to "treat as sRGB and warn" — that's the right punt for now. See the `BT.2020 transfer curve handling` known gap in `heic-support.md`.
+- **BT.2020 / HDR transfer curves.** iPhone HDR HEIC uses BT.2020 primaries with PQ or HLG transfer curves. Handling HDR correctly requires scene-vs-display-referred semantics, tone mapping, and possibly a separate HDR output format. Initial HEIC support already falls back to "treat as sRGB and warn" — that's the right punt for now. See the `BT.2020 transfer curve handling` parked item in `heic-support.md`.
 - **Soft proofing.** Preview "how this will look printed on this paper" via a destination ICC + rendering intent. Late-stage feature; depends on sub-project 3 plus a print workflow.
 - **Per-camera DCP profiles.** Orthogonal to working-space work — improves raw decode color accuracy, not gamut handling. Tracked under [Processing Parity](processing-parity.md) (Raw processing section).
 
@@ -79,7 +79,7 @@ Let the user pick the output color space at apply time (default sRGB, with Displ
 
 ## Related
 
-- [HEIC Support](heic-support.md) — multiple known gaps explicitly wait for sub-project 1 (P3/BT.2020 fixtures, BT.2020 transfer handling, out-of-gamut clamping audit).
+- [HEIC Support](heic-support.md) — multiple parked items explicitly wait for sub-project 1 (P3/BT.2020 fixtures, BT.2020 transfer handling, out-of-gamut clamping audit).
 - [Pluggable Pipeline](pluggable-pipeline.md) — `Stage` trait + `ColorSpace` enum already exists; the `color-space-aware stage insertion` sub-task there gates on sub-project 1.
 - [Processing Parity](processing-parity.md) — per-camera DCP profiles tracked under that epic's raw processing section.
 - [Ecosystem Interop](ecosystem-interop.md) — ICC profiles matter for cross-tool compatibility.

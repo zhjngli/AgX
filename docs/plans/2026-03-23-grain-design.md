@@ -251,7 +251,7 @@ All fields optional with serde defaults. Missing `[grain]` section = no grain.
 
 ## References
 
-- [Darktable grain module](https://docs.darktable.org/usermanual/4.8/en/module-reference/processing-modules/grain/) — simplex noise on L channel, coarseness + strength controls
+- [Darktable grain module](https://docs.darktable.org/usermanual/5.2/en/module-reference/processing-modules/grain/) — simplex noise on L channel, coarseness + strength controls
 - [Darktable default module order](https://docs.darktable.org/usermanual/3.8/en/special-topics/module-order/) — sharpen → grain → soften → vignette → dither
 - [Darktable issue #4451: physically-realistic grain](https://github.com/darktable-org/darktable/issues/4451) — discussion of Monte Carlo replacement, found impractical (20+ hours for single image)
 - [Newson et al. 2017: Realistic Film Grain Rendering (IPOL)](https://www.ipol.im/pub/art/2017/192/) — physics-based Boolean model, academic gold standard, computationally infeasible for interactive editing
