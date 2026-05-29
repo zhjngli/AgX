@@ -196,16 +196,17 @@ pub fn encode_to_file_with_options(
         }
     };
 
-    // Inject metadata if available
-    let buf = if let Some(meta) = metadata {
-        inject_metadata(buf, format, meta)?
-    } else {
-        buf
+    // ICC is written unconditionally; EXIF is forwarded only when present.
+    // JPEG and PNG get both via img_parts post-encode; TIFF will get ICC
+    // inline during encode in a later task and EXIF via little_exif
+    // post-write.
+    let buf = match format {
+        OutputFormat::Jpeg | OutputFormat::Png => inject_icc_and_exif(buf, format, metadata)?,
+        OutputFormat::Tiff => buf,
     };
 
     std::fs::write(&final_path, &buf)?;
 
-    // For TIFF output, inject metadata via little_exif after writing
     if format == OutputFormat::Tiff {
         if let Some(meta) = metadata {
             inject_metadata_tiff(&final_path, meta);
@@ -224,20 +225,25 @@ pub fn encode_to_file(linear: &Rgb32FImage, path: &std::path::Path) -> Result<()
     Ok(())
 }
 
-/// Inject metadata into an encoded JPEG or PNG buffer.
-fn inject_metadata(
+/// Inject the sRGB v4 ICC profile and (optionally) the input EXIF into a
+/// JPEG or PNG buffer. ICC is unconditional — see the encode module's
+/// output-labeling contract. EXIF passes through only if the input had it.
+fn inject_icc_and_exif(
     buf: Vec<u8>,
     format: OutputFormat,
-    metadata: &ImageMetadata,
+    metadata: Option<&ImageMetadata>,
 ) -> Result<Vec<u8>> {
-    use img_parts::ImageEXIF;
+    use img_parts::{ImageEXIF, ImageICC};
 
     match format {
         OutputFormat::Jpeg => {
             let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
                 .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-            if let Some(exif) = &metadata.exif {
-                jpeg.set_exif(Some(exif.clone().into()));
+            jpeg.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+            if let Some(meta) = metadata {
+                if let Some(exif) = &meta.exif {
+                    jpeg.set_exif(Some(exif.clone().into()));
+                }
             }
             let mut out = Vec::new();
             jpeg.encoder()
@@ -248,8 +254,11 @@ fn inject_metadata(
         OutputFormat::Png => {
             let mut png = img_parts::png::Png::from_bytes(buf.into())
                 .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-            if let Some(exif) = &metadata.exif {
-                png.set_exif(Some(exif.clone().into()));
+            png.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+            if let Some(meta) = metadata {
+                if let Some(exif) = &meta.exif {
+                    png.set_exif(Some(exif.clone().into()));
+                }
             }
             let mut out = Vec::new();
             png.encoder()
@@ -257,7 +266,7 @@ fn inject_metadata(
                 .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
             Ok(out)
         }
-        OutputFormat::Tiff => Ok(buf), // Handled separately via inject_metadata_tiff
+        OutputFormat::Tiff => Ok(buf), // TIFF writes ICC inline during encode (Task 7)
     }
 }
 
@@ -565,5 +574,26 @@ mod tests {
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
         let _ = std::fs::remove_file(result.unwrap());
+    }
+
+    #[test]
+    fn encode_jpeg_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+        use img_parts::ImageICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_jpeg.jpg");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        encode_to_file(&linear, &temp_path).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
+        let icc = jpeg.icc_profile().expect("output JPEG must carry an ICC profile");
+        assert_eq!(
+            &icc[..],
+            SRGB_V4_ICC,
+            "embedded ICC must equal the SRGB_V4_ICC blob"
+        );
+
+        let _ = std::fs::remove_file(&temp_path);
     }
 }

@@ -15,10 +15,6 @@
 /// The encoder writes these bytes unconditionally into every output file;
 /// see the `encode` module-level doc comment for the output-labeling
 /// contract.
-// `dead_code` allow is temporary: Tasks 5/6/7 (color management SP2) wire
-// this const into the JPEG/PNG/TIFF encoder paths; once consumed, the
-// attribute should be removed.
-#[allow(dead_code)]
 pub(crate) const SRGB_V4_ICC: &[u8] = include_bytes!("profiles/srgb_v4.icc");
 
 #[cfg(test)]
