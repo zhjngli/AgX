@@ -4,13 +4,14 @@ Open-source photo editing library + CLI in Rust with a portable, human-readable 
 
 ## Workspace Layout
 
-Cargo workspace with five crates:
+Cargo workspace with six crates:
 
 - `crates/agx/` -- core library (decode, engine, adjustments, presets, encode)
 - `crates/agx-cli/` -- thin CLI wrapper (edit, apply, batch-edit)
 - `crates/agx-docgen/` -- dev-only tool for generating CLI and preset reference markdown
 - `crates/agx-e2e/` -- e2e test suite (golden file comparison, 65 image x look tests)
 - `crates/agx-lut-gen/` -- dev-only tool for generating .cube LUT files
+- `crates/agx-profile-gen/` -- dev-only tool for generating the bundled sRGB ICC profile
 
 ## Architecture
 

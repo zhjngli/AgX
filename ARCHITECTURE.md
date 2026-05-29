@@ -108,6 +108,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | engine/gpu | GPU pipeline via wgpu + WGSL compute shaders (see engine README)      |
 | engine/stages | CPU stage implementations (see engine README)                        |
 | agx-cli    | [`crates/agx-cli/README.md`](crates/agx-cli/README.md)                   |
+| agx-profile-gen | dev-only tool — generates the bundled sRGB ICC profile via lcms2 (see `crates/agx/src/encode/profiles/README.md`) |
 
 ## Design Docs
 

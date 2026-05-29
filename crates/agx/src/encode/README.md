@@ -20,7 +20,7 @@ Every output file embeds an sRGB v4 ICC profile (`SRGB_V4_ICC` in `icc.rs`). The
 
 Per-format mechanism:
 
-- **JPEG / PNG**: written via `img_parts::set_icc_profile` in `inject_icc_and_exif` (post-encode buffer rewrite).
+- **JPEG / PNG**: written via `img_parts::set_icc_profile` in the per-format helpers `inject_jpeg_icc_and_exif` / `inject_png_icc_and_exif` (post-encode buffer rewrite).
 - **TIFF**: written via the `tiff` crate's `write_tag(Tag::IccProfile, ...)` during encode (inline tag in the IFD).
 
 ## Extension Guide
@@ -30,7 +30,7 @@ To add a new output format:
 1. Add a variant to `OutputFormat` and update `extension()` / `from_extension()`.
 2. Add an encoding branch in `encode_to_file_with_options` using the appropriate encoder.
 3. Embed `SRGB_V4_ICC` per the new format's standard ICC mechanism (e.g. JPEG APP2, PNG `iCCP`, TIFF `IccProfile` tag, HEIF `colr` box).
-4. Add EXIF injection support in `inject_icc_and_exif` (or a format-specific post-write step) if the format supports it.
+4. Add EXIF injection support in a per-format `inject_<fmt>_icc_and_exif` helper (or a format-specific post-write step) if the format supports it.
 5. Update `parse_output_format` in the CLI.
 
 ## Does NOT
