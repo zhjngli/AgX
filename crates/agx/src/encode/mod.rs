@@ -230,7 +230,7 @@ fn inject_metadata(
     format: OutputFormat,
     metadata: &ImageMetadata,
 ) -> Result<Vec<u8>> {
-    use img_parts::{ImageEXIF, ImageICC};
+    use img_parts::ImageEXIF;
 
     match format {
         OutputFormat::Jpeg => {
@@ -238,9 +238,6 @@ fn inject_metadata(
                 .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
             if let Some(exif) = &metadata.exif {
                 jpeg.set_exif(Some(exif.clone().into()));
-            }
-            if let Some(icc) = &metadata.icc_profile {
-                jpeg.set_icc_profile(Some(icc.clone().into()));
             }
             let mut out = Vec::new();
             jpeg.encoder()
@@ -253,9 +250,6 @@ fn inject_metadata(
                 .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
             if let Some(exif) = &metadata.exif {
                 png.set_exif(Some(exif.clone().into()));
-            }
-            if let Some(icc) = &metadata.icc_profile {
-                png.set_icc_profile(Some(icc.clone().into()));
             }
             let mut out = Vec::new();
             png.encoder()
@@ -543,7 +537,6 @@ mod tests {
         ];
         let meta = ImageMetadata {
             exif: Some(exif_bytes.clone()),
-            icc_profile: None,
         };
 
         let temp_path = std::env::temp_dir().join("agx_test_meta_rt.jpg");
