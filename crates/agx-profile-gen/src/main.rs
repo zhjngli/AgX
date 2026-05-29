@@ -52,6 +52,9 @@ fn build_srgb_v4_profile() -> Vec<u8> {
     )
     .expect("build RGB profile");
 
+    // Force v4 explicitly. lcms2 currently defaults new profiles to v4.3,
+    // but pinning the value here protects against silent regressions if a
+    // future lcms2 release changes the default.
     profile.set_version(4.3);
 
     profile.icc().expect("serialize ICC bytes")
@@ -84,5 +87,21 @@ mod tests {
             "expected 300..=8000 bytes, got {}",
             n
         );
+    }
+
+    /// Round-trip through lcms2's own parser. The header-byte tests above
+    /// confirm "looks like a v4 RGB display profile"; this test confirms
+    /// "lcms2 itself parses the bytes back into a coherent RGB display
+    /// profile." A silent lcms2 upgrade that changes curve encoding or
+    /// primaries representation would still pass the header tests but
+    /// trip this one.
+    #[test]
+    fn generated_profile_round_trips_through_lcms2() {
+        use lcms2::{ColorSpaceSignature, Profile, ProfileClassSignature};
+
+        let bytes = build_srgb_v4_profile();
+        let profile = Profile::new_icc(&bytes).expect("parse generated profile");
+        assert_eq!(profile.color_space(), ColorSpaceSignature::RgbData);
+        assert_eq!(profile.device_class(), ProfileClassSignature::DisplayClass);
     }
 }
