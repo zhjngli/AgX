@@ -15,6 +15,8 @@ use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
 use crate::error::Result;
 use crate::metadata::ImageMetadata;
 
+mod icc;
+
 /// Supported output image formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
