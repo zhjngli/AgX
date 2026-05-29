@@ -1,0 +1,88 @@
+//! Generates AgX's bundled ICC profile blobs.
+//!
+//! Currently emits a single sRGB v4 profile to
+//! `crates/agx/src/encode/profiles/srgb_v4.icc`. The generator is dev-only
+//! (the output bytes are committed); regenerate only when the source
+//! parameters change or a future ICC spec revision is adopted.
+//!
+//! License chain: lcms2 (MIT) + this generator (MIT/Apache via AgX). The
+//! generated profile inherits MIT — see
+//! `docs/contributing/asset-licensing.md`.
+
+use std::path::PathBuf;
+
+use lcms2::{CIExyY, CIExyYTRIPLE, Profile, ToneCurve};
+
+const OUTPUT_PATH: &str = "crates/agx/src/encode/profiles/srgb_v4.icc";
+
+fn main() {
+    let bytes = build_srgb_v4_profile();
+
+    let path = PathBuf::from(OUTPUT_PATH);
+    std::fs::create_dir_all(path.parent().unwrap()).expect("create profiles dir");
+    std::fs::write(&path, &bytes).expect("write profile");
+
+    println!("wrote {} bytes to {}", bytes.len(), path.display());
+}
+
+/// Build a v4 sRGB profile: BT.709/sRGB primaries (Rec. 709 chromaticities),
+/// D65 white point, sRGB parametric transfer curve.
+fn build_srgb_v4_profile() -> Vec<u8> {
+    let primaries = CIExyYTRIPLE {
+        Red: CIExyY { x: 0.6400, y: 0.3300, Y: 1.0 },
+        Green: CIExyY { x: 0.3000, y: 0.6000, Y: 1.0 },
+        Blue: CIExyY { x: 0.1500, y: 0.0600, Y: 1.0 },
+    };
+    let d65 = CIExyY { x: 0.31270, y: 0.32900, Y: 1.0 };
+
+    // sRGB parametric transfer curve, type 4 (IEC 61966-2.1):
+    //   if x >= d: y = (a*x + b)^gamma
+    //   else:      y = c*x
+    // Parameters: gamma=2.4, a=1/1.055, b=0.055/1.055, c=1/12.92, d=0.04045.
+    let srgb_curve = ToneCurve::new_parametric(
+        4,
+        &[2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045],
+    )
+    .expect("build sRGB tone curve");
+
+    let mut profile = Profile::new_rgb(
+        &d65,
+        &primaries,
+        &[&srgb_curve, &srgb_curve, &srgb_curve],
+    )
+    .expect("build RGB profile");
+
+    profile.set_version(4.3);
+
+    profile.icc().expect("serialize ICC bytes")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_srgb_v4_profile;
+
+    #[test]
+    fn generated_profile_is_v4() {
+        let bytes = build_srgb_v4_profile();
+        assert!(bytes.len() >= 128, "profile header must be at least 128 bytes");
+        assert_eq!(bytes[8], 0x04, "expected v4 major version, got {:#x}", bytes[8]);
+    }
+
+    #[test]
+    fn generated_profile_is_display_class_rgb() {
+        let bytes = build_srgb_v4_profile();
+        assert_eq!(&bytes[12..16], b"mntr", "profile class");
+        assert_eq!(&bytes[16..20], b"RGB ", "color space");
+    }
+
+    #[test]
+    fn generated_profile_in_expected_size_range() {
+        let bytes = build_srgb_v4_profile();
+        let n = bytes.len();
+        assert!(
+            (300..=8000).contains(&n),
+            "expected 300..=8000 bytes, got {}",
+            n
+        );
+    }
+}
