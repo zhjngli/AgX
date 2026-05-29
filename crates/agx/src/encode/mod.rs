@@ -600,7 +600,9 @@ mod tests {
 
         let bytes = std::fs::read(&temp_path).unwrap();
         let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
-        let icc = jpeg.icc_profile().expect("output JPEG must carry an ICC profile");
+        let icc = jpeg
+            .icc_profile()
+            .expect("output JPEG must carry an ICC profile");
         assert_eq!(
             &icc[..],
             SRGB_V4_ICC,
@@ -648,7 +650,9 @@ mod tests {
 
         let bytes = std::fs::read(&temp_path).unwrap();
         let png = img_parts::png::Png::from_bytes(bytes.into()).unwrap();
-        let icc = png.icc_profile().expect("output PNG must carry an ICC profile");
+        let icc = png
+            .icc_profile()
+            .expect("output PNG must carry an ICC profile");
         assert_eq!(&icc[..], SRGB_V4_ICC);
 
         let _ = std::fs::remove_file(&temp_path);
@@ -696,8 +700,7 @@ mod tests {
     /// by 1 even at q=100; PNG and TIFF are lossless.
     #[test]
     fn encode_pixel_bytes_unchanged_after_icc_embed() {
-        let linear: Rgb32FImage =
-            ImageBuffer::from_pixel(4, 4, Rgb([0.2159f32, 0.2159, 0.2159]));
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.2159f32, 0.2159, 0.2159]));
         let expected_pixel: [u8; 3] = [128, 128, 128];
 
         for (fmt, ext) in [

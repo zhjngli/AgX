@@ -46,11 +46,7 @@ mod tests {
     /// Color space at offset 16..20 must be "RGB " (4-char field, space-padded).
     #[test]
     fn srgb_v4_icc_blob_is_rgb_color_space() {
-        assert_eq!(
-            &SRGB_V4_ICC[16..20],
-            b"RGB ",
-            "expected RGB color space"
-        );
+        assert_eq!(&SRGB_V4_ICC[16..20], b"RGB ", "expected RGB color space");
     }
 
     /// Catch accidental swap to a different profile. Our generated blob is

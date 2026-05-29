@@ -29,28 +29,38 @@ fn main() {
 /// D65 white point, sRGB parametric transfer curve.
 fn build_srgb_v4_profile() -> Vec<u8> {
     let primaries = CIExyYTRIPLE {
-        Red: CIExyY { x: 0.6400, y: 0.3300, Y: 1.0 },
-        Green: CIExyY { x: 0.3000, y: 0.6000, Y: 1.0 },
-        Blue: CIExyY { x: 0.1500, y: 0.0600, Y: 1.0 },
+        Red: CIExyY {
+            x: 0.6400,
+            y: 0.3300,
+            Y: 1.0,
+        },
+        Green: CIExyY {
+            x: 0.3000,
+            y: 0.6000,
+            Y: 1.0,
+        },
+        Blue: CIExyY {
+            x: 0.1500,
+            y: 0.0600,
+            Y: 1.0,
+        },
     };
-    let d65 = CIExyY { x: 0.31270, y: 0.32900, Y: 1.0 };
+    let d65 = CIExyY {
+        x: 0.31270,
+        y: 0.32900,
+        Y: 1.0,
+    };
 
     // sRGB parametric transfer curve, type 4 (IEC 61966-2.1):
     //   if x >= d: y = (a*x + b)^gamma
     //   else:      y = c*x
     // Parameters: gamma=2.4, a=1/1.055, b=0.055/1.055, c=1/12.92, d=0.04045.
-    let srgb_curve = ToneCurve::new_parametric(
-        4,
-        &[2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045],
-    )
-    .expect("build sRGB tone curve");
+    let srgb_curve =
+        ToneCurve::new_parametric(4, &[2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045])
+            .expect("build sRGB tone curve");
 
-    let mut profile = Profile::new_rgb(
-        &d65,
-        &primaries,
-        &[&srgb_curve, &srgb_curve, &srgb_curve],
-    )
-    .expect("build RGB profile");
+    let mut profile = Profile::new_rgb(&d65, &primaries, &[&srgb_curve, &srgb_curve, &srgb_curve])
+        .expect("build RGB profile");
 
     // Force v4 explicitly. lcms2 currently defaults new profiles to v4.3,
     // but pinning the value here protects against silent regressions if a
@@ -94,8 +104,15 @@ mod tests {
     #[test]
     fn generated_profile_is_v4() {
         let bytes = build_srgb_v4_profile();
-        assert!(bytes.len() >= 128, "profile header must be at least 128 bytes");
-        assert_eq!(bytes[8], 0x04, "expected v4 major version, got {:#x}", bytes[8]);
+        assert!(
+            bytes.len() >= 128,
+            "profile header must be at least 128 bytes"
+        );
+        assert_eq!(
+            bytes[8], 0x04,
+            "expected v4 major version, got {:#x}",
+            bytes[8]
+        );
     }
 
     #[test]
