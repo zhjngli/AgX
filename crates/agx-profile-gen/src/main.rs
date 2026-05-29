@@ -57,7 +57,34 @@ fn build_srgb_v4_profile() -> Vec<u8> {
     // future lcms2 release changes the default.
     profile.set_version(4.3);
 
-    profile.icc().expect("serialize ICC bytes")
+    let mut bytes = profile.icc().expect("serialize ICC bytes");
+    force_deterministic_creation_datetime(&mut bytes);
+    bytes
+}
+
+/// Overwrite the ICC v4 header `dateTime` field (offset 24, 12 bytes,
+/// six big-endian u16: year, month, day, hour, minute, second) with a
+/// fixed value so the generated blob is byte-stable across regenerations.
+///
+/// lcms2 stamps the current wall-clock time by default. Without this fix,
+/// every `cargo run -p agx-profile-gen` produces a different blob — even
+/// when source parameters are unchanged — and the committed
+/// `srgb_v4.icc` looks like it diverges on every dev's machine. Fixing
+/// the timestamp to a project epoch (AgX founding year, 2026-01-01
+/// 00:00:00 UTC) gives us a single canonical blob.
+///
+/// Safe post-`icc()` patch: the optional Profile ID field at bytes
+/// 84..100 is zero in lcms2 output (no MD5 dependency on header bytes).
+fn force_deterministic_creation_datetime(bytes: &mut [u8]) {
+    let dt: [u8; 12] = [
+        0x07, 0xEA, // year 2026
+        0x00, 0x01, // month 1
+        0x00, 0x01, // day 1
+        0x00, 0x00, // hour
+        0x00, 0x00, // minute
+        0x00, 0x00, // second
+    ];
+    bytes[24..36].copy_from_slice(&dt);
 }
 
 #[cfg(test)]
