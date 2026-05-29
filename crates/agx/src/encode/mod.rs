@@ -596,4 +596,25 @@ mod tests {
 
         let _ = std::fs::remove_file(&temp_path);
     }
+
+    #[test]
+    fn encode_png_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+        use img_parts::ImageICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_png.png");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        let opts = EncodeOptions {
+            jpeg_quality: 92,
+            format: Some(OutputFormat::Png),
+        };
+        encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let png = img_parts::png::Png::from_bytes(bytes.into()).unwrap();
+        let icc = png.icc_profile().expect("output PNG must carry an ICC profile");
+        assert_eq!(&icc[..], SRGB_V4_ICC);
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
 }
