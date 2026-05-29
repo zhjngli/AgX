@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
-use image::codecs::tiff::TiffEncoder;
 use image::{Rgb, Rgb32FImage, RgbImage};
 
 use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
@@ -187,19 +186,33 @@ pub fn encode_to_file_with_options(
             buf
         }
         OutputFormat::Tiff => {
+            use tiff::encoder::{colortype, TiffEncoder};
+            use tiff::tags::Tag;
+
+            let raw = rgb8.into_raw();
+            let (w, h) = (linear.width(), linear.height());
+
             let mut buf = Vec::new();
-            let cursor = Cursor::new(&mut buf);
-            let encoder = TiffEncoder::new(cursor);
-            rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+            {
+                let cursor = Cursor::new(&mut buf);
+                let mut tiff = TiffEncoder::new(cursor)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+                let mut img = tiff
+                    .new_image::<colortype::RGB8>(w, h)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+                img.encoder()
+                    .write_tag(Tag::IccProfile, crate::encode::icc::SRGB_V4_ICC)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+                img.write_data(&raw)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+            }
             buf
         }
     };
 
     // ICC is written unconditionally; EXIF is forwarded only when present.
-    // JPEG and PNG get both via img_parts post-encode; TIFF will get ICC
-    // inline during encode in a later task and EXIF via little_exif
-    // post-write.
+    // JPEG and PNG get both via img_parts post-encode; TIFF gets ICC inline
+    // during encode (above) and EXIF via little_exif post-write.
     let buf = match format {
         OutputFormat::Jpeg | OutputFormat::Png => inject_icc_and_exif(buf, format, metadata)?,
         OutputFormat::Tiff => buf,
@@ -266,7 +279,7 @@ fn inject_icc_and_exif(
                 .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
             Ok(out)
         }
-        OutputFormat::Tiff => Ok(buf), // TIFF writes ICC inline during encode (Task 7)
+        OutputFormat::Tiff => Ok(buf), // TIFF writes ICC inline during encode
     }
 }
 
@@ -593,6 +606,29 @@ mod tests {
             SRGB_V4_ICC,
             "embedded ICC must equal the SRGB_V4_ICC blob"
         );
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn encode_tiff_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_tiff.tiff");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        let opts = EncodeOptions {
+            jpeg_quality: 92,
+            format: Some(OutputFormat::Tiff),
+        };
+        encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(bytes))
+            .expect("output must be parseable as TIFF");
+        let icc = decoder
+            .get_tag_u8_vec(tiff::tags::Tag::IccProfile)
+            .expect("output TIFF must carry an ICCProfile tag");
+        assert_eq!(icc, SRGB_V4_ICC);
 
         let _ = std::fs::remove_file(&temp_path);
     }
