@@ -653,4 +653,80 @@ mod tests {
 
         let _ = std::fs::remove_file(&temp_path);
     }
+
+    /// Pin the contract that input metadata never influences output ICC.
+    /// `ImageMetadata` no longer carries an `icc_profile` field, but a
+    /// caller could still pass EXIF; this test confirms the EXIF path
+    /// does not somehow leak into the ICC slot.
+    #[test]
+    fn encode_jpeg_overrides_any_input_metadata_with_srgb_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+        use img_parts::ImageICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_override.jpg");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+
+        let exif_bytes = vec![
+            0x45, 0x78, 0x69, 0x66, 0x00, 0x00, b'M', b'M', 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,
+        ];
+        let meta = ImageMetadata {
+            exif: Some(exif_bytes),
+        };
+
+        let opts = EncodeOptions::default();
+        encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
+        let icc = jpeg.icc_profile().expect("output must have ICC");
+        assert_eq!(
+            &icc[..],
+            SRGB_V4_ICC,
+            "input metadata must not influence output ICC"
+        );
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    /// Pin pixel data unchanged after the ICC embed. Encode a deterministic
+    /// grey input across JPEG / PNG / TIFF; decode back and assert the
+    /// pixel byte equals the expected sRGB-quantized value derived from
+    /// the linear input (matches `encode_rec2020_to_srgb_rgb8_quantization_table`).
+    /// JPEG gets a small tolerance because chroma subsampling shifts greys
+    /// by 1 even at q=100; PNG and TIFF are lossless.
+    #[test]
+    fn encode_pixel_bytes_unchanged_after_icc_embed() {
+        let linear: Rgb32FImage =
+            ImageBuffer::from_pixel(4, 4, Rgb([0.2159f32, 0.2159, 0.2159]));
+        let expected_pixel: [u8; 3] = [128, 128, 128];
+
+        for (fmt, ext) in [
+            (OutputFormat::Jpeg, "jpg"),
+            (OutputFormat::Png, "png"),
+            (OutputFormat::Tiff, "tiff"),
+        ] {
+            let path = std::env::temp_dir().join(format!("agx_test_pix_{ext}.{ext}"));
+            let opts = EncodeOptions {
+                jpeg_quality: 100,
+                format: Some(fmt),
+            };
+            encode_to_file_with_options(&linear, &path, &opts, None).unwrap();
+
+            let img = image::open(&path).unwrap().to_rgb8();
+            assert_eq!(img.dimensions(), (4, 4), "fmt {fmt:?} dims wrong");
+            let px = img.get_pixel(0, 0).0;
+
+            let tol: i32 = if fmt == OutputFormat::Jpeg { 2 } else { 0 };
+            for c in 0..3 {
+                let d = (px[c] as i32 - expected_pixel[c] as i32).abs();
+                assert!(
+                    d <= tol,
+                    "fmt {fmt:?} channel {c} px={} expected={} tol={tol}",
+                    px[c],
+                    expected_pixel[c],
+                );
+            }
+            let _ = std::fs::remove_file(&path);
+        }
+    }
 }
