@@ -6,7 +6,7 @@ AgX is published as a Rust library (`agx-photo` on crates.io) under MIT OR Apach
 
 - **Public domain / CC0.** No obligations, no propagation.
 - **MIT / BSD / Apache-2.0.** Standard permissive. Requires attribution somewhere in the distribution; trivial to satisfy.
-- **Self-generated.** Anything AgX produces via its own dev tools (LUTs from `agx-lut-gen`, ICC profiles from `agx-profile-gen`) is treated as MIT/Apache under the AgX license.
+- **Self-generated.** Anything AgX produces via its own dev tools (LUTs from `agx-lut-gen`, ICC profiles from `agx-profile-gen`) is treated as MIT/Apache under the AgX license. The generator tool itself must also be permissively licensed — lcms2 (MIT) is the established choice for ICC.
 
 ## Rejected — and why
 
@@ -27,4 +27,4 @@ AgX is published as a Rust library (`agx-photo` on crates.io) under MIT OR Apach
 3. Add the asset bytes to its module's `profiles/` (or equivalent) directory.
 4. Add a one-line attribution comment in the consuming Rust file pointing at this policy doc.
 
-For ICC profiles specifically, the generator pattern is the right default: it gives full provenance and avoids any third-party license question.
+For ICC profiles specifically, the generator pattern is the right default: it gives full provenance and avoids any third-party license question. See [`crates/agx/src/encode/profiles/README.md`](../../crates/agx/src/encode/profiles/README.md) for the in-tree example.
