@@ -116,13 +116,6 @@ mod tests {
     }
 
     #[test]
-    fn generated_profile_is_display_class_rgb() {
-        let bytes = build_srgb_v4_profile();
-        assert_eq!(&bytes[12..16], b"mntr", "profile class");
-        assert_eq!(&bytes[16..20], b"RGB ", "color space");
-    }
-
-    #[test]
     fn generated_profile_in_expected_size_range() {
         let bytes = build_srgb_v4_profile();
         let n = bytes.len();

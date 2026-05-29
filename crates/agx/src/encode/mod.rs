@@ -210,11 +210,9 @@ pub fn encode_to_file_with_options(
         }
     };
 
-    // ICC is written unconditionally; EXIF is forwarded only when present.
-    // JPEG and PNG get both via img_parts post-encode; TIFF gets ICC inline
-    // during encode (above) and EXIF via little_exif post-write.
     let buf = match format {
-        OutputFormat::Jpeg | OutputFormat::Png => inject_icc_and_exif(buf, format, metadata)?,
+        OutputFormat::Jpeg => inject_jpeg_icc_and_exif(buf, metadata)?,
+        OutputFormat::Png => inject_png_icc_and_exif(buf, metadata)?,
         OutputFormat::Tiff => buf,
     };
 
@@ -238,49 +236,43 @@ pub fn encode_to_file(linear: &Rgb32FImage, path: &std::path::Path) -> Result<()
     Ok(())
 }
 
-/// Inject the sRGB v4 ICC profile and (optionally) the input EXIF into a
-/// JPEG or PNG buffer. ICC is unconditional — see the encode module's
-/// output-labeling contract. EXIF passes through only if the input had it.
-fn inject_icc_and_exif(
+/// Inject sRGB ICC + optional EXIF into a JPEG buffer. ICC is unconditional
+/// per the encode module's output-labeling contract; EXIF passes through
+/// only if input metadata carried it.
+fn inject_jpeg_icc_and_exif(
     buf: Vec<u8>,
-    format: OutputFormat,
     metadata: Option<&ImageMetadata>,
 ) -> Result<Vec<u8>> {
     use img_parts::{ImageEXIF, ImageICC};
 
-    match format {
-        OutputFormat::Jpeg => {
-            let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-            jpeg.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
-            if let Some(meta) = metadata {
-                if let Some(exif) = &meta.exif {
-                    jpeg.set_exif(Some(exif.clone().into()));
-                }
-            }
-            let mut out = Vec::new();
-            jpeg.encoder()
-                .write_to(&mut out)
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
-            Ok(out)
-        }
-        OutputFormat::Png => {
-            let mut png = img_parts::png::Png::from_bytes(buf.into())
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-            png.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
-            if let Some(meta) = metadata {
-                if let Some(exif) = &meta.exif {
-                    png.set_exif(Some(exif.clone().into()));
-                }
-            }
-            let mut out = Vec::new();
-            png.encoder()
-                .write_to(&mut out)
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
-            Ok(out)
-        }
-        OutputFormat::Tiff => Ok(buf), // TIFF writes ICC inline during encode
+    let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
+    jpeg.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
+        jpeg.set_exif(Some(exif.clone().into()));
     }
+    let mut out = Vec::new();
+    jpeg.encoder()
+        .write_to(&mut out)
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
+    Ok(out)
+}
+
+/// Inject sRGB ICC + optional EXIF into a PNG buffer. Mirrors the JPEG path.
+fn inject_png_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
+    use img_parts::{ImageEXIF, ImageICC};
+
+    let mut png = img_parts::png::Png::from_bytes(buf.into())
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
+    png.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
+        png.set_exif(Some(exif.clone().into()));
+    }
+    let mut out = Vec::new();
+    png.encoder()
+        .write_to(&mut out)
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
+    Ok(out)
 }
 
 /// Inject metadata into an existing TIFF file via little_exif. Best-effort — failures are silent.
