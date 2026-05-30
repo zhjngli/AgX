@@ -14,12 +14,14 @@ Decode image files into linear Rec.2020 `Rgb32FImage` buffers for the engine.
 - `is_heic_extension(path)` -- check if a file extension is a HEIF container (.heic, .heif)
 - `heic::decode_heic(path)` -- decode HEIC/HEIF files via libheif FFI (behind `heic` feature)
 - `heic::extract_heic_metadata(path)` -- extract raw EXIF bytes from HEIF metadata blocks (behind `heic` feature)
+- `icc::convert_to_working_space(buf, icc_bytes)` -- convert a gamma-encoded buffer from an embedded ICC profile into linear Rec.2020 via lcms2 (behind `icc` feature)
 
 ## Extension Guide
 
 - **Standard formats:** Supported automatically via the `image` crate. If `image` adds a new format, it works with no changes.
 - **Raw formats:** Add the extension to `RAW_EXTENSIONS`. LibRaw already supports 1000+ camera models, so new raw formats typically just need the extension added.
 - **HEIF container formats:** AgX recognizes `.heic` and `.heif` extensions today. To add AV1-based `.avif` decoding, append `"avif"` to `HEIC_EXTENSIONS`; libheif will handle the codec if the system build of libheif was compiled with AV1 support. New variants typically just need an extension entry.
+- **New formats with embedded ICC:** a new format decoder should extract the embedded ICC bytes and route them through `icc::convert_to_working_space`, falling back to the sRGB path on `None`/`Err`. This keeps profile handling uniform across formats.
 
 ## Does NOT
 
@@ -30,8 +32,10 @@ Decode image files into linear Rec.2020 `Rgb32FImage` buffers for the engine.
 ## Key Decisions
 
 - **Output is always linear Rec.2020 f32.** Standard sRGB inputs and BT.709 are matrix-converted; Display P3 HEIC inputs are matrix-converted directly to Rec.2020 (preserving wide gamut); BT.2020 SDR primaries map identity. LibRaw stays in sRGB output mode then matrix-converts (native Rec.2020 path deferred as perf follow-up).
+- **Input ICC profiles are honored when present.** With the `icc` feature on, an embedded ICC profile (JPEG APP2, PNG iCCP, TIFF `ICCProfile` tag, HEIF rICC/prof) is parsed via lcms2 and used to convert the input directly to linear Rec.2020 — so Adobe RGB, ProPhoto, and explicitly-tagged sRGB inputs land at correct coordinates instead of being assumed sRGB. No profile, a malformed profile, or the feature off all fall back to the sRGB assumption (behavior unchanged from before). HEIF nclx-tagged sources keep their fast matrix path; the ICC path only applies when nclx is absent.
 - **Raw support is feature-gated.** The `raw` feature flag controls LibRaw FFI compilation. Without it, raw extensions produce an error message rather than a compile failure.
 - **HEIC support is feature-gated.** The `heic` feature flag controls libheif FFI compilation. Without it, HEIC/HEIF extensions produce an error message rather than a compile failure.
+- **Input ICC support is feature-gated.** The `icc` feature flag controls the `lcms2` (LittleCMS) dependency. Without it, embedded profiles are ignored and all inputs are assumed sRGB. Unlike `raw`/`heic`, lcms2 vendors and compiles its own C source — no system library install is required.
 - **Extension-based routing.** `decode()` checks the file extension to choose the decode path. This is simple and aligns with how camera files are named.
 
 ## Building from source
@@ -40,3 +44,5 @@ The optional FFI-backed decoders require system libraries:
 
 - **LibRaw** (for `raw` feature): `brew install libraw` (macOS) or `sudo apt install libraw-dev` (Debian/Ubuntu).
 - **libheif** (for `heic` feature): `brew install libheif` (macOS) or `sudo apt install libheif-dev libheif-plugin-libde265` (Debian/Ubuntu — the plugin package provides the HEVC decoder backend, which `libheif-dev` no longer pulls in transitively on Ubuntu 24.04).
+
+The `icc` feature needs no system library — the `lcms2` crate builds its bundled LittleCMS C source automatically.

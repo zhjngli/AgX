@@ -42,11 +42,11 @@ Embed an sRGB ICC profile in encoded output so downstream software identifies th
 
 Parse embedded ICC profiles from inputs and convert into the working space, replacing the current "assume everything is sRGB" fallback.
 
-- [ ] Pick the ICC parsing tactic: `lcms2` (C FFI, comprehensive, heavy) vs pure-Rust crates (e.g. `qcms`) — document maturity, gamut coverage, and binary-size trade-offs in the design doc.
-- [ ] Parse ICC from JPEG (APP2), TIFF (`ICCProfile` tag), PNG (`iCCP` chunk), HEIF (icc/rICC profile box).
-- [ ] Convert input → working space using the parsed profile.
-- [ ] Fallback when ICC is missing: assume sRGB (preserves current behavior).
-- [ ] Add e2e fixture: an Adobe RGB JPEG with goldens.
+- [x] Pick the ICC parsing tactic: `lcms2` (C FFI, comprehensive, heavy) vs pure-Rust crates (e.g. `qcms`) — document maturity, gamut coverage, and binary-size trade-offs in the design doc.
+- [x] Parse ICC from JPEG (APP2), TIFF (`ICCProfile` tag), PNG (`iCCP` chunk), HEIF (icc/rICC profile box).
+- [x] Convert input → working space using the parsed profile.
+- [x] Fallback when ICC is missing: assume sRGB (preserves current behavior).
+- [x] Add e2e fixture: an Adobe RGB JPEG with goldens.
 
 **Acceptance:** Adobe RGB JPEGs decode to correct values in the working space (verified against ImageMagick or `tificc`). Scanner / Lightroom-exported TIFFs with non-standard ICCs decode without crashing. New e2e fixture has goldens.
 

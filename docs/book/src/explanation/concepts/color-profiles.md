@@ -1,6 +1,6 @@
 # Color profiles
 
-AgX writes a color profile into every output file. This page explains what that profile does, why it's necessary, and why AgX picks a specific open-source profile rather than the better-known vendor reference profiles.
+AgX reads the color profile embedded in an input file to interpret its colors, and writes a color profile into every output file to label the result. This page explains what those profiles do, why they're necessary, and why AgX picks a specific open-source profile for output rather than the better-known vendor reference profiles.
 
 If you want to look up the underlying color spaces or matrices, see the [color spaces explanation](color-spaces.md).
 
@@ -9,6 +9,12 @@ If you want to look up the underlying color spaces or matrices, see the [color s
 A color profile (an ICC profile, named for the International Color Consortium that standardizes the format) is a small chunk of data inside an image file that names the color space the pixel values live in. Pixel value `(255, 0, 0)` means a different shade of red depending on the color space — moderately saturated in sRGB, much more vivid in Display P3. Without a profile, a viewer has to guess which interpretation applies.
 
 Most viewers default-guess sRGB, which matches AgX's output most of the time. But profile-aware tools (Photoshop, color-managed browsers, professional viewers on wide-gamut displays) honor the embedded profile when one is present. Embedding the right profile turns an implicit guess into an explicit statement.
+
+## Reading the profile on input
+
+The same ambiguity applies when AgX opens your photo. A JPEG straight from a camera set to Adobe RGB, or a 16-bit TIFF exported from Lightroom in ProPhoto RGB, carries an embedded profile that says "these pixel values are Adobe RGB" (or ProPhoto, or Display P3). If AgX ignored that and assumed sRGB, every saturated color would land in the wrong place — greens and reds pulled inward, the whole image subtly desaturated and hue-shifted.
+
+So AgX reads the embedded profile and converts the image into its internal working space accordingly, preserving the colors the file actually describes. Adobe RGB, ProPhoto RGB, Display P3, and explicitly-tagged sRGB inputs are all interpreted correctly. A file with no embedded profile is assumed to be sRGB — the safe, overwhelmingly-common default for untagged images.
 
 ## What AgX embeds
 
