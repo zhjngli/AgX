@@ -16,6 +16,8 @@ release = false
 image = "0.25"
 
 [dev-dependencies]
-agx = { package = "agx-photo", path = "../agx", features = ["raw", "heic"] }
+agx = { package = "agx-photo", path = "../agx", features = ["raw", "heic", "icc"] }
 exif = { package = "kamadak-exif", version = "0.5" }
 tempfile = "3"
+lcms2 = "6"
+img-parts = "0.4"
