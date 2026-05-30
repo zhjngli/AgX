@@ -47,13 +47,16 @@ cargo test -p agx-e2e
 
 # Regenerate golden files
 GOLDEN_UPDATE=1 cargo test -p agx-e2e
+
+# Regenerate a committed binary fixture (e.g. the Adobe RGB ICC-tagged JPEG)
+cargo test -p agx-e2e --test generate_fixtures -- --ignored gen_adobe_rgb_gradient
 ```
 
 ## Fixtures
 
 | Directory | Contents |
 |-----------|----------|
-| `fixtures/jpeg/` | JPEG test images |
+| `fixtures/jpeg/` | JPEG test images (incl. `adobe_rgb_gradient.jpg`, tagged with an embedded Adobe RGB ICC profile to exercise the input-ICC read path) |
 | `fixtures/raw/` | RAF (Fujifilm RAW) test images |
 | `fixtures/heic/` | HEIC test images (iPhone Display P3 + synthetic OOG sanity check) |
 | `fixtures/looks/` | Preset TOML files (8 color + 4 B&W + 1 base) |
