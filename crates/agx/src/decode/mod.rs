@@ -80,13 +80,46 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
     decode_standard(path)
 }
 
+/// Extract raw embedded ICC profile bytes from a standard-format file.
+///
+/// JPEG (APP2) and PNG (iCCP) are read via `img-parts`; TIFF via the `tiff`
+/// crate's `ICCProfile` tag (0x8773). Returns `None` when no profile is
+/// embedded or the container can't be parsed.
+#[cfg(feature = "icc")]
+fn extract_icc_standard(path: &std::path::Path) -> Option<Vec<u8>> {
+    use img_parts::ImageICC;
+
+    let bytes = std::fs::read(path).ok()?;
+
+    if let Ok(jpeg) = img_parts::jpeg::Jpeg::from_bytes(bytes.clone().into()) {
+        if let Some(icc) = jpeg.icc_profile() {
+            return Some(icc.to_vec());
+        }
+    }
+    if let Ok(png) = img_parts::png::Png::from_bytes(bytes.clone().into()) {
+        if let Some(icc) = png.icc_profile() {
+            return Some(icc.to_vec());
+        }
+    }
+    if let Ok(mut decoder) = tiff::decoder::Decoder::new(std::io::Cursor::new(&bytes)) {
+        if let Ok(icc) = decoder.get_tag_u8_vec(tiff::tags::Tag::IccProfile) {
+            if !icc.is_empty() {
+                return Some(icc);
+            }
+        }
+    }
+    None
+}
+
 /// Decode a standard image file (JPEG, PNG, TIFF, BMP, WebP) into a linear
 /// Rec.2020 f32 buffer.
 ///
-/// The input image is assumed to be in sRGB gamma space (ICC parsing is
-/// deferred). Each pixel is converted from sRGB gamma to linear sRGB and then
-/// matrix-converted into the engine working space (linear Rec.2020) in a
-/// single fused per-pixel pass. The output `Rgb32FImage` is the engine's
+/// If the file embeds an ICC profile and the `icc` feature is enabled, lcms2
+/// converts the gamma-encoded values straight to linear Rec.2020. Otherwise
+/// (no profile, feature off, or malformed profile) the input is assumed to be
+/// in sRGB gamma space: each pixel is converted from sRGB gamma to linear sRGB
+/// and then matrix-converted into the engine working space (linear Rec.2020) in
+/// a single fused per-pixel pass. The output `Rgb32FImage` is the engine's
 /// working-space contract: linear Rec.2020.
 pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let img = image::ImageReader::open(path)
@@ -96,6 +129,23 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
     let orientation = orientation::read_orientation(path);
     let img = orientation.apply(img);
     let mut buf = img.into_rgb32f();
+
+    // ICC path: if the file embeds a profile and the feature is on, let lcms2
+    // convert the gamma-encoded values straight to linear Rec.2020. On any
+    // failure, fall through to the sRGB assumption below.
+    #[cfg(feature = "icc")]
+    {
+        if let Some(icc_bytes) = extract_icc_standard(path) {
+            match icc::convert_to_working_space(&mut buf, &icc_bytes) {
+                Ok(()) => return Ok(buf),
+                Err(e) => {
+                    eprintln!("agx: embedded ICC profile could not be applied ({e}); assuming sRGB");
+                }
+            }
+        }
+    }
+
+    // sRGB fallback (also the path when the `icc` feature is disabled).
     let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
     for px in buf.pixels_mut() {
         let lin: LinSrgb<f32> = Srgb::new(px.0[0], px.0[1], px.0[2]).into_linear();
@@ -233,6 +283,64 @@ mod tests {
     fn decode_nonexistent_file_returns_error() {
         let result = decode_standard(std::path::Path::new("/nonexistent/file.png"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn decode_without_icc_uses_srgb_fallback() {
+        let temp_path = std::env::temp_dir().join("agx_test_no_icc.png");
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
+        img.save(&temp_path).unwrap();
+
+        let result = decode_standard(&temp_path).unwrap();
+        let pixel = result.get_pixel(0, 0);
+        assert!(
+            (pixel.0[0] - 0.2159).abs() < 0.01,
+            "no-ICC decode must use sRGB fallback, got {}",
+            pixel.0[0]
+        );
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[cfg(feature = "icc")]
+    #[test]
+    fn decode_tagged_adobe_rgb_png_is_honored() {
+        use img_parts::ImageICC;
+        use lcms2::{CIExyY, CIExyYTRIPLE, Profile, ToneCurve};
+
+        let d65 = CIExyY { x: 0.3127, y: 0.3290, Y: 1.0 };
+        let primaries = CIExyYTRIPLE {
+            Red: CIExyY { x: 0.6400, y: 0.3300, Y: 1.0 },
+            Green: CIExyY { x: 0.2100, y: 0.7100, Y: 1.0 },
+            Blue: CIExyY { x: 0.1500, y: 0.0600, Y: 1.0 },
+        };
+        let gamma = ToneCurve::new(2.19921875);
+        let icc = Profile::new_rgb(&d65, &primaries, &[&gamma, &gamma, &gamma])
+            .unwrap()
+            .icc()
+            .unwrap();
+
+        let red: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_pixel(2, 2, Rgb([255, 0, 0]));
+        let mut png_bytes = Vec::new();
+        red.write_with_encoder(image::codecs::png::PngEncoder::new(&mut png_bytes))
+            .unwrap();
+        let mut png = img_parts::png::Png::from_bytes(png_bytes.into()).unwrap();
+        png.set_icc_profile(Some(icc.into()));
+        let mut tagged = Vec::new();
+        png.encoder().write_to(&mut tagged).unwrap();
+
+        let temp_path = std::env::temp_dir().join("agx_test_adobe_rgb.png");
+        std::fs::write(&temp_path, &tagged).unwrap();
+
+        let decoded = decode_standard(&temp_path).unwrap();
+        let p = decoded.get_pixel(0, 0).0;
+
+        // sRGB-assumed decode of pure red lands ~0.627 R; Adobe RGB red is wider.
+        assert!(
+            p[0] > 0.70,
+            "Adobe RGB red should map wider than sRGB red (~0.627); got {}",
+            p[0]
+        );
+        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]
