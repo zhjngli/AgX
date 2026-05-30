@@ -87,9 +87,10 @@ These invariants must hold across the entire codebase. The [architecture explana
 
 1. **Always re-render from original** — the engine holds an immutable original and applies all adjustments from scratch on every render.
 2. **Declarative presets** — preset files declare parameter values, not operation sequences.
-3. **Working space is linear Rec.2020** — stages 1–3 (WB + Exposure, Dehaze, Denoise) operate in linear Rec.2020; stages 5–8 (PerPixelAdjustments, Detail, Grain, Vignette) operate in gamma-encoded Rec.2020 (sRGB transfer curve applied to Rec.2020 linear values); stages 4 and 9 are the conversion stages. Decode converts inputs into linear Rec.2020; encode converts linear Rec.2020 to sRGB output. ICC profile handling remains out of scope at this revision (tracked in `docs/backlog/color-management.md`).
-4. **Fixed render order** — the engine applies adjustments in a hardcoded order regardless of preset key order.
-5. **Dual pipeline, same output** — CPU and GPU pipelines produce near-identical output; CPU is the canonical path.
+3. **Working space is linear Rec.2020** — stages 1–3 (WB + Exposure, Dehaze, Denoise) operate in linear Rec.2020; stages 5–8 (PerPixelAdjustments, Detail, Grain, Vignette) operate in gamma-encoded Rec.2020 (sRGB transfer curve applied to Rec.2020 linear values); stages 4 and 9 are the conversion stages. Decode converts inputs into linear Rec.2020; encode converts linear Rec.2020 to sRGB output. Input ICC parsing remains out of scope at this revision (tracked in `docs/backlog/color-management.md`).
+4. **Encoded output self-identifies as sRGB** — every JPEG, PNG, and TIFF file produced by the encode pipeline embeds an sRGB v4 ICC profile (`SRGB_V4_ICC` in `crates/agx/src/encode/icc.rs`). This is unconditional and does not depend on input metadata. Pixel data is sRGB-encoded; the embedded profile names the same color space, so downstream tools render correctly without guessing. Tested in `encode::tests::encode_{jpeg,png,tiff}_embeds_srgb_v4_icc`.
+5. **Fixed render order** — the engine applies adjustments in a hardcoded order regardless of preset key order.
+6. **Dual pipeline, same output** — CPU and GPU pipelines produce near-identical output; CPU is the canonical path.
 
 ## Per-Module Details
 
@@ -107,6 +108,7 @@ Each module has (or will have) a README.md documenting its public API, internal 
 | engine/gpu | GPU pipeline via wgpu + WGSL compute shaders (see engine README)      |
 | engine/stages | CPU stage implementations (see engine README)                        |
 | agx-cli    | [`crates/agx-cli/README.md`](crates/agx-cli/README.md)                   |
+| agx-profile-gen | dev-only tool — generates the bundled sRGB ICC profile via lcms2 (see `crates/agx/src/encode/profiles/README.md`) |
 
 ## Design Docs
 

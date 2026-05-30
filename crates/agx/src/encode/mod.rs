@@ -8,12 +8,13 @@ use std::path::PathBuf;
 
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
-use image::codecs::tiff::TiffEncoder;
 use image::{Rgb, Rgb32FImage, RgbImage};
 
 use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
 use crate::error::Result;
 use crate::metadata::ImageMetadata;
+
+mod icc;
 
 /// Supported output image formats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -185,25 +186,38 @@ pub fn encode_to_file_with_options(
             buf
         }
         OutputFormat::Tiff => {
+            use tiff::encoder::{colortype, TiffEncoder};
+            use tiff::tags::Tag;
+
+            let raw = rgb8.into_raw();
+            let (w, h) = (linear.width(), linear.height());
+
             let mut buf = Vec::new();
-            let cursor = Cursor::new(&mut buf);
-            let encoder = TiffEncoder::new(cursor);
-            rgb8.write_with_encoder(encoder)
-                .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+            {
+                let cursor = Cursor::new(&mut buf);
+                let mut tiff = TiffEncoder::new(cursor)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+                let mut img = tiff
+                    .new_image::<colortype::RGB8>(w, h)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+                img.encoder()
+                    .write_tag(Tag::IccProfile, crate::encode::icc::SRGB_V4_ICC)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+                img.write_data(&raw)
+                    .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
+            }
             buf
         }
     };
 
-    // Inject metadata if available
-    let buf = if let Some(meta) = metadata {
-        inject_metadata(buf, format, meta)?
-    } else {
-        buf
+    let buf = match format {
+        OutputFormat::Jpeg => inject_jpeg_icc_and_exif(buf, metadata)?,
+        OutputFormat::Png => inject_png_icc_and_exif(buf, metadata)?,
+        OutputFormat::Tiff => buf,
     };
 
     std::fs::write(&final_path, &buf)?;
 
-    // For TIFF output, inject metadata via little_exif after writing
     if format == OutputFormat::Tiff {
         if let Some(meta) = metadata {
             inject_metadata_tiff(&final_path, meta);
@@ -222,47 +236,40 @@ pub fn encode_to_file(linear: &Rgb32FImage, path: &std::path::Path) -> Result<()
     Ok(())
 }
 
-/// Inject metadata into an encoded JPEG or PNG buffer.
-fn inject_metadata(
-    buf: Vec<u8>,
-    format: OutputFormat,
-    metadata: &ImageMetadata,
-) -> Result<Vec<u8>> {
+/// Inject sRGB ICC + optional EXIF into a JPEG buffer. ICC is unconditional
+/// per the encode module's output-labeling contract; EXIF passes through
+/// only if input metadata carried it.
+fn inject_jpeg_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
     use img_parts::{ImageEXIF, ImageICC};
 
-    match format {
-        OutputFormat::Jpeg => {
-            let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-            if let Some(exif) = &metadata.exif {
-                jpeg.set_exif(Some(exif.clone().into()));
-            }
-            if let Some(icc) = &metadata.icc_profile {
-                jpeg.set_icc_profile(Some(icc.clone().into()));
-            }
-            let mut out = Vec::new();
-            jpeg.encoder()
-                .write_to(&mut out)
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
-            Ok(out)
-        }
-        OutputFormat::Png => {
-            let mut png = img_parts::png::Png::from_bytes(buf.into())
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-            if let Some(exif) = &metadata.exif {
-                png.set_exif(Some(exif.clone().into()));
-            }
-            if let Some(icc) = &metadata.icc_profile {
-                png.set_icc_profile(Some(icc.clone().into()));
-            }
-            let mut out = Vec::new();
-            png.encoder()
-                .write_to(&mut out)
-                .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
-            Ok(out)
-        }
-        OutputFormat::Tiff => Ok(buf), // Handled separately via inject_metadata_tiff
+    let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
+    jpeg.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
+        jpeg.set_exif(Some(exif.clone().into()));
     }
+    let mut out = Vec::new();
+    jpeg.encoder()
+        .write_to(&mut out)
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
+    Ok(out)
+}
+
+/// Inject sRGB ICC + optional EXIF into a PNG buffer. Mirrors the JPEG path.
+fn inject_png_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
+    use img_parts::{ImageEXIF, ImageICC};
+
+    let mut png = img_parts::png::Png::from_bytes(buf.into())
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
+    png.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
+        png.set_exif(Some(exif.clone().into()));
+    }
+    let mut out = Vec::new();
+    png.encoder()
+        .write_to(&mut out)
+        .map_err(|e| crate::error::AgxError::Encode(format!("metadata write: {e}")))?;
+    Ok(out)
 }
 
 /// Inject metadata into an existing TIFF file via little_exif. Best-effort — failures are silent.
@@ -541,7 +548,6 @@ mod tests {
         ];
         let meta = ImageMetadata {
             exif: Some(exif_bytes.clone()),
-            icc_profile: None,
         };
 
         let temp_path = std::env::temp_dir().join("agx_test_meta_rt.jpg");
@@ -570,5 +576,187 @@ mod tests {
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
         let _ = std::fs::remove_file(result.unwrap());
+    }
+
+    #[test]
+    fn encode_jpeg_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+        use img_parts::ImageICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_jpeg.jpg");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        encode_to_file(&linear, &temp_path).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
+        let icc = jpeg
+            .icc_profile()
+            .expect("output JPEG must carry an ICC profile");
+        assert_eq!(
+            &icc[..],
+            SRGB_V4_ICC,
+            "embedded ICC must equal the SRGB_V4_ICC blob"
+        );
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn encode_tiff_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_tiff.tiff");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        let opts = EncodeOptions {
+            jpeg_quality: 92,
+            format: Some(OutputFormat::Tiff),
+        };
+        encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(bytes))
+            .expect("output must be parseable as TIFF");
+        let icc = decoder
+            .get_tag_u8_vec(tiff::tags::Tag::IccProfile)
+            .expect("output TIFF must carry an ICCProfile tag");
+        assert_eq!(icc, SRGB_V4_ICC);
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    /// TIFF writes ICC inline during encode; `inject_metadata_tiff` then
+    /// rewrites the file post-write via `little_exif` to add EXIF. This
+    /// test pins that the ICC tag survives the EXIF rewrite — if
+    /// `little_exif` ever reconstructs the IFD in a way that drops
+    /// unknown tags, the regression surfaces here.
+    #[test]
+    fn encode_tiff_with_exif_still_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+
+        let exif_bytes = vec![
+            0x45, 0x78, 0x69, 0x66, 0x00, 0x00, b'M', b'M', 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,
+        ];
+        let meta = ImageMetadata {
+            exif: Some(exif_bytes),
+        };
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_tiff_with_exif.tiff");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        let opts = EncodeOptions {
+            jpeg_quality: 92,
+            format: Some(OutputFormat::Tiff),
+        };
+        encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(bytes))
+            .expect("output must be parseable as TIFF after EXIF injection");
+        let icc = decoder.get_tag_u8_vec(tiff::tags::Tag::IccProfile).expect(
+            "ICC tag must survive little_exif post-write — regression in EXIF-then-ICC ordering",
+        );
+        assert_eq!(icc, SRGB_V4_ICC);
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn encode_png_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+        use img_parts::ImageICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_png.png");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        let opts = EncodeOptions {
+            jpeg_quality: 92,
+            format: Some(OutputFormat::Png),
+        };
+        encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let png = img_parts::png::Png::from_bytes(bytes.into()).unwrap();
+        let icc = png
+            .icc_profile()
+            .expect("output PNG must carry an ICC profile");
+        assert_eq!(&icc[..], SRGB_V4_ICC);
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    /// Pin the contract that input metadata never influences output ICC.
+    /// `ImageMetadata` no longer carries an `icc_profile` field, but a
+    /// caller could still pass EXIF; this test confirms the EXIF path
+    /// does not somehow leak into the ICC slot.
+    #[test]
+    fn encode_jpeg_overrides_any_input_metadata_with_srgb_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+        use img_parts::ImageICC;
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_override.jpg");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+
+        let exif_bytes = vec![
+            0x45, 0x78, 0x69, 0x66, 0x00, 0x00, b'M', b'M', 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,
+        ];
+        let meta = ImageMetadata {
+            exif: Some(exif_bytes),
+        };
+
+        let opts = EncodeOptions::default();
+        encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
+        let icc = jpeg.icc_profile().expect("output must have ICC");
+        assert_eq!(
+            &icc[..],
+            SRGB_V4_ICC,
+            "input metadata must not influence output ICC"
+        );
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
+    /// Pin pixel data unchanged after the ICC embed. Encode a colored
+    /// (non-greyscale) Rec.2020 input across JPEG / PNG / TIFF; decode
+    /// back and assert each pixel matches what the public per-pixel
+    /// kernel `encode_linear_rec2020_to_srgb_rgb8` produces independently.
+    /// Colored input exercises the off-diagonal matrix terms — greyscale
+    /// would short-circuit them. JPEG gets a small tolerance because
+    /// chroma subsampling shifts colored pixels by ±2 even at q=100;
+    /// PNG and TIFF are lossless.
+    #[test]
+    fn encode_pixel_bytes_unchanged_after_icc_embed() {
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.1, 0.2]));
+        let expected_rgb8 = encode_linear_rec2020_to_srgb_rgb8(&linear);
+        let expected_pixel = expected_rgb8.get_pixel(0, 0).0;
+
+        for (fmt, ext) in [
+            (OutputFormat::Jpeg, "jpg"),
+            (OutputFormat::Png, "png"),
+            (OutputFormat::Tiff, "tiff"),
+        ] {
+            let path = std::env::temp_dir().join(format!("agx_test_pix_{ext}.{ext}"));
+            let opts = EncodeOptions {
+                jpeg_quality: 100,
+                format: Some(fmt),
+            };
+            encode_to_file_with_options(&linear, &path, &opts, None).unwrap();
+
+            let img = image::open(&path).unwrap().to_rgb8();
+            assert_eq!(img.dimensions(), (4, 4), "fmt {fmt:?} dims wrong");
+            let px = img.get_pixel(0, 0).0;
+
+            let tol: i32 = if fmt == OutputFormat::Jpeg { 3 } else { 0 };
+            for c in 0..3 {
+                let d = (px[c] as i32 - expected_pixel[c] as i32).abs();
+                assert!(
+                    d <= tol,
+                    "fmt {fmt:?} channel {c} px={} expected={} tol={tol}",
+                    px[c],
+                    expected_pixel[c],
+                );
+            }
+            let _ = std::fs::remove_file(&path);
+        }
     }
 }

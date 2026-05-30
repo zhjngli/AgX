@@ -22,7 +22,7 @@ The dependency direction is strictly bottom-up. `error` is the foundation — ev
 
 `preset` depends on `lut` (for `Lut3D`) and `engine` (for `Parameters`); these types are what a TOML document declares. The dependency rules permit `engine` to import from `preset` — and it does: `apply_preset()` and `layer_preset()` read parameter values out of a parsed preset. The conceptual flow is still one-directional: preset values flow into the engine; the engine never asks preset to compute anything. Serialization is a preset concern, not an engine concern.
 
-`metadata` stays out of every other module because it carries no semantic load on the rendered image. EXIF bytes and ICC profiles flow from input to output without being interpreted. Pixel logic never touches metadata; metadata never touches pixels.
+`metadata` stays out of every other module because it carries no semantic load on the rendered image. EXIF bytes flow from input to output without being interpreted. ICC profile bytes on output come from the encoder, which always labels the file as sRGB. Pixel logic never touches metadata; metadata never touches pixels.
 
 ## Core invariants and why they exist
 

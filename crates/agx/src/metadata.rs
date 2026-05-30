@@ -1,20 +1,26 @@
 //! Image metadata extraction and representation.
 //!
-//! Provides a unified interface for extracting EXIF and ICC profile metadata
-//! from various image formats (JPEG, PNG, TIFF-based raw, LibRaw-parsed raw).
+//! Provides a unified interface for extracting EXIF metadata from various
+//! image formats (JPEG, PNG, TIFF-based raw, LibRaw-parsed raw).
+//!
+//! Output ICC profile labeling is owned by the `encode` module, not by
+//! input metadata pass-through — see `encode::icc`.
 
 use std::path::Path;
 
-/// Extracted metadata from an input image (EXIF, ICC profile).
+/// Extracted EXIF metadata from an input image.
+///
+/// Output color labeling (ICC profile) is owned by the encoder, not by
+/// input metadata pass-through — every output file is sRGB and gets a
+/// fresh sRGB ICC blob from `encode::icc`. See the `encode` module-level
+/// doc for the contract.
 #[derive(Debug, Clone)]
 pub struct ImageMetadata {
     /// Raw EXIF bytes.
     pub exif: Option<Vec<u8>>,
-    /// Raw ICC profile bytes.
-    pub icc_profile: Option<Vec<u8>>,
 }
 
-/// Extract metadata (EXIF, ICC profile) from an input image file.
+/// Extract EXIF metadata from an input image file.
 ///
 /// Extraction strategy (best-effort, cascading):
 /// 1. `img-parts` for JPEG — lossless byte-level copy
@@ -70,7 +76,6 @@ fn extract_metadata_raw(path: &Path) -> Option<ImageMetadata> {
             if let Some(exif_bytes) = crate::decode::raw::extract_raw_metadata(path) {
                 return Some(ImageMetadata {
                     exif: Some(exif_bytes),
-                    icc_profile: None,
                 });
             }
         }
@@ -83,7 +88,6 @@ fn extract_metadata_raw(path: &Path) -> Option<ImageMetadata> {
             if let Some(exif_bytes) = crate::decode::heic::extract_heic_metadata(path) {
                 return Some(ImageMetadata {
                     exif: Some(exif_bytes),
-                    icc_profile: None,
                 });
             }
         }
@@ -182,31 +186,23 @@ pub(crate) fn normalize_orientation_in_exif(bytes: &mut [u8]) {
 }
 
 fn extract_metadata_jpeg(bytes: &[u8]) -> Option<ImageMetadata> {
-    use img_parts::{ImageEXIF, ImageICC};
+    use img_parts::ImageEXIF;
 
     let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.to_vec().into()).ok()?;
     let exif = jpeg.exif().map(|b| b.to_vec());
-    let icc = jpeg.icc_profile().map(|b| b.to_vec());
-    if exif.is_some() || icc.is_some() {
-        return Some(ImageMetadata {
-            exif,
-            icc_profile: icc,
-        });
+    if exif.is_some() {
+        return Some(ImageMetadata { exif });
     }
     None
 }
 
 fn extract_metadata_png(bytes: &[u8]) -> Option<ImageMetadata> {
-    use img_parts::{ImageEXIF, ImageICC};
+    use img_parts::ImageEXIF;
 
     let png = img_parts::png::Png::from_bytes(bytes.to_vec().into()).ok()?;
     let exif = png.exif().map(|b| b.to_vec());
-    let icc = png.icc_profile().map(|b| b.to_vec());
-    if exif.is_some() || icc.is_some() {
-        return Some(ImageMetadata {
-            exif,
-            icc_profile: icc,
-        });
+    if exif.is_some() {
+        return Some(ImageMetadata { exif });
     }
     None
 }
@@ -235,7 +231,6 @@ fn extract_metadata_raw_tiff(path: &Path) -> Option<ImageMetadata> {
     };
     Some(ImageMetadata {
         exif: Some(exif_bytes),
-        icc_profile: None,
     })
 }
 

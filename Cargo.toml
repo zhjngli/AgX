@@ -6,6 +6,7 @@ members = [
     "crates/agx-docgen",
     "crates/agx-e2e",
     "crates/agx-lut-gen",
+    "crates/agx-profile-gen",
 ]
 
 # Optimize test builds — e2e tests do heavy pixel processing and run

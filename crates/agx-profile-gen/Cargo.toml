@@ -1,0 +1,13 @@
+[package]
+name = "agx-profile-gen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Dev-only crate — opt out of cargo-release's version bumps, replacements, and
+# tag operations.
+[package.metadata.release]
+release = false
+
+[dependencies]
+lcms2 = "6"
