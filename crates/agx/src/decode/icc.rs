@@ -26,9 +26,21 @@ const D65: CIExyY = CIExyY {
 /// gamma 1.0). Returns `Err` if lcms2 cannot construct it.
 fn linear_rec2020_profile() -> Result<Profile> {
     let primaries = CIExyYTRIPLE {
-        Red: CIExyY { x: 0.708, y: 0.292, Y: 1.0 },
-        Green: CIExyY { x: 0.170, y: 0.797, Y: 1.0 },
-        Blue: CIExyY { x: 0.131, y: 0.046, Y: 1.0 },
+        Red: CIExyY {
+            x: 0.708,
+            y: 0.292,
+            Y: 1.0,
+        },
+        Green: CIExyY {
+            x: 0.170,
+            y: 0.797,
+            Y: 1.0,
+        },
+        Blue: CIExyY {
+            x: 0.131,
+            y: 0.046,
+            Y: 1.0,
+        },
     };
     let linear = ToneCurve::new(1.0);
     Profile::new_rgb(&D65, &primaries, &[&linear, &linear, &linear])
@@ -74,9 +86,21 @@ mod tests {
     /// Build an Adobe RGB (1998) ICC blob via lcms2 for tests.
     fn adobe_rgb_icc() -> Vec<u8> {
         let primaries = CIExyYTRIPLE {
-            Red: CIExyY { x: 0.6400, y: 0.3300, Y: 1.0 },
-            Green: CIExyY { x: 0.2100, y: 0.7100, Y: 1.0 },
-            Blue: CIExyY { x: 0.1500, y: 0.0600, Y: 1.0 },
+            Red: CIExyY {
+                x: 0.6400,
+                y: 0.3300,
+                Y: 1.0,
+            },
+            Green: CIExyY {
+                x: 0.2100,
+                y: 0.7100,
+                Y: 1.0,
+            },
+            Blue: CIExyY {
+                x: 0.1500,
+                y: 0.0600,
+                Y: 1.0,
+            },
         };
         let gamma = ToneCurve::new(2.19921875);
         Profile::new_rgb(&D65, &primaries, &[&gamma, &gamma, &gamma])

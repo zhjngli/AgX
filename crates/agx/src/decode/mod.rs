@@ -139,7 +139,9 @@ pub fn decode_standard(path: &std::path::Path) -> Result<Rgb32FImage> {
             match icc::convert_to_working_space(&mut buf, &icc_bytes) {
                 Ok(()) => return Ok(buf),
                 Err(e) => {
-                    eprintln!("agx: embedded ICC profile could not be applied ({e}); assuming sRGB");
+                    eprintln!(
+                        "agx: embedded ICC profile could not be applied ({e}); assuming sRGB"
+                    );
                 }
             }
         }
@@ -288,7 +290,8 @@ mod tests {
     #[test]
     fn decode_without_icc_uses_srgb_fallback() {
         let temp_path = std::env::temp_dir().join("agx_test_no_icc.png");
-        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
+            ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
 
         let result = decode_standard(&temp_path).unwrap();
@@ -307,11 +310,27 @@ mod tests {
         use img_parts::ImageICC;
         use lcms2::{CIExyY, CIExyYTRIPLE, Profile, ToneCurve};
 
-        let d65 = CIExyY { x: 0.3127, y: 0.3290, Y: 1.0 };
+        let d65 = CIExyY {
+            x: 0.3127,
+            y: 0.3290,
+            Y: 1.0,
+        };
         let primaries = CIExyYTRIPLE {
-            Red: CIExyY { x: 0.6400, y: 0.3300, Y: 1.0 },
-            Green: CIExyY { x: 0.2100, y: 0.7100, Y: 1.0 },
-            Blue: CIExyY { x: 0.1500, y: 0.0600, Y: 1.0 },
+            Red: CIExyY {
+                x: 0.6400,
+                y: 0.3300,
+                Y: 1.0,
+            },
+            Green: CIExyY {
+                x: 0.2100,
+                y: 0.7100,
+                Y: 1.0,
+            },
+            Blue: CIExyY {
+                x: 0.1500,
+                y: 0.0600,
+                Y: 1.0,
+            },
         };
         let gamma = ToneCurve::new(2.19921875);
         let icc = Profile::new_rgb(&d65, &primaries, &[&gamma, &gamma, &gamma])
