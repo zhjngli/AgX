@@ -4,6 +4,12 @@ on:
   pull_request:
     branches: [main]
 
+# Minimum-privilege default. None of the CI jobs need write access — they
+# only run cargo, build docs, and run tests. Add per-job overrides if a
+# future job needs to comment on PRs / upload artifacts / etc.
+permissions:
+  contents: read
+
 jobs:
   fast-checks-matrix:
     name: Fast (${{ matrix.check }})

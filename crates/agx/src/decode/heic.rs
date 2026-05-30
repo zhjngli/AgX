@@ -360,11 +360,16 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
         }
         return SourceColorSpace::Srgb;
     }
-    if nclx_ptr.is_null() {
-        return SourceColorSpace::Srgb;
-    }
-
-    let primaries = unsafe { (*nclx_ptr).color_primaries };
+    // SAFETY: libheif documents that on success (err.code == 0), it either
+    // sets `nclx_ptr` to a non-null pointer to a valid, properly initialized
+    // `heif_color_profile_nclx` struct, or leaves it null. The is_null path
+    // is the `None` arm below. We borrow the struct through `as_ref` to read
+    // one Copy field, then drop the borrow before passing the raw pointer
+    // back to libheif's `free`.
+    let primaries = match unsafe { nclx_ptr.as_ref() } {
+        Some(nclx) => nclx.color_primaries,
+        None => return SourceColorSpace::Srgb,
+    };
 
     // Release the libheif-allocated struct.
     unsafe { heif_nclx_color_profile_free(nclx_ptr) };
