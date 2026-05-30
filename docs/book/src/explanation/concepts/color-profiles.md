@@ -14,7 +14,7 @@ Most viewers default-guess sRGB, which matches AgX's output most of the time. Bu
 
 AgX embeds an sRGB v4 ICC profile in every JPEG, PNG, and TIFF output. The profile is identical across all output files — the encoder doesn't pick a profile based on input; the output color space is always sRGB and the profile reflects that.
 
-v4 is the modern ICC spec (the v2 spec dates to 1998). Every contemporary tool — macOS Preview, Photoshop, Lightroom, Safari, Chrome, Firefox, GIMP — handles v4 correctly. v4's compact form is around 3 KB, the same order of magnitude as v2.
+v4 is the modern ICC spec (the v2 spec dates to 1998). Every contemporary tool — macOS Preview, Photoshop, Lightroom, Safari, Chrome, Firefox, GIMP — handles v4 correctly. AgX's blob is a compact parametric-curve representation under 1 KB, small enough to be invisible against typical photo file sizes.
 
 ## Why an open-source profile
 

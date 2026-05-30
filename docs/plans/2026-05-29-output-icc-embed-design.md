@@ -1,5 +1,7 @@
 # Output ICC Embed (sRGB default) Design
 
+> **Post-implementation note (2026-05-29):** The "Blob source and licensing" section below selects Elle Stone's `sRGB-elle-V4-srgbtrc.icc` (assumed CC0). During execution, that source was found to be CC-BY-SA 3.0 — incompatible with AgX's MIT/Apache library posture. The implementation pivoted to synthesizing the profile via the `lcms2` Rust crate (MIT) through a new dev-only `crates/agx-profile-gen` workspace member. See [`docs/contributing/asset-licensing.md`](../contributing/asset-licensing.md) for the policy and rejected-options table, and [`crates/agx/src/encode/profiles/README.md`](../../crates/agx/src/encode/profiles/README.md) for the regeneration recipe. The rest of this design (in-scope items, encoder layout, testing strategy, DoD) is implemented as written.
+
 ## Problem
 
 AgX encodes every output as sRGB-quantized 8-bit RGB but writes no ICC profile. Downstream tools (Preview, Photoshop, browsers, Lightroom) fall back to their own assumption — usually sRGB on legacy paths, sometimes Display P3 on wide-gamut displays, sometimes "whatever the embedded EXIF Color Space tag suggests." The output looks correct in the common case but inconsistent in the wide-gamut-display case, and is not authoritative either way.

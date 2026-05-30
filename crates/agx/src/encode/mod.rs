@@ -624,6 +624,41 @@ mod tests {
         let _ = std::fs::remove_file(&temp_path);
     }
 
+    /// TIFF writes ICC inline during encode; `inject_metadata_tiff` then
+    /// rewrites the file post-write via `little_exif` to add EXIF. This
+    /// test pins that the ICC tag survives the EXIF rewrite — if
+    /// `little_exif` ever reconstructs the IFD in a way that drops
+    /// unknown tags, the regression surfaces here.
+    #[test]
+    fn encode_tiff_with_exif_still_embeds_srgb_v4_icc() {
+        use crate::encode::icc::SRGB_V4_ICC;
+
+        let exif_bytes = vec![
+            0x45, 0x78, 0x69, 0x66, 0x00, 0x00, b'M', b'M', 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,
+        ];
+        let meta = ImageMetadata {
+            exif: Some(exif_bytes),
+        };
+
+        let temp_path = std::env::temp_dir().join("agx_test_icc_tiff_with_exif.tiff");
+        let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.5, 0.5]));
+        let opts = EncodeOptions {
+            jpeg_quality: 92,
+            format: Some(OutputFormat::Tiff),
+        };
+        encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
+
+        let bytes = std::fs::read(&temp_path).unwrap();
+        let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(bytes))
+            .expect("output must be parseable as TIFF after EXIF injection");
+        let icc = decoder.get_tag_u8_vec(tiff::tags::Tag::IccProfile).expect(
+            "ICC tag must survive little_exif post-write — regression in EXIF-then-ICC ordering",
+        );
+        assert_eq!(icc, SRGB_V4_ICC);
+
+        let _ = std::fs::remove_file(&temp_path);
+    }
+
     #[test]
     fn encode_png_embeds_srgb_v4_icc() {
         use crate::encode::icc::SRGB_V4_ICC;
