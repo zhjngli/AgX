@@ -528,7 +528,10 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     };
 
     // ICC path: an embedded rICC/prof profile takes precedence over the sRGB
-    // fallback. nclx-classified sources (DisplayP3/Bt2020) never enter here.
+    // fallback. nclx-classified sources (DisplayP3/Bt2020) never reach the
+    // `Srgb` arm. A genuine BT.709-nclx source also classifies as `Srgb` but
+    // carries no raw profile, so `raw_color_profile()` returns `None` and it
+    // falls through to the matrix path harmlessly.
     #[cfg(feature = "icc")]
     {
         if matches!(source_space, SourceColorSpace::Srgb) {

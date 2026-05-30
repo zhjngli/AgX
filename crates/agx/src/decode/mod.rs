@@ -88,22 +88,34 @@ pub fn decode(path: &std::path::Path) -> Result<Rgb32FImage> {
 #[cfg(feature = "icc")]
 fn extract_icc_standard(path: &std::path::Path) -> Option<Vec<u8>> {
     use img_parts::ImageICC;
+    use std::io::Read;
 
-    let bytes = std::fs::read(path).ok()?;
+    // Probe the leading magic bytes before reading the whole file, so formats
+    // that can't carry an ICC profile we parse (BMP, WebP, ...) bail out after
+    // 4 bytes instead of allocating a full-file copy only to discard it.
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut magic = [0u8; 4];
+    file.read_exact(&mut magic).ok()?;
 
-    // Probe the leading magic bytes so exactly one container parser runs —
-    // avoiding speculative full-file parses (and their buffer copies) for the
-    // formats that don't match.
-    match bytes.get(..4)? {
-        [0xFF, 0xD8, 0xFF, _] => img_parts::jpeg::Jpeg::from_bytes(bytes.into())
+    // Read the rest of the file only once the magic matches a supported format.
+    // `read_exact` already consumed the first 4 bytes, so prepend them back.
+    let read_full = |mut file: std::fs::File| -> Option<Vec<u8>> {
+        let mut bytes = magic.to_vec();
+        file.read_to_end(&mut bytes).ok()?;
+        Some(bytes)
+    };
+
+    match magic {
+        [0xFF, 0xD8, 0xFF, _] => img_parts::jpeg::Jpeg::from_bytes(read_full(file)?.into())
             .ok()?
             .icc_profile()
             .map(|icc| icc.to_vec()),
-        [0x89, 0x50, 0x4E, 0x47] => img_parts::png::Png::from_bytes(bytes.into())
+        [0x89, 0x50, 0x4E, 0x47] => img_parts::png::Png::from_bytes(read_full(file)?.into())
             .ok()?
             .icc_profile()
             .map(|icc| icc.to_vec()),
         [0x49, 0x49, 0x2A, 0x00] | [0x4D, 0x4D, 0x00, 0x2A] => {
+            let bytes = read_full(file)?;
             let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(&bytes)).ok()?;
             let icc = decoder.get_tag_u8_vec(tiff::tags::Tag::IccProfile).ok()?;
             (!icc.is_empty()).then_some(icc)

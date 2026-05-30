@@ -23,8 +23,10 @@ const D65: CIExyY = CIExyY {
 };
 
 /// Build the destination profile: linear Rec.2020 (Rec.2020 primaries, D65,
-/// gamma 1.0). Returns `Err` if lcms2 cannot construct it.
-fn linear_rec2020_profile() -> Result<Profile> {
+/// gamma 1.0). The primaries are compile-time constants, so lcms2 construction
+/// cannot fail for valid input — a panic here would mean a broken lcms2 build
+/// (which is statically vendored, so it would have failed to compile).
+fn build_linear_rec2020_profile() -> Profile {
     let primaries = CIExyYTRIPLE {
         Red: CIExyY {
             x: 0.708,
@@ -44,7 +46,16 @@ fn linear_rec2020_profile() -> Result<Profile> {
     };
     let linear = ToneCurve::new(1.0);
     Profile::new_rgb(&D65, &primaries, &[&linear, &linear, &linear])
-        .map_err(|_| AgxError::Decode("failed to build linear Rec.2020 profile".into()))
+        .expect("lcms2 failed to build the constant linear Rec.2020 destination profile")
+}
+
+thread_local! {
+    /// Per-thread cached linear Rec.2020 destination profile. It is a constant,
+    /// so building it once per worker thread avoids a redundant lcms2 profile
+    /// construction on every decoded image (batch decode runs across rayon
+    /// threads). `Profile` is `Send` but not `Sync`, so a thread-local — not a
+    /// global `OnceLock` — is the correct sharing model.
+    static DEST_PROFILE: Profile = build_linear_rec2020_profile();
 }
 
 /// Convert a decoded, gamma-encoded RGB f32 buffer from the color space
@@ -60,24 +71,25 @@ fn linear_rec2020_profile() -> Result<Profile> {
 pub(crate) fn convert_to_working_space(buf: &mut Rgb32FImage, icc_bytes: &[u8]) -> Result<()> {
     let input = Profile::new_icc(icc_bytes)
         .map_err(|_| AgxError::Decode("malformed or unsupported ICC profile".into()))?;
-    let dest = linear_rec2020_profile()?;
-    let transform = Transform::new(
-        &input,
-        PixelFormat::RGB_FLT,
-        &dest,
-        PixelFormat::RGB_FLT,
-        Intent::RelativeColorimetric,
-    )
-    .map_err(|_| AgxError::Decode("failed to build ICC transform".into()))?;
+    DEST_PROFILE.with(|dest| {
+        let transform = Transform::new(
+            &input,
+            PixelFormat::RGB_FLT,
+            dest,
+            PixelFormat::RGB_FLT,
+            Intent::RelativeColorimetric,
+        )
+        .map_err(|_| AgxError::Decode("failed to build ICC transform".into()))?;
 
-    // Zero-copy: an `Rgb32FImage` stores its samples as a flat row-major
-    // `[f32]` with pixel-contiguous layout and no row padding, so the backing
-    // buffer reinterprets directly as `[[f32; 3]]` for the in-place transform —
-    // no per-image allocation or extra pass. `[f32; 3]` is `Pod` and matches
-    // lcms2's `RGB_FLT` pixel size (12 bytes).
-    let pixels: &mut [[f32; 3]] = bytemuck::cast_slice_mut(buf);
-    transform.transform_in_place(pixels);
-    Ok(())
+        // Zero-copy: an `Rgb32FImage` stores its samples as a flat row-major
+        // `[f32]` with pixel-contiguous layout and no row padding, so the
+        // backing buffer reinterprets directly as `[[f32; 3]]` for the in-place
+        // transform — no per-image allocation or extra pass. `[f32; 3]` is
+        // `Pod` and matches lcms2's `RGB_FLT` pixel size (12 bytes).
+        let pixels: &mut [[f32; 3]] = bytemuck::cast_slice_mut(buf);
+        transform.transform_in_place(pixels);
+        Ok(())
+    })
 }
 
 /// Build an Adobe RGB (1998) ICC blob via lcms2. Test-only helper shared by

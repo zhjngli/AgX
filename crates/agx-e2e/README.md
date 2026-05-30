@@ -58,7 +58,7 @@ cargo test -p agx-e2e --test generate_fixtures -- --ignored gen_adobe_rgb_gradie
 |-----------|----------|
 | `fixtures/jpeg/` | JPEG test images (incl. `adobe_rgb_gradient.jpg`, tagged with an embedded Adobe RGB ICC profile to exercise the input-ICC read path) |
 | `fixtures/raw/` | RAF (Fujifilm RAW) test images |
-| `fixtures/heic/` | HEIC test images (iPhone Display P3 + synthetic OOG sanity check) |
+| `fixtures/heic/` | HEIC test images. The four iPhone captures embed a Display P3 ICC profile (no nclx tag), so they decode via the input-ICC read path; `synthetic_p3_red.heic` carries nclx Display P3 primaries and exercises the matrix path instead. |
 | `fixtures/looks/` | Preset TOML files (8 color + 4 B&W + 1 base) |
 | `fixtures/looks/luts/` | Generated 33x33x33 .cube LUT files |
 | `fixtures/golden/jpeg/` | JPEG golden reference images |
