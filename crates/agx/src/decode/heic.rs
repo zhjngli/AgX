@@ -136,6 +136,13 @@ extern "C" {
         out_data: *mut *mut heif_color_profile_nclx,
     ) -> heif_error;
     fn heif_nclx_color_profile_free(profile: *mut heif_color_profile_nclx);
+    #[cfg(feature = "icc")]
+    fn heif_image_handle_get_raw_color_profile_size(handle: *const heif_image_handle) -> usize;
+    #[cfg(feature = "icc")]
+    fn heif_image_handle_get_raw_color_profile(
+        handle: *const heif_image_handle,
+        out_data: *mut c_void,
+    ) -> heif_error;
     fn heif_image_handle_get_number_of_metadata_blocks(
         handle: *const heif_image_handle,
         type_filter: *const c_char,
@@ -264,6 +271,25 @@ impl HeifImageHandle {
         }
         Ok(HeifImage { ptr: img })
     }
+
+    /// Read the raw embedded ICC profile bytes (rICC/prof box), if present.
+    #[cfg(feature = "icc")]
+    fn raw_color_profile(&self) -> Option<Vec<u8>> {
+        let size = unsafe { heif_image_handle_get_raw_color_profile_size(self.ptr) };
+        if size == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; size];
+        // SAFETY: libheif writes exactly `size` bytes (queried above) into the
+        // provided buffer when a raw profile is present.
+        let err = unsafe {
+            heif_image_handle_get_raw_color_profile(self.ptr, buf.as_mut_ptr() as *mut c_void)
+        };
+        if err.code != 0 {
+            return None;
+        }
+        Some(buf)
+    }
 }
 
 impl Drop for HeifImageHandle {
@@ -340,10 +366,10 @@ fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
 
     if profile_type == HEIF_COLOR_PROFILE_TYPE_RICC || profile_type == HEIF_COLOR_PROFILE_TYPE_PROF
     {
-        eprintln!(
-            "agx: HEIC source declares an ICC color profile; treating as sRGB. \
-             Full ICC support requires the color-management work."
-        );
+        // Classify as sRGB so the matrix path is the fallback; the actual ICC
+        // read (and conversion via lcms2) happens later in `decode_heic` via
+        // `raw_color_profile()`, which takes precedence over this fallback when
+        // the `icc` feature is enabled and a raw profile is present.
         return SourceColorSpace::Srgb;
     }
 
@@ -474,47 +500,61 @@ pub fn decode_heic(path: &Path) -> Result<Rgb32FImage> {
     // asserted above; on any real HEIF the product fits comfortably in `usize`.
     let pixel_slice: &[u8] = unsafe { std::slice::from_raw_parts(data, stride * height as usize) };
 
-    let buf = if bits == 8 {
+    // Build a gamma-encoded, normalized [0,1] buffer (no linearization, no
+    // matrix yet). Both the ICC path and the matrix path consume this.
+    let mut buf: Rgb32FImage = if bits == 8 {
         Rgb32FImage::from_fn(width, height, |x, y| {
-            let row_offset = (y as usize) * stride;
-            let col_offset = (x as usize) * bytes_per_pixel;
-            let i = row_offset + col_offset;
-            let sr = pixel_slice[i] as f32 / 255.0;
-            let sg = pixel_slice[i + 1] as f32 / 255.0;
-            let sb = pixel_slice[i + 2] as f32 / 255.0;
-            let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
-            let lin_rgb = [lin.red, lin.green, lin.blue];
-            let out = match source_space {
-                SourceColorSpace::Srgb => apply_matrix(lin_rgb, &LINEAR_SRGB_TO_LINEAR_REC2020),
-                SourceColorSpace::DisplayP3 => apply_matrix(lin_rgb, &LINEAR_P3_TO_LINEAR_REC2020),
-                SourceColorSpace::Bt2020 => apply_matrix(lin_rgb, &LINEAR_BT2020_TO_LINEAR_REC2020),
-            };
-            image::Rgb(out)
+            let i = (y as usize) * stride + (x as usize) * bytes_per_pixel;
+            image::Rgb([
+                pixel_slice[i] as f32 / 255.0,
+                pixel_slice[i + 1] as f32 / 255.0,
+                pixel_slice[i + 2] as f32 / 255.0,
+            ])
         })
     } else {
         // 9 or 10-bit values packed into 16-bit little-endian containers.
         let max_value = ((1u32 << bits) - 1) as f32;
         Rgb32FImage::from_fn(width, height, |x, y| {
-            let row_offset = (y as usize) * stride;
-            let col_offset = (x as usize) * bytes_per_pixel;
-            let i = row_offset + col_offset;
-            let r_raw = u16::from_le_bytes([pixel_slice[i], pixel_slice[i + 1]]);
-            let g_raw = u16::from_le_bytes([pixel_slice[i + 2], pixel_slice[i + 3]]);
-            let b_raw = u16::from_le_bytes([pixel_slice[i + 4], pixel_slice[i + 5]]);
-            let sr = r_raw as f32 / max_value;
-            let sg = g_raw as f32 / max_value;
-            let sb = b_raw as f32 / max_value;
-            let lin: LinSrgb<f32> = Srgb::new(sr, sg, sb).into_linear();
-            let lin_rgb = [lin.red, lin.green, lin.blue];
-            let out = match source_space {
-                SourceColorSpace::Srgb => apply_matrix(lin_rgb, &LINEAR_SRGB_TO_LINEAR_REC2020),
-                SourceColorSpace::DisplayP3 => apply_matrix(lin_rgb, &LINEAR_P3_TO_LINEAR_REC2020),
-                SourceColorSpace::Bt2020 => apply_matrix(lin_rgb, &LINEAR_BT2020_TO_LINEAR_REC2020),
-            };
-            image::Rgb(out)
+            let i = (y as usize) * stride + (x as usize) * bytes_per_pixel;
+            let r = u16::from_le_bytes([pixel_slice[i], pixel_slice[i + 1]]);
+            let g = u16::from_le_bytes([pixel_slice[i + 2], pixel_slice[i + 3]]);
+            let b = u16::from_le_bytes([pixel_slice[i + 4], pixel_slice[i + 5]]);
+            image::Rgb([
+                r as f32 / max_value,
+                g as f32 / max_value,
+                b as f32 / max_value,
+            ])
         })
     };
 
+    // ICC path: an embedded rICC/prof profile takes precedence over the sRGB
+    // fallback. nclx-classified sources (DisplayP3/Bt2020) never enter here.
+    #[cfg(feature = "icc")]
+    {
+        if matches!(source_space, SourceColorSpace::Srgb) {
+            if let Some(icc_bytes) = handle.raw_color_profile() {
+                match crate::decode::icc::convert_to_working_space(&mut buf, &icc_bytes) {
+                    Ok(()) => return Ok(buf),
+                    Err(e) => {
+                        eprintln!(
+                            "agx: HEIC embedded ICC profile could not be applied ({e}); assuming sRGB"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // Matrix path: linearize (sRGB curve) then apply source -> Rec.2020 matrix.
+    let matrix = match source_space {
+        SourceColorSpace::Srgb => &LINEAR_SRGB_TO_LINEAR_REC2020,
+        SourceColorSpace::DisplayP3 => &LINEAR_P3_TO_LINEAR_REC2020,
+        SourceColorSpace::Bt2020 => &LINEAR_BT2020_TO_LINEAR_REC2020,
+    };
+    for px in buf.pixels_mut() {
+        let lin: LinSrgb<f32> = Srgb::new(px.0[0], px.0[1], px.0[2]).into_linear();
+        px.0 = apply_matrix([lin.red, lin.green, lin.blue], matrix);
+    }
     Ok(buf)
 }
 
