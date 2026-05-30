@@ -8,6 +8,9 @@ pub mod raw;
 #[cfg(feature = "heic")]
 pub mod heic;
 
+#[cfg(feature = "icc")]
+pub(crate) mod icc;
+
 use image::Rgb32FImage;
 use palette::{LinSrgb, Srgb};
 
