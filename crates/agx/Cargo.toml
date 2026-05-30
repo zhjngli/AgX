@@ -53,7 +53,7 @@ profiling = ["dep:serde_json"]
 docgen = ["dep:schemars", "dep:serde_json"]
 validate = ["dep:schemars", "dep:serde_json", "dep:jsonschema", "dep:toml_edit"]
 gpu = ["dep:wgpu", "dep:naga_oil", "dep:naga", "dep:bytemuck", "dep:pollster", "dep:half"]
-icc = ["dep:lcms2"]
+icc = ["dep:lcms2", "dep:bytemuck"]
 
 [package.metadata.docs.rs]
 features = ["raw", "heic", "validate", "docgen", "icc"]

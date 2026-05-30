@@ -91,24 +91,25 @@ fn extract_icc_standard(path: &std::path::Path) -> Option<Vec<u8>> {
 
     let bytes = std::fs::read(path).ok()?;
 
-    if let Ok(jpeg) = img_parts::jpeg::Jpeg::from_bytes(bytes.clone().into()) {
-        if let Some(icc) = jpeg.icc_profile() {
-            return Some(icc.to_vec());
+    // Probe the leading magic bytes so exactly one container parser runs —
+    // avoiding speculative full-file parses (and their buffer copies) for the
+    // formats that don't match.
+    match bytes.get(..4)? {
+        [0xFF, 0xD8, 0xFF, _] => img_parts::jpeg::Jpeg::from_bytes(bytes.into())
+            .ok()?
+            .icc_profile()
+            .map(|icc| icc.to_vec()),
+        [0x89, 0x50, 0x4E, 0x47] => img_parts::png::Png::from_bytes(bytes.into())
+            .ok()?
+            .icc_profile()
+            .map(|icc| icc.to_vec()),
+        [0x49, 0x49, 0x2A, 0x00] | [0x4D, 0x4D, 0x00, 0x2A] => {
+            let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(&bytes)).ok()?;
+            let icc = decoder.get_tag_u8_vec(tiff::tags::Tag::IccProfile).ok()?;
+            (!icc.is_empty()).then_some(icc)
         }
+        _ => None,
     }
-    if let Ok(png) = img_parts::png::Png::from_bytes(bytes.clone().into()) {
-        if let Some(icc) = png.icc_profile() {
-            return Some(icc.to_vec());
-        }
-    }
-    if let Ok(mut decoder) = tiff::decoder::Decoder::new(std::io::Cursor::new(&bytes)) {
-        if let Ok(icc) = decoder.get_tag_u8_vec(tiff::tags::Tag::IccProfile) {
-            if !icc.is_empty() {
-                return Some(icc);
-            }
-        }
-    }
-    None
 }
 
 /// Decode a standard image file (JPEG, PNG, TIFF, BMP, WebP) into a linear
@@ -308,35 +309,8 @@ mod tests {
     #[test]
     fn decode_tagged_adobe_rgb_png_is_honored() {
         use img_parts::ImageICC;
-        use lcms2::{CIExyY, CIExyYTRIPLE, Profile, ToneCurve};
 
-        let d65 = CIExyY {
-            x: 0.3127,
-            y: 0.3290,
-            Y: 1.0,
-        };
-        let primaries = CIExyYTRIPLE {
-            Red: CIExyY {
-                x: 0.6400,
-                y: 0.3300,
-                Y: 1.0,
-            },
-            Green: CIExyY {
-                x: 0.2100,
-                y: 0.7100,
-                Y: 1.0,
-            },
-            Blue: CIExyY {
-                x: 0.1500,
-                y: 0.0600,
-                Y: 1.0,
-            },
-        };
-        let gamma = ToneCurve::new(2.19921875);
-        let icc = Profile::new_rgb(&d65, &primaries, &[&gamma, &gamma, &gamma])
-            .unwrap()
-            .icc()
-            .unwrap();
+        let icc = icc::adobe_rgb_icc();
 
         let red: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_pixel(2, 2, Rgb([255, 0, 0]));
         let mut png_bytes = Vec::new();

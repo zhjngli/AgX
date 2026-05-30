@@ -70,44 +70,48 @@ pub(crate) fn convert_to_working_space(buf: &mut Rgb32FImage, icc_bytes: &[u8]) 
     )
     .map_err(|_| AgxError::Decode("failed to build ICC transform".into()))?;
 
-    let mut pixels: Vec<[f32; 3]> = buf.pixels().map(|p| p.0).collect();
-    transform.transform_in_place(&mut pixels);
-    for (dst, src) in buf.pixels_mut().zip(pixels) {
-        dst.0 = src;
-    }
+    // Zero-copy: an `Rgb32FImage` stores its samples as a flat row-major
+    // `[f32]` with pixel-contiguous layout and no row padding, so the backing
+    // buffer reinterprets directly as `[[f32; 3]]` for the in-place transform —
+    // no per-image allocation or extra pass. `[f32; 3]` is `Pod` and matches
+    // lcms2's `RGB_FLT` pixel size (12 bytes).
+    let pixels: &mut [[f32; 3]] = bytemuck::cast_slice_mut(buf);
+    transform.transform_in_place(pixels);
     Ok(())
+}
+
+/// Build an Adobe RGB (1998) ICC blob via lcms2. Test-only helper shared by
+/// this module's tests and `decode`'s ICC-dispatch tests.
+#[cfg(test)]
+pub(crate) fn adobe_rgb_icc() -> Vec<u8> {
+    let primaries = CIExyYTRIPLE {
+        Red: CIExyY {
+            x: 0.6400,
+            y: 0.3300,
+            Y: 1.0,
+        },
+        Green: CIExyY {
+            x: 0.2100,
+            y: 0.7100,
+            Y: 1.0,
+        },
+        Blue: CIExyY {
+            x: 0.1500,
+            y: 0.0600,
+            Y: 1.0,
+        },
+    };
+    let gamma = ToneCurve::new(2.19921875);
+    Profile::new_rgb(&D65, &primaries, &[&gamma, &gamma, &gamma])
+        .expect("build adobe rgb profile")
+        .icc()
+        .expect("serialize adobe rgb icc")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use image::{ImageBuffer, Rgb};
-
-    /// Build an Adobe RGB (1998) ICC blob via lcms2 for tests.
-    fn adobe_rgb_icc() -> Vec<u8> {
-        let primaries = CIExyYTRIPLE {
-            Red: CIExyY {
-                x: 0.6400,
-                y: 0.3300,
-                Y: 1.0,
-            },
-            Green: CIExyY {
-                x: 0.2100,
-                y: 0.7100,
-                Y: 1.0,
-            },
-            Blue: CIExyY {
-                x: 0.1500,
-                y: 0.0600,
-                Y: 1.0,
-            },
-        };
-        let gamma = ToneCurve::new(2.19921875);
-        Profile::new_rgb(&D65, &primaries, &[&gamma, &gamma, &gamma])
-            .expect("build adobe rgb profile")
-            .icc()
-            .expect("serialize adobe rgb icc")
-    }
 
     /// An sRGB ICC profile should convert to (approximately) the same linear
     /// Rec.2020 values as AgX's built-in sRGB path.
@@ -171,8 +175,8 @@ mod tests {
             max_diff > 0.02,
             "Adobe RGB red should differ from sRGB-assumed red; max_diff={max_diff}"
         );
-        for c in 0..3 {
-            assert!(adobe[c].is_finite(), "channel {c} not finite");
+        for (c, &v) in adobe.iter().enumerate() {
+            assert!(v.is_finite(), "channel {c} not finite");
         }
     }
 
