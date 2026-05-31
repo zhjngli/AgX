@@ -358,9 +358,11 @@ fn apply_matrix(rgb: [f32; 3], m: &[[f32; 3]; 3]) -> [f32; 3] {
 
 /// Inspect the file's color profile and classify the source space.
 ///
-/// Returns `SourceColorSpace::Srgb` as a safe fallback when the file
-/// declares an ICC profile (deferred to color-management work) or an
-/// unknown NCLX combination. In both cases a stderr warning is emitted.
+/// Returns `SourceColorSpace::Srgb` as a safe fallback for an unknown NCLX
+/// combination or BT.2020 (each emits a stderr warning). An embedded ICC
+/// profile (rICC/prof) also classifies as `Srgb` here, but `decode_heic` reads
+/// the raw profile via the `icc` feature and converts it directly, taking
+/// precedence over this fallback.
 fn probe_source_color_space(handle: &HeifImageHandle) -> SourceColorSpace {
     let profile_type = unsafe { heif_image_handle_get_color_profile_type(handle.ptr) };
 

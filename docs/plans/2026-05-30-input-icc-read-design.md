@@ -56,8 +56,8 @@ Out of scope:
 - **Soft proofing / destination-ICC preview.** Parked; depends on SP3 but is a
   separate feature.
 - **Per-image rendering-intent selection.** SP3 uses a fixed intent (relative
-  colorimetric + black point compensation); exposing intent as a knob is future
-  work if demand surfaces.
+  colorimetric, no black point compensation); exposing intent as a knob is
+  future work if demand surfaces.
 
 ## Approach
 
@@ -113,10 +113,11 @@ cleanest realization is a single lcms2 transform straight to that space:
   destination profile and run it over the decoded pixel buffer in one pass,
   producing linear Rec.2020 f32 directly. lcms2 handles input-TRC linearization
   and primary conversion internally.
-- Rendering intent: **relative colorimetric with black point compensation** —
+- Rendering intent: **relative colorimetric** (no black point compensation) —
   the standard photographic default. Gamut mapping rarely triggers on input
   conversion anyway, because the Rec.2020 working space contains essentially all
-  practical input gamuts.
+  practical input gamuts, so BPC would add nothing and is left off to keep the
+  lcms2 call minimal.
 
 This replaces, for the ICC-present path, the existing "sRGB curve + fixed
 sRGB→Rec.2020 matrix" step. The no-profile path keeps that existing step
@@ -178,8 +179,11 @@ instead of warning + sRGB.
 lcms2 = { version = "6", optional = true }
 
 [features]
-icc = ["dep:lcms2"]
+icc = ["dep:lcms2", "dep:bytemuck"]
 ```
+
+(`bytemuck` backs the zero-copy reinterpret of the `Rgb32FImage` backing
+buffer as `[[f32; 3]]` for the in-place lcms2 transform.)
 
 `Cargo.toml` (agx-cli): add `icc` to the agx feature list
 (`features = ["raw", "validate", "heic", "icc"]`). Add `icc` to the docs.rs
@@ -300,14 +304,22 @@ Per `CLAUDE.md`:
 - **lcms2 build cost.** Enabling `icc` compiles LittleCMS's bundled C once. Build
   time and binary size rise modestly; no runtime install dependency. Feature
   gate keeps it optional for library consumers.
-- **Rendering intent is fixed for now.** Relative colorimetric + BPC is the right
-  default for input conversion into a gamut (Rec.2020) that contains essentially
-  all input gamuts; out-of-gamut mapping almost never triggers on the input side.
-  Exposing intent is deferred unless a concrete need appears.
-- **HEIF nclx vs ICC precedence.** iPhone captures use nclx; ICC-tagged HEIF is
-  rarer. Keeping nclx as the fast path and using ICC only when nclx is absent or
-  the profile is explicitly rICC/prof avoids regressing the common iPhone path
-  while closing the ICC gap.
+- **Rendering intent is fixed for now.** Relative colorimetric (no BPC) is the
+  right default for input conversion into a gamut (Rec.2020) that contains
+  essentially all input gamuts; out-of-gamut mapping almost never triggers on
+  the input side. Exposing intent is deferred unless a concrete need appears.
+- **HEIF nclx vs ICC precedence.** Keeping nclx as the fast path and using ICC
+  only when nclx is absent or the profile is explicitly rICC/prof avoids
+  regressing the common nclx-tagged iPhone path while closing the ICC gap.
+
+  > **Post-implementation note (2026-05-31):** the design above assumed iPhone
+  > HEIC captures carry nclx primaries. The actual e2e fixtures
+  > (`crates/agx-e2e/fixtures/heic/*.heic`) turned out to embed a **Display P3
+  > ICC profile with no nclx tag**, so they decode through the ICC path, not the
+  > nclx fast path. This was an unplanned bonus — those fixtures now exercise the
+  > HEIF rICC read end-to-end — and is why the HEIC goldens regenerated. The
+  > nclx fast path is still real and covered by the synthetic `synthetic_p3_red`
+  > fixture (genuine nclx primaries), which did not change.
 - **Shared infrastructure with SP4.** SP4 (output gamut choice) needs the inverse
   direction (working space → target gamut + matching ICC embed). The synthetic
   linear-Rec.2020 profile and the lcms2 transform plumbing introduced here are
