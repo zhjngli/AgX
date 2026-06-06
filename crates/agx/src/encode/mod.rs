@@ -146,10 +146,10 @@ pub fn resolve_output(
     }
 }
 
-/// Convert a single sRGB-gamma f32 channel value to 8-bit u8 with clamping;
+/// Convert a single post-curve f32 channel value to 8-bit u8 with clamping;
 /// NaN/inf inputs map to 255, negative inputs to 0. Called from
-/// `encode_linear_rec2020_to_srgb_rgb8` after the matrix and transfer-curve
-/// passes (i.e. the input is already post-matrix, post-curve sRGB gamma).
+/// `encode_linear_rec2020_to_rgb8` after the matrix and transfer-curve
+/// passes (i.e. the input is already post-matrix, post-curve gamma).
 ///
 /// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
 /// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round
@@ -179,15 +179,14 @@ fn encode_linear_rec2020_to_rgb8(
     curve: fn(f32) -> f32,
 ) -> RgbImage {
     let (w, h) = linear_rec2020.dimensions();
-    let m = matrix;
     RgbImage::from_fn(w, h, |x, y| {
         let p = linear_rec2020.get_pixel(x, y);
         let r = p.0[0];
         let g = p.0[1];
         let b = p.0[2];
-        let r_t = m[0][0] * r + m[0][1] * g + m[0][2] * b;
-        let g_t = m[1][0] * r + m[1][1] * g + m[1][2] * b;
-        let b_t = m[2][0] * r + m[2][1] * g + m[2][2] * b;
+        let r_t = matrix[0][0] * r + matrix[0][1] * g + matrix[0][2] * b;
+        let g_t = matrix[1][0] * r + matrix[1][1] * g + matrix[1][2] * b;
+        let b_t = matrix[2][0] * r + matrix[2][1] * g + matrix[2][2] * b;
         Rgb([
             quantize_u8(curve(r_t)),
             quantize_u8(curve(g_t)),
@@ -206,10 +205,17 @@ pub fn encode_linear_rec2020_to_srgb_rgb8(linear_rec2020: &Rgb32FImage) -> RgbIm
     )
 }
 
+/// A (Rec.2020 → target linear matrix, transfer-curve) pair for one output gamut.
+type GamutRecipe = (&'static [[f32; 3]; 3], fn(f32) -> f32);
+
 /// The (matrix, transfer-curve) pair that realizes an output gamut. Display P3
 /// reuses the sRGB transfer curve by design (it differs from sRGB only in
 /// primaries); Adobe RGB uses its own gamma curve.
-fn gamut_recipe(gamut: OutputGamut) -> (&'static [[f32; 3]; 3], fn(f32) -> f32) {
+//
+// Wired into `encode_to_file_with_options` once `EncodeOptions.output_gamut`
+// lands; until then only the unit tests exercise it.
+#[allow(dead_code)]
+fn gamut_recipe(gamut: OutputGamut) -> GamutRecipe {
     match gamut {
         OutputGamut::Srgb => (&LINEAR_REC2020_TO_LINEAR_SRGB, srgb_curve_signed),
         OutputGamut::DisplayP3 => (&LINEAR_REC2020_TO_LINEAR_P3, srgb_curve_signed),
