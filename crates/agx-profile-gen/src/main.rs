@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use lcms2::{CIExyY, CIExyYTRIPLE, Locale, Profile, Tag, TagSignature, ToneCurve, MLU};
 
-/// (relative output path, builder) for every bundled profile.
+/// (relative output path, serialized profile bytes) for every bundled profile.
 fn profiles() -> Vec<(&'static str, Vec<u8>)> {
     vec![
         (
@@ -132,6 +132,7 @@ fn build_display_p3_v4_profile() -> Vec<u8> {
             .expect("build sRGB tone curve");
     let mut profile = Profile::new_rgb(&d65, &primaries, &[&srgb_curve, &srgb_curve, &srgb_curve])
         .expect("build P3 profile");
+    // Pin v4 explicitly (see build_srgb_v4_profile for the rationale).
     profile.set_version(4.3);
 
     let mut desc = MLU::new(1);
@@ -178,6 +179,7 @@ fn build_adobe_rgb_v4_profile() -> Vec<u8> {
     let gamma = ToneCurve::new(563.0 / 256.0);
     let mut profile = Profile::new_rgb(&d65, &primaries, &[&gamma, &gamma, &gamma])
         .expect("build Adobe RGB profile");
+    // Pin v4 explicitly (see build_srgb_v4_profile for the rationale).
     profile.set_version(4.3);
 
     let mut desc = MLU::new(1);
@@ -299,12 +301,15 @@ mod tests {
 
     #[test]
     fn new_profiles_in_expected_size_range() {
-        for bytes in [
-            super::build_display_p3_v4_profile(),
-            super::build_adobe_rgb_v4_profile(),
+        for (name, bytes) in [
+            ("display_p3", super::build_display_p3_v4_profile()),
+            ("adobe_rgb", super::build_adobe_rgb_v4_profile()),
         ] {
             let n = bytes.len();
-            assert!((300..=8000).contains(&n), "got {n} bytes");
+            assert!(
+                (300..=8000).contains(&n),
+                "{name}: expected 300..=8000 bytes, got {n}"
+            );
         }
     }
 }
