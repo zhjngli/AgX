@@ -21,3 +21,4 @@ exif = { package = "kamadak-exif", version = "0.5" }
 tempfile = "3"
 lcms2 = "6"
 img-parts = "0.4"
+tiff = "0.10"

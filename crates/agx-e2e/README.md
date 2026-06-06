@@ -48,19 +48,24 @@ cargo test -p agx-e2e
 # Regenerate golden files
 GOLDEN_UPDATE=1 cargo test -p agx-e2e
 
-# Regenerate a committed binary fixture (e.g. the Adobe RGB ICC-tagged JPEG)
-cargo test -p agx-e2e --test generate_fixtures -- --ignored gen_adobe_rgb_gradient
+# Regenerate the committed ICC-tagged binary fixtures (run any/all generators)
+cargo test -p agx-e2e --test generate_fixtures -- --ignored \
+  gen_adobe_rgb_gradient gen_prophoto_gradient gen_adobe_rgb_tiff
 ```
 
 ## Fixtures
 
 | Directory | Contents |
 |-----------|----------|
-| `fixtures/jpeg/` | JPEG test images (incl. `adobe_rgb_gradient.jpg`, tagged with an embedded Adobe RGB ICC profile to exercise the input-ICC read path) |
+| `fixtures/jpeg/` | JPEG test images (incl. `adobe_rgb_gradient.jpg`, tagged with an embedded Adobe RGB ICC profile to exercise the input-ICC read path via the JPEG APP2 marker) |
+| `fixtures/png/` | PNG test images. `prophoto_gradient.png` is tagged with an embedded ProPhoto RGB ICC profile (iCCP chunk), exercising PNG ICC extraction and the widest-gamut input conversion in the suite. |
+| `fixtures/tiff/` | TIFF test images. `adobe_rgb_gradient.tiff` is tagged with an embedded Adobe RGB ICC profile (ICCProfile tag 0x8773), exercising TIFF ICC-tag extraction. |
 | `fixtures/raw/` | RAF (Fujifilm RAW) test images |
 | `fixtures/heic/` | HEIC test images. The four iPhone captures embed a Display P3 ICC profile (no nclx tag), so they decode via the input-ICC read path; `synthetic_p3_red.heic` carries nclx Display P3 primaries and exercises the matrix path instead. |
 | `fixtures/looks/` | Preset TOML files (8 color + 4 B&W + 1 base) |
 | `fixtures/looks/luts/` | Generated 33x33x33 .cube LUT files |
 | `fixtures/golden/jpeg/` | JPEG golden reference images |
+| `fixtures/golden/png/` | PNG golden reference images |
+| `fixtures/golden/tiff/` | TIFF golden reference images |
 | `fixtures/golden/raw/` | RAW golden reference images |
 | `fixtures/golden/heic/` | HEIC golden reference images |

@@ -223,6 +223,40 @@ fn cli_adobe_rgb_gradient() {
 }
 
 #[test]
+fn cli_prophoto_gradient() {
+    // Synthetic PNG tagged with an embedded ProPhoto RGB ICC profile (iCCP
+    // chunk). Exercises PNG ICC extraction *and* the widest-gamut input
+    // conversion in the suite (ProPhoto extends well beyond Rec.2020; lcms2
+    // gamut-maps it into the working space). Lossless format → strict tolerance.
+    run_image_matrix(
+        "png/prophoto_gradient.png",
+        "prophoto_gradient",
+        "png",
+        2,
+        0.0,
+        &["p3_heavy_edit", "portra_400"],
+    );
+}
+
+#[test]
+fn cli_adobe_rgb_tiff() {
+    // Synthetic TIFF tagged with an embedded Adobe RGB ICC profile (ICCProfile
+    // tag 0x8773). Exercises TIFF ICC-tag extraction — the only TIFF *input* in
+    // the suite. Lossless format → strict tolerance.
+    // `image_name` must match the input file stem — the CLI derives output
+    // filenames from it. Goldens live under their own `tiff/` dir, so this does
+    // not collide with the JPEG `adobe_rgb_gradient` fixture.
+    run_image_matrix(
+        "tiff/adobe_rgb_gradient.tiff",
+        "adobe_rgb_gradient",
+        "tiff",
+        2,
+        0.0,
+        &["p3_heavy_edit", "portra_400"],
+    );
+}
+
+#[test]
 fn cli_cinque_terre_manarola() {
     run_image_matrix(
         "raw/cinque_terre_manarola.raf",
