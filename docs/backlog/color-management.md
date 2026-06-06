@@ -42,11 +42,11 @@ Embed an sRGB ICC profile in encoded output so downstream software identifies th
 
 Parse embedded ICC profiles from inputs and convert into the working space, replacing the current "assume everything is sRGB" fallback.
 
-- [ ] Pick the ICC parsing tactic: `lcms2` (C FFI, comprehensive, heavy) vs pure-Rust crates (e.g. `qcms`) — document maturity, gamut coverage, and binary-size trade-offs in the design doc.
-- [ ] Parse ICC from JPEG (APP2), TIFF (`ICCProfile` tag), PNG (`iCCP` chunk), HEIF (icc/rICC profile box).
-- [ ] Convert input → working space using the parsed profile.
-- [ ] Fallback when ICC is missing: assume sRGB (preserves current behavior).
-- [ ] Add e2e fixture: an Adobe RGB JPEG with goldens.
+- [x] Pick the ICC parsing tactic: `lcms2` (C FFI, comprehensive, heavy) vs pure-Rust crates (e.g. `qcms`) — document maturity, gamut coverage, and binary-size trade-offs in the design doc.
+- [x] Parse ICC from JPEG (APP2), TIFF (`ICCProfile` tag), PNG (`iCCP` chunk), HEIF (icc/rICC profile box).
+- [x] Convert input → working space using the parsed profile.
+- [x] Fallback when ICC is missing: assume sRGB (preserves current behavior).
+- [x] Add e2e fixture: an Adobe RGB JPEG with goldens.
 
 **Acceptance:** Adobe RGB JPEGs decode to correct values in the working space (verified against ImageMagick or `tificc`). Scanner / Lightroom-exported TIFFs with non-standard ICCs decode without crashing. New e2e fixture has goldens.
 
@@ -68,6 +68,7 @@ Let the user pick the output color space at apply time (default sRGB, with Displ
 - **BT.2020 / HDR transfer curves.** iPhone HDR HEIC uses BT.2020 primaries with PQ or HLG transfer curves. Handling HDR correctly requires scene-vs-display-referred semantics, tone mapping, and possibly a separate HDR output format. Initial HEIC support already falls back to "treat as sRGB and warn" — that's the right punt for now. See the `BT.2020 transfer curve handling` parked item in `heic-support.md`.
 - **Soft proofing.** Preview "how this will look printed on this paper" via a destination ICC + rendering intent. Late-stage feature; depends on sub-project 3 plus a print workflow.
 - **Per-camera DCP profiles.** Orthogonal to working-space work — improves raw decode color accuracy, not gamut handling. Tracked under [Processing Parity](processing-parity.md) (Raw processing section).
+- **Real-world Adobe RGB e2e fixture.** Sub-project 3 ships with a synthetically-tagged Adobe RGB JPEG fixture (deterministic, license-clean, carries CI). A real camera capture would additionally exercise real-world ICC quirks. iPhones don't emit Adobe RGB (Display P3 HEIC / sRGB only); Fujifilm and most mirrorless/DSLR bodies do via the Color Space → Adobe RGB menu setting. Pull one in as a supplementary fixture when convenient.
 
 ## Considerations
 

@@ -37,6 +37,7 @@ naga = { version = "23", features = ["wgsl-in", "wgsl-out"], optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
 pollster = { version = "0.4", optional = true }
 half = { version = "2", features = ["bytemuck"], optional = true }
+lcms2 = { version = "6", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -52,6 +53,7 @@ profiling = ["dep:serde_json"]
 docgen = ["dep:schemars", "dep:serde_json"]
 validate = ["dep:schemars", "dep:serde_json", "dep:jsonschema", "dep:toml_edit"]
 gpu = ["dep:wgpu", "dep:naga_oil", "dep:naga", "dep:bytemuck", "dep:pollster", "dep:half"]
+icc = ["dep:lcms2", "dep:bytemuck"]
 
 [package.metadata.docs.rs]
-features = ["raw", "heic", "validate", "docgen"]
+features = ["raw", "heic", "validate", "docgen", "icc"]

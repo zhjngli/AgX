@@ -205,6 +205,58 @@ fn cli_synthetic_p3_red() {
 }
 
 #[test]
+fn cli_adobe_rgb_gradient() {
+    // Synthetic JPEG tagged with an embedded Adobe RGB (1998) ICC profile,
+    // exercising the SP3 input-ICC read path: the decoder must parse the
+    // profile and convert wide-gamut color into the working space via lcms2
+    // rather than assuming sRGB. JPEG-strict tolerance — the fixture is
+    // deterministic. `p3_heavy_edit` saturates the wide-gamut content; the
+    // noop golden captures the raw ICC-honored decode.
+    run_image_matrix(
+        "jpeg/adobe_rgb_gradient.jpg",
+        "adobe_rgb_gradient",
+        "jpeg",
+        2,
+        0.0,
+        &["p3_heavy_edit", "portra_400"],
+    );
+}
+
+#[test]
+fn cli_prophoto_gradient() {
+    // Synthetic PNG tagged with an embedded ProPhoto RGB ICC profile (iCCP
+    // chunk). Exercises PNG ICC extraction *and* the widest-gamut input
+    // conversion in the suite (ProPhoto extends well beyond Rec.2020; lcms2
+    // gamut-maps it into the working space). Lossless format → strict tolerance.
+    run_image_matrix(
+        "png/prophoto_gradient.png",
+        "prophoto_gradient",
+        "png",
+        2,
+        0.0,
+        &["p3_heavy_edit", "portra_400"],
+    );
+}
+
+#[test]
+fn cli_adobe_rgb_tiff() {
+    // Synthetic TIFF tagged with an embedded Adobe RGB ICC profile (ICCProfile
+    // tag 0x8773). Exercises TIFF ICC-tag extraction — the only TIFF *input* in
+    // the suite. Lossless format → strict tolerance.
+    // `image_name` must match the input file stem — the CLI derives output
+    // filenames from it. Goldens live under their own `tiff/` dir, so this does
+    // not collide with the JPEG `adobe_rgb_gradient` fixture.
+    run_image_matrix(
+        "tiff/adobe_rgb_gradient.tiff",
+        "adobe_rgb_gradient",
+        "tiff",
+        2,
+        0.0,
+        &["p3_heavy_edit", "portra_400"],
+    );
+}
+
+#[test]
 fn cli_cinque_terre_manarola() {
     run_image_matrix(
         "raw/cinque_terre_manarola.raf",
