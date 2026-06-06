@@ -436,3 +436,40 @@ fn cli_nonexistent_input_fails() {
         "CLI should fail for nonexistent input"
     );
 }
+
+/// Output-gamut coverage: render the wide-gamut Display P3 HEIC source through an
+/// identity `edit` at each output gamut and pin goldens. Exercises working-space
+/// → target conversion end-to-end (srgb baseline + the two wider boxes). HEIC
+/// tolerance mirrors the other HEIC tests (10, 1.0) for libheif version jitter.
+#[test]
+fn cli_output_gamut_matrix() {
+    for gamut in ["srgb", "p3", "adobe-rgb"] {
+        let dir = TempDir::new().unwrap();
+        let input = fixture_path("heic/marina_sunset.heic");
+        let out = dir.path().join("out.png");
+
+        let mut cmd = cli_bin();
+        cmd.args([
+            "edit",
+            "-i",
+            input.to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--output-gamut",
+            gamut,
+        ]);
+        let status = cmd.status().expect("failed to run edit");
+        assert!(
+            status.success(),
+            "edit --output-gamut {gamut} should succeed"
+        );
+
+        assert_valid_output(&out);
+        assert_golden(
+            &out,
+            &format!("output_gamut/marina_sunset_{gamut}.png"),
+            10,
+            1.0,
+        );
+    }
+}
