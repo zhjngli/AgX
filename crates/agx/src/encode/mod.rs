@@ -48,6 +48,47 @@ impl OutputFormat {
     }
 }
 
+/// Output color space: gamut primaries + transfer curve + embedded ICC profile.
+///
+/// Chosen at encode time via `--output-gamut`. The default (`Srgb`) reproduces
+/// pre-SP4 output byte-for-byte. Not part of the preset schema (no serde) — it is
+/// a delivery concern, parsed from the CLI via `FromStr`. The core crate has no
+/// `clap` dependency, so this mirrors `VignetteShape` / `GrainType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputGamut {
+    /// sRGB — universal, default. Byte-identical to pre-SP4 output.
+    #[default]
+    Srgb,
+    /// Display P3 — DCI-P3 primaries, D65 white, sRGB transfer curve.
+    DisplayP3,
+    /// Adobe RGB (1998) — Adobe primaries, D65 white, gamma 2.19921875.
+    AdobeRgb,
+}
+
+impl std::fmt::Display for OutputGamut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Srgb => write!(f, "srgb"),
+            Self::DisplayP3 => write!(f, "p3"),
+            Self::AdobeRgb => write!(f, "adobe-rgb"),
+        }
+    }
+}
+
+impl std::str::FromStr for OutputGamut {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "srgb" => Ok(Self::Srgb),
+            "p3" => Ok(Self::DisplayP3),
+            "adobe-rgb" => Ok(Self::AdobeRgb),
+            _ => Err(format!(
+                "invalid output gamut '{s}'. Use: srgb, p3, or adobe-rgb"
+            )),
+        }
+    }
+}
+
 /// Options controlling image encoding.
 pub struct EncodeOptions {
     /// JPEG quality (1-100). Only applies to JPEG output. Default: 92.
@@ -724,6 +765,31 @@ mod tests {
     /// would short-circuit them. JPEG gets a small tolerance because
     /// chroma subsampling shifts colored pixels by ±2 even at q=100;
     /// PNG and TIFF are lossless.
+    #[test]
+    fn output_gamut_default_is_srgb() {
+        assert_eq!(OutputGamut::default(), OutputGamut::Srgb);
+    }
+
+    #[test]
+    fn output_gamut_round_trips_through_string() {
+        use std::str::FromStr;
+        for (s, g) in [
+            ("srgb", OutputGamut::Srgb),
+            ("p3", OutputGamut::DisplayP3),
+            ("adobe-rgb", OutputGamut::AdobeRgb),
+        ] {
+            assert_eq!(OutputGamut::from_str(s).unwrap(), g);
+            assert_eq!(g.to_string(), s);
+        }
+    }
+
+    #[test]
+    fn output_gamut_rejects_unknown() {
+        use std::str::FromStr;
+        let err = OutputGamut::from_str("rec2020").unwrap_err();
+        assert!(err.contains("rec2020"));
+    }
+
     #[test]
     fn encode_pixel_bytes_unchanged_after_icc_embed() {
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.1, 0.2]));
