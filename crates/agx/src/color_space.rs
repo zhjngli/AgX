@@ -49,6 +49,19 @@ pub fn srgb_curve_signed_inverse(x: f32) -> f32 {
     sign_factor * linear
 }
 
+/// Apply the Adobe RGB (1998) transfer curve, sign-preserving.
+///
+/// Adobe RGB encodes with a pure gamma of 563/256 (≈ 2.19921875); the encode
+/// direction raises to `1/2.19921875`. Sign-preserving for negative inputs that
+/// can arise from heavy edits in the wide working space, matching the
+/// `srgb_curve_signed` convention: `sign(x) * |x|^(1/2.19921875)`.
+pub fn adobe_rgb_curve_signed(x: f32) -> f32 {
+    let sign_factor = if x < 0.0 { -1.0 } else { 1.0 };
+    // Encode exponent 1/gamma = 256/563, written as the exact rational so the
+    // literal is lint-clean (clippy::excessive_precision) and self-documenting.
+    sign_factor * x.abs().powf(256.0 / 563.0)
+}
+
 /// Linear Display P3 → linear Rec.2020.
 ///
 /// Display P3 uses the DCI-P3 primaries with D65 white point. The Rec.2020
@@ -72,6 +85,24 @@ pub const LINEAR_P3_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
 /// guards against that drift.
 pub const LINEAR_BT2020_TO_LINEAR_REC2020: [[f32; 3]; 3] =
     [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+/// Linear Rec.2020 → linear Display P3 (DCI-P3 primaries, D65). Inverse of
+/// `LINEAR_P3_TO_LINEAR_REC2020`. Derived from primaries and pinned against
+/// lcms2 by `color_space::icc_crosscheck_tests` (run under `--features icc`).
+pub const LINEAR_REC2020_TO_LINEAR_P3: [[f32; 3]; 3] = [
+    [1.343578, -0.282180, -0.061399],
+    [-0.065297, 1.075788, -0.010490],
+    [0.002822, -0.019598, 1.016777],
+];
+
+/// Linear Rec.2020 → linear Adobe RGB (1998) (Adobe primaries, D65). Derived
+/// from primaries and pinned against lcms2 by `color_space::icc_crosscheck_tests`
+/// (run under `--features icc`).
+pub const LINEAR_REC2020_TO_LINEAR_ADOBE_RGB: [[f32; 3]; 3] = [
+    [1.151978, -0.097503, -0.054475],
+    [-0.124550, 1.1329, -0.008349],
+    [-0.022530, -0.049807, 1.072337],
+];
 
 /// Apply a 3×3 matrix to every pixel of a `[[f32; 3]]` buffer in place.
 ///
@@ -306,6 +337,56 @@ mod tests {
     }
 
     #[test]
+    fn rec2020_to_p3_and_adobe_preserve_white() {
+        // Each row must sum to ~1.0 so neutral (equal-RGB) values stay neutral.
+        for m in [
+            &LINEAR_REC2020_TO_LINEAR_P3,
+            &LINEAR_REC2020_TO_LINEAR_ADOBE_RGB,
+        ] {
+            for row in m.iter() {
+                let sum = row[0] + row[1] + row[2];
+                assert!((sum - 1.0).abs() < 1e-3, "row sum {sum} should be ~1.0");
+            }
+        }
+    }
+
+    #[test]
+    fn rec2020_p3_round_trip_is_identity() {
+        // LINEAR_REC2020_TO_LINEAR_P3 must invert the existing P3 -> Rec.2020 matrix.
+        let fwd = LINEAR_P3_TO_LINEAR_REC2020;
+        let inv = LINEAR_REC2020_TO_LINEAR_P3;
+        for v in &[
+            [1.0_f32, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.4, 0.6, 0.2],
+        ] {
+            let mid = [
+                fwd[0][0] * v[0] + fwd[0][1] * v[1] + fwd[0][2] * v[2],
+                fwd[1][0] * v[0] + fwd[1][1] * v[1] + fwd[1][2] * v[2],
+                fwd[2][0] * v[0] + fwd[2][1] * v[1] + fwd[2][2] * v[2],
+            ];
+            let out = [
+                inv[0][0] * mid[0] + inv[0][1] * mid[1] + inv[0][2] * mid[2],
+                inv[1][0] * mid[0] + inv[1][1] * mid[1] + inv[1][2] * mid[2],
+                inv[2][0] * mid[0] + inv[2][1] * mid[1] + inv[2][2] * mid[2],
+            ];
+            for c in 0..3 {
+                assert!((out[c] - v[c]).abs() < 1e-4, "round-trip drift at {c}");
+            }
+        }
+    }
+
+    #[test]
+    fn adobe_rgb_curve_signed_is_odd_and_round_trips() {
+        let pos = adobe_rgb_curve_signed(0.5);
+        let neg = adobe_rgb_curve_signed(-0.5);
+        assert!((pos + neg).abs() < 1e-6, "curve must be odd");
+        let decoded = pos.powf(563.0 / 256.0); // inverse gamma (563/256)
+        assert!((decoded - 0.5).abs() < 1e-4, "round-trip drift: {decoded}");
+    }
+
+    #[test]
     fn wrap_lut_lookup_constant_non_white_lut_matches_hand_computed_round_trip() {
         // A LUT that always returns a gamut-asymmetric gamma-sRGB triple. The
         // post-LUT bracket converts that to gamma Rec.2020: a swapped matrix
@@ -345,5 +426,94 @@ mod tests {
             "b: got {ob}, expected {}",
             expected[2]
         );
+    }
+}
+
+/// Cross-check the hand-baked Rec.2020 → target matrices against lcms2. Gated on
+/// `icc` because lcms2 is only available behind that feature. Run with:
+/// `cargo test -p agx-photo --features icc --lib color_space::icc_crosscheck_tests`.
+#[cfg(all(test, feature = "icc"))]
+mod icc_crosscheck_tests {
+    use super::*;
+    use lcms2::{CIExyY, CIExyYTRIPLE, Intent, PixelFormat, Profile, ToneCurve, Transform};
+
+    const D65: CIExyY = CIExyY {
+        x: 0.3127,
+        y: 0.3290,
+        Y: 1.0,
+    };
+
+    fn linear_profile(r: (f64, f64), g: (f64, f64), b: (f64, f64)) -> Profile {
+        let primaries = CIExyYTRIPLE {
+            Red: CIExyY {
+                x: r.0,
+                y: r.1,
+                Y: 1.0,
+            },
+            Green: CIExyY {
+                x: g.0,
+                y: g.1,
+                Y: 1.0,
+            },
+            Blue: CIExyY {
+                x: b.0,
+                y: b.1,
+                Y: 1.0,
+            },
+        };
+        let linear = ToneCurve::new(1.0);
+        Profile::new_rgb(&D65, &primaries, &[&linear, &linear, &linear])
+            .expect("build linear profile")
+    }
+
+    fn assert_matrix_matches_lcms2(target: Profile, m: &[[f32; 3]; 3]) {
+        // Linear Rec.2020 source so the transform is the pure primary matrix.
+        let src = linear_profile((0.708, 0.292), (0.170, 0.797), (0.131, 0.046));
+        let t = Transform::new(
+            &src,
+            PixelFormat::RGB_FLT,
+            &target,
+            PixelFormat::RGB_FLT,
+            Intent::RelativeColorimetric,
+        )
+        .expect("build transform");
+
+        for color in [
+            [0.5_f32, 0.2, 0.1],
+            [0.1, 0.6, 0.3],
+            [0.9, 0.8, 0.2],
+            [0.3, 0.3, 0.3],
+        ] {
+            let mut buf = [color];
+            t.transform_in_place(&mut buf[..]);
+            let lcms = buf[0];
+            let ours = [
+                m[0][0] * color[0] + m[0][1] * color[1] + m[0][2] * color[2],
+                m[1][0] * color[0] + m[1][1] * color[1] + m[1][2] * color[2],
+                m[2][0] * color[0] + m[2][1] * color[1] + m[2][2] * color[2],
+            ];
+            for c in 0..3 {
+                // Our f32 matrix multiply vs lcms2's f64 internals: 2e-3 headroom
+                // covers the rounding difference for a pure 3x3 primary conversion.
+                assert!(
+                    (lcms[c] - ours[c]).abs() < 2e-3,
+                    "channel {c}: lcms2 {} vs ours {}",
+                    lcms[c],
+                    ours[c]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rec2020_to_p3_matrix_matches_lcms2() {
+        let p3 = linear_profile((0.680, 0.320), (0.265, 0.690), (0.150, 0.060));
+        assert_matrix_matches_lcms2(p3, &LINEAR_REC2020_TO_LINEAR_P3);
+    }
+
+    #[test]
+    fn rec2020_to_adobe_matrix_matches_lcms2() {
+        let adobe = linear_profile((0.640, 0.330), (0.210, 0.710), (0.150, 0.060));
+        assert_matrix_matches_lcms2(adobe, &LINEAR_REC2020_TO_LINEAR_ADOBE_RGB);
     }
 }

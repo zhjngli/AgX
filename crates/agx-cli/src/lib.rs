@@ -46,6 +46,10 @@ pub struct OutputOpts {
     /// Output format (jpeg, png, tiff). Inferred from extension if not specified.
     #[arg(long)]
     format: Option<String>,
+    /// Output color space: srgb (default), p3 (Display P3), or adobe-rgb.
+    /// Converts the image into the chosen gamut and embeds the matching ICC.
+    #[arg(long, default_value_t = agx::encode::OutputGamut::Srgb)]
+    pub output_gamut: agx::encode::OutputGamut,
     /// Write profiling timing data to this JSON file (requires --features profiling)
     #[cfg(feature = "profiling")]
     #[arg(long)]
@@ -63,6 +67,7 @@ impl OutputOpts {
         Ok(agx::encode::EncodeOptions {
             jpeg_quality: self.quality,
             format: self.parse_format()?,
+            output_gamut: self.output_gamut,
         })
     }
 }
@@ -763,6 +768,50 @@ mod tests {
         assert!(subcommands.iter().any(|name| name == "batch-apply"));
         assert!(subcommands.iter().any(|name| name == "batch-edit"));
         assert!(subcommands.iter().any(|name| name == "multi-apply"));
+    }
+
+    #[test]
+    fn output_gamut_flag_parses_into_encode_options() {
+        use super::{Cli, Commands};
+        let cli = Cli::parse_from([
+            "agx",
+            "apply",
+            "-i",
+            "in.png",
+            "-p",
+            "look.toml",
+            "-o",
+            "out.png",
+            "--output-gamut",
+            "p3",
+        ]);
+        let Commands::Apply { output_opts, .. } = cli.command else {
+            panic!("expected apply");
+        };
+        let opts = output_opts.encode_options().unwrap();
+        assert_eq!(opts.output_gamut, agx::encode::OutputGamut::DisplayP3);
+    }
+
+    #[test]
+    fn output_gamut_defaults_to_srgb() {
+        use super::{Cli, Commands};
+        let cli = Cli::parse_from([
+            "agx",
+            "apply",
+            "-i",
+            "in.png",
+            "-p",
+            "look.toml",
+            "-o",
+            "out.png",
+        ]);
+        let Commands::Apply { output_opts, .. } = cli.command else {
+            panic!("expected apply");
+        };
+        assert_eq!(
+            output_opts.encode_options().unwrap().output_gamut,
+            agx::encode::OutputGamut::Srgb
+        );
     }
 
     #[test]

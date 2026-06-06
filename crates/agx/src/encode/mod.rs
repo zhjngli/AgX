@@ -1,7 +1,8 @@
 //! Image encoding: writing rendered output to JPEG, PNG, TIFF.
 //!
 //! Input contract: linear Rec.2020 `Rgb32FImage`. This module converts to
-//! 8-bit sRGB-encoded output via a fused matrix → curve → quantize pass.
+//! 8-bit output in the chosen output gamut (default sRGB), embedding the
+//! matching ICC profile, via a fused matrix → curve → quantize pass.
 
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -10,7 +11,10 @@ use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::{Rgb, Rgb32FImage, RgbImage};
 
-use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
+use crate::color_space::{
+    adobe_rgb_curve_signed, srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_ADOBE_RGB,
+    LINEAR_REC2020_TO_LINEAR_P3, LINEAR_REC2020_TO_LINEAR_SRGB,
+};
 use crate::error::Result;
 use crate::metadata::ImageMetadata;
 
@@ -48,12 +52,55 @@ impl OutputFormat {
     }
 }
 
+/// Output color space: gamut primaries + transfer curve + embedded ICC profile.
+///
+/// Chosen at encode time via `--output-gamut`. The default (`Srgb`) reproduces
+/// pre-SP4 output byte-for-byte. Not part of the preset schema (no serde) — it is
+/// a delivery concern, parsed from the CLI via `FromStr`. The core crate has no
+/// `clap` dependency, so this mirrors `VignetteShape` / `GrainType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputGamut {
+    /// sRGB — universal, default. Byte-identical to pre-SP4 output.
+    #[default]
+    Srgb,
+    /// Display P3 — DCI-P3 primaries, D65 white, sRGB transfer curve.
+    DisplayP3,
+    /// Adobe RGB (1998) — Adobe primaries, D65 white, gamma 2.19921875.
+    AdobeRgb,
+}
+
+impl std::fmt::Display for OutputGamut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Srgb => write!(f, "srgb"),
+            Self::DisplayP3 => write!(f, "p3"),
+            Self::AdobeRgb => write!(f, "adobe-rgb"),
+        }
+    }
+}
+
+impl std::str::FromStr for OutputGamut {
+    type Err = String;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "srgb" => Ok(Self::Srgb),
+            "p3" => Ok(Self::DisplayP3),
+            "adobe-rgb" => Ok(Self::AdobeRgb),
+            _ => Err(format!(
+                "invalid output gamut '{s}'. Use: srgb, p3, or adobe-rgb"
+            )),
+        }
+    }
+}
+
 /// Options controlling image encoding.
 pub struct EncodeOptions {
     /// JPEG quality (1-100). Only applies to JPEG output. Default: 92.
     pub jpeg_quality: u8,
     /// Explicit output format. If `None`, inferred from file extension.
     pub format: Option<OutputFormat>,
+    /// Output color space + embedded ICC. Default: sRGB (byte-identical to pre-SP4).
+    pub output_gamut: OutputGamut,
 }
 
 impl Default for EncodeOptions {
@@ -61,6 +108,7 @@ impl Default for EncodeOptions {
         Self {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         }
     }
 }
@@ -102,10 +150,10 @@ pub fn resolve_output(
     }
 }
 
-/// Convert a single sRGB-gamma f32 channel value to 8-bit u8 with clamping;
-/// NaN/inf inputs map to 255, negative inputs to 0. Called from
-/// `encode_linear_rec2020_to_srgb_rgb8` after the matrix and transfer-curve
-/// passes (i.e. the input is already post-matrix, post-curve sRGB gamma).
+/// Convert a single post-curve f32 channel value to 8-bit u8 with clamping:
+/// NaN and +inf map to 255; negatives (including -inf) and values <= 0 map to 0.
+/// Called from `encode_linear_rec2020_to_rgb8` after the matrix and transfer-curve
+/// passes (i.e. the input is already post-matrix, post-curve gamma).
 ///
 /// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
 /// performs on `ImageRgb32F` input: clamp to [0, 1], scale to [0, 255], round
@@ -125,37 +173,60 @@ fn quantize_u8(x: f32) -> u8 {
     (normalized * 255.0).round() as u8
 }
 
-/// Encode a linear Rec.2020 f32 image to an 8-bit sRGB-encoded `RgbImage`
-/// in a single fused pass.
-///
-/// Combines the Rec.2020 → sRGB matrix multiply, the sRGB transfer curve,
-/// and the f32 → u8 quantization in one traversal. A multi-step conversion
-/// via intermediate f32 buffers would allocate hundreds of MB at high
-/// resolutions; this avoids that.
-pub fn encode_linear_rec2020_to_srgb_rgb8(linear_rec2020: &Rgb32FImage) -> RgbImage {
+/// Encode a linear Rec.2020 f32 image to an 8-bit `RgbImage` in a single fused
+/// pass: `matrix` (Rec.2020 → target linear) → `curve` (target transfer, applied
+/// sign-preserving) → `quantize_u8`. Allocating intermediate f32 buffers would
+/// cost hundreds of MB at high resolution; this avoids that.
+fn encode_linear_rec2020_to_rgb8(
+    linear_rec2020: &Rgb32FImage,
+    matrix: &[[f32; 3]; 3],
+    curve: fn(f32) -> f32,
+) -> RgbImage {
     let (w, h) = linear_rec2020.dimensions();
-    let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
     RgbImage::from_fn(w, h, |x, y| {
         let p = linear_rec2020.get_pixel(x, y);
         let r = p.0[0];
         let g = p.0[1];
         let b = p.0[2];
-        // linear Rec.2020 → linear sRGB
-        let r_s = m[0][0] * r + m[0][1] * g + m[0][2] * b;
-        let g_s = m[1][0] * r + m[1][1] * g + m[1][2] * b;
-        let b_s = m[2][0] * r + m[2][1] * g + m[2][2] * b;
-        // linear sRGB → sRGB gamma (sign-preserving) → clamp + quantize via quantize_u8
+        let r_t = matrix[0][0] * r + matrix[0][1] * g + matrix[0][2] * b;
+        let g_t = matrix[1][0] * r + matrix[1][1] * g + matrix[1][2] * b;
+        let b_t = matrix[2][0] * r + matrix[2][1] * g + matrix[2][2] * b;
         Rgb([
-            quantize_u8(srgb_curve_signed(r_s)),
-            quantize_u8(srgb_curve_signed(g_s)),
-            quantize_u8(srgb_curve_signed(b_s)),
+            quantize_u8(curve(r_t)),
+            quantize_u8(curve(g_t)),
+            quantize_u8(curve(b_t)),
         ])
     })
 }
 
+/// Encode a linear Rec.2020 f32 image to 8-bit sRGB. Thin wrapper over the
+/// generalized pass; preserves the long-standing public entry point.
+pub fn encode_linear_rec2020_to_srgb_rgb8(linear_rec2020: &Rgb32FImage) -> RgbImage {
+    encode_linear_rec2020_to_rgb8(
+        linear_rec2020,
+        &LINEAR_REC2020_TO_LINEAR_SRGB,
+        srgb_curve_signed,
+    )
+}
+
+/// A (Rec.2020 → target linear matrix, transfer-curve) pair for one output gamut.
+type GamutRecipe = (&'static [[f32; 3]; 3], fn(f32) -> f32);
+
+/// The (matrix, transfer-curve) pair that realizes an output gamut. Display P3
+/// reuses the sRGB transfer curve by design (it differs from sRGB only in
+/// primaries); Adobe RGB uses its own gamma curve.
+fn gamut_recipe(gamut: OutputGamut) -> GamutRecipe {
+    match gamut {
+        OutputGamut::Srgb => (&LINEAR_REC2020_TO_LINEAR_SRGB, srgb_curve_signed),
+        OutputGamut::DisplayP3 => (&LINEAR_REC2020_TO_LINEAR_P3, srgb_curve_signed),
+        OutputGamut::AdobeRgb => (&LINEAR_REC2020_TO_LINEAR_ADOBE_RGB, adobe_rgb_curve_signed),
+    }
+}
+
 /// Encode a linear Rec.2020 f32 image to a file with full options.
 ///
-/// Converts to 8-bit sRGB via a fused matrix → curve → quantize pass; resolves
+/// Converts to 8-bit output in `options.output_gamut` (default sRGB) via a fused
+/// matrix → curve → quantize pass and embeds the matching ICC profile; resolves
 /// the output format and path, encodes with the appropriate encoder, and
 /// optionally injects metadata. Returns the final output path (which may
 /// differ from the input path if an extension was appended).
@@ -167,7 +238,9 @@ pub fn encode_to_file_with_options(
 ) -> Result<PathBuf> {
     let (final_path, format) = resolve_output(path, options.format);
 
-    let rgb8 = encode_linear_rec2020_to_srgb_rgb8(linear);
+    let (matrix, curve) = gamut_recipe(options.output_gamut);
+    let rgb8 = encode_linear_rec2020_to_rgb8(linear, matrix, curve);
+    let icc = icc::icc_for(options.output_gamut);
 
     // Encode to in-memory buffer with format-specific encoder
     let buf = match format {
@@ -201,7 +274,7 @@ pub fn encode_to_file_with_options(
                     .new_image::<colortype::RGB8>(w, h)
                     .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
                 img.encoder()
-                    .write_tag(Tag::IccProfile, crate::encode::icc::SRGB_V4_ICC)
+                    .write_tag(Tag::IccProfile, icc)
                     .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
                 img.write_data(&raw)
                     .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
@@ -211,8 +284,8 @@ pub fn encode_to_file_with_options(
     };
 
     let buf = match format {
-        OutputFormat::Jpeg => inject_jpeg_icc_and_exif(buf, metadata)?,
-        OutputFormat::Png => inject_png_icc_and_exif(buf, metadata)?,
+        OutputFormat::Jpeg => inject_jpeg_icc_and_exif(buf, icc, metadata)?,
+        OutputFormat::Png => inject_png_icc_and_exif(buf, icc, metadata)?,
         OutputFormat::Tiff => buf,
     };
 
@@ -236,15 +309,19 @@ pub fn encode_to_file(linear: &Rgb32FImage, path: &std::path::Path) -> Result<()
     Ok(())
 }
 
-/// Inject sRGB ICC + optional EXIF into a JPEG buffer. ICC is unconditional
+/// Inject ICC + optional EXIF into a JPEG buffer. ICC is unconditional
 /// per the encode module's output-labeling contract; EXIF passes through
 /// only if input metadata carried it.
-fn inject_jpeg_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
+fn inject_jpeg_icc_and_exif(
+    buf: Vec<u8>,
+    icc: &[u8],
+    metadata: Option<&ImageMetadata>,
+) -> Result<Vec<u8>> {
     use img_parts::{ImageEXIF, ImageICC};
 
     let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
         .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-    jpeg.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    jpeg.set_icc_profile(Some(icc.to_vec().into()));
     if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
         jpeg.set_exif(Some(exif.clone().into()));
     }
@@ -255,13 +332,17 @@ fn inject_jpeg_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> R
     Ok(out)
 }
 
-/// Inject sRGB ICC + optional EXIF into a PNG buffer. Mirrors the JPEG path.
-fn inject_png_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
+/// Inject ICC + optional EXIF into a PNG buffer. Mirrors the JPEG path.
+fn inject_png_icc_and_exif(
+    buf: Vec<u8>,
+    icc: &[u8],
+    metadata: Option<&ImageMetadata>,
+) -> Result<Vec<u8>> {
     use img_parts::{ImageEXIF, ImageICC};
 
     let mut png = img_parts::png::Png::from_bytes(buf.into())
         .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-    png.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    png.set_icc_profile(Some(icc.to_vec().into()));
     if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
         png.set_exif(Some(exif.clone().into()));
     }
@@ -453,6 +534,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 95,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
@@ -471,10 +553,12 @@ mod tests {
         let opts_low = EncodeOptions {
             jpeg_quality: 50,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let opts_high = EncodeOptions {
             jpeg_quality: 95,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
 
         encode_to_file_with_options(&linear, &path_low, &opts_low, None).unwrap();
@@ -498,6 +582,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert!(final_path.exists());
@@ -513,6 +598,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert!(final_path.exists());
@@ -528,6 +614,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Jpeg),
+            output_gamut: OutputGamut::Srgb,
         };
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert_eq!(
@@ -555,6 +642,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
 
@@ -610,6 +698,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Tiff),
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
 
@@ -645,6 +734,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Tiff),
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
 
@@ -669,6 +759,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Png),
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
 
@@ -716,6 +807,146 @@ mod tests {
         let _ = std::fs::remove_file(&temp_path);
     }
 
+    #[test]
+    fn output_gamut_default_is_srgb() {
+        assert_eq!(OutputGamut::default(), OutputGamut::Srgb);
+    }
+
+    #[test]
+    fn output_gamut_round_trips_through_string() {
+        use std::str::FromStr;
+        for (s, g) in [
+            ("srgb", OutputGamut::Srgb),
+            ("p3", OutputGamut::DisplayP3),
+            ("adobe-rgb", OutputGamut::AdobeRgb),
+        ] {
+            assert_eq!(OutputGamut::from_str(s).unwrap(), g);
+            assert_eq!(g.to_string(), s);
+        }
+    }
+
+    #[test]
+    fn output_gamut_rejects_unknown() {
+        use std::str::FromStr;
+        let err = OutputGamut::from_str("rec2020").unwrap_err();
+        assert!(err.contains("rec2020"));
+    }
+
+    #[test]
+    fn srgb_recipe_matches_legacy_srgb_encode() {
+        // The generalized path, called with the sRGB recipe, must reproduce the
+        // dedicated sRGB function byte-for-byte (the zero-churn guarantee).
+        use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
+        let mut img = Rgb32FImage::new(4, 4);
+        for (i, p) in img.pixels_mut().enumerate() {
+            let v = i as f32 / 16.0;
+            *p = Rgb([v, 1.0 - v, 0.5 * v]);
+        }
+        let legacy = encode_linear_rec2020_to_srgb_rgb8(&img);
+        let generic =
+            encode_linear_rec2020_to_rgb8(&img, &LINEAR_REC2020_TO_LINEAR_SRGB, srgb_curve_signed);
+        assert_eq!(legacy.into_raw(), generic.into_raw());
+    }
+
+    #[test]
+    fn encode_jpeg_embeds_selected_gamut_icc() {
+        use crate::encode::icc::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+        use img_parts::ImageICC;
+
+        let img = Rgb32FImage::from_pixel(2, 2, Rgb([0.5, 0.4, 0.3]));
+        let dir = tempfile::tempdir().unwrap();
+
+        for (gamut, expected) in [
+            (OutputGamut::DisplayP3, DISPLAY_P3_V4_ICC),
+            (OutputGamut::AdobeRgb, ADOBE_RGB_V4_ICC),
+        ] {
+            let path = dir.path().join(format!("{gamut}.jpg"));
+            let opts = EncodeOptions {
+                jpeg_quality: 92,
+                format: Some(OutputFormat::Jpeg),
+                output_gamut: gamut,
+            };
+            encode_to_file_with_options(&img, &path, &opts, None).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
+            let icc = jpeg.icc_profile().expect("jpeg has icc");
+            assert_eq!(&icc[..], expected, "{gamut} must embed its own ICC");
+        }
+    }
+
+    #[test]
+    fn encode_png_embeds_selected_gamut_icc() {
+        use crate::encode::icc::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+        use img_parts::ImageICC;
+
+        let img = Rgb32FImage::from_pixel(2, 2, Rgb([0.5, 0.4, 0.3]));
+        let dir = tempfile::tempdir().unwrap();
+
+        for (gamut, expected) in [
+            (OutputGamut::DisplayP3, DISPLAY_P3_V4_ICC),
+            (OutputGamut::AdobeRgb, ADOBE_RGB_V4_ICC),
+        ] {
+            let path = dir.path().join(format!("{gamut}.png"));
+            let opts = EncodeOptions {
+                jpeg_quality: 92,
+                format: Some(OutputFormat::Png),
+                output_gamut: gamut,
+            };
+            encode_to_file_with_options(&img, &path, &opts, None).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let png = img_parts::png::Png::from_bytes(bytes.into()).unwrap();
+            let icc = png.icc_profile().expect("png has icc");
+            assert_eq!(&icc[..], expected, "{gamut} must embed its own ICC");
+        }
+    }
+
+    #[test]
+    fn encode_tiff_embeds_selected_gamut_icc() {
+        use crate::encode::icc::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+
+        let img = Rgb32FImage::from_pixel(2, 2, Rgb([0.5, 0.4, 0.3]));
+        let dir = tempfile::tempdir().unwrap();
+
+        for (gamut, expected) in [
+            (OutputGamut::DisplayP3, DISPLAY_P3_V4_ICC),
+            (OutputGamut::AdobeRgb, ADOBE_RGB_V4_ICC),
+        ] {
+            let path = dir.path().join(format!("{gamut}.tiff"));
+            let opts = EncodeOptions {
+                jpeg_quality: 92,
+                format: Some(OutputFormat::Tiff),
+                output_gamut: gamut,
+            };
+            encode_to_file_with_options(&img, &path, &opts, None).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(bytes))
+                .expect("output must be parseable as TIFF");
+            let icc = decoder
+                .get_tag_u8_vec(tiff::tags::Tag::IccProfile)
+                .expect("output TIFF must carry an ICCProfile tag");
+            assert_eq!(icc, expected, "{gamut} must embed its own ICC");
+        }
+    }
+
+    #[test]
+    fn gamut_recipe_selects_distinct_matrices() {
+        // p3 and adobe-rgb must produce different bytes than srgb for a saturated
+        // input (proves the recipe actually switches the conversion).
+        let mut img = Rgb32FImage::new(2, 2);
+        for p in img.pixels_mut() {
+            *p = Rgb([0.9, 0.1, 0.2]);
+        }
+        let srgb = {
+            let (m, c) = gamut_recipe(OutputGamut::Srgb);
+            encode_linear_rec2020_to_rgb8(&img, m, c).into_raw()
+        };
+        for g in [OutputGamut::DisplayP3, OutputGamut::AdobeRgb] {
+            let (m, c) = gamut_recipe(g);
+            let out = encode_linear_rec2020_to_rgb8(&img, m, c).into_raw();
+            assert_ne!(srgb, out, "{g} should differ from srgb");
+        }
+    }
+
     /// Pin pixel data unchanged after the ICC embed. Encode a colored
     /// (non-greyscale) Rec.2020 input across JPEG / PNG / TIFF; decode
     /// back and assert each pixel matches what the public per-pixel
@@ -739,6 +970,7 @@ mod tests {
             let opts = EncodeOptions {
                 jpeg_quality: 100,
                 format: Some(fmt),
+                output_gamut: OutputGamut::Srgb,
             };
             encode_to_file_with_options(&linear, &path, &opts, None).unwrap();
 

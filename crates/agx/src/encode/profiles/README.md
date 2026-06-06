@@ -4,7 +4,11 @@ This directory holds the ICC profile blobs the encoder embeds in output files.
 
 ## Current contents
 
-- `srgb_v4.icc` — sRGB v4, lcms2-generated. The encoder unconditionally embeds these bytes in every JPEG / PNG / TIFF output. See `crates/agx/src/encode/icc.rs` for the consuming code.
+- `srgb_v4.icc` — sRGB v4, lcms2-generated.
+- `display_p3_v4.icc` — Display P3 v4 (DCI-P3 primaries + sRGB transfer curve), lcms2-generated.
+- `adobe_rgb_v4.icc` — Adobe RGB (1998) v4 (Adobe primaries + gamma 563/256), lcms2-generated.
+
+The encoder selects and embeds the matching blob for the chosen output gamut. See `crates/agx/src/encode/icc.rs` for the consuming code.
 
 ## Why we generate the blob ourselves
 
@@ -18,4 +22,4 @@ To regenerate (rarely needed — the bytes are deterministic):
 cargo run -p agx-profile-gen
 ```
 
-The committed `srgb_v4.icc` is the canonical artifact; regenerate only if the generator changes or a future ICC spec update warrants it.
+This writes all three blobs. The committed files are the canonical artifacts; regenerate only if the generator changes or a future ICC spec revision warrants it.
