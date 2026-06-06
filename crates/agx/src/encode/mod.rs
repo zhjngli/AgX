@@ -10,7 +10,10 @@ use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
 use image::{Rgb, Rgb32FImage, RgbImage};
 
-use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
+use crate::color_space::{
+    adobe_rgb_curve_signed, srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_ADOBE_RGB,
+    LINEAR_REC2020_TO_LINEAR_P3, LINEAR_REC2020_TO_LINEAR_SRGB,
+};
 use crate::error::Result;
 use crate::metadata::ImageMetadata;
 
@@ -166,32 +169,52 @@ fn quantize_u8(x: f32) -> u8 {
     (normalized * 255.0).round() as u8
 }
 
-/// Encode a linear Rec.2020 f32 image to an 8-bit sRGB-encoded `RgbImage`
-/// in a single fused pass.
-///
-/// Combines the Rec.2020 → sRGB matrix multiply, the sRGB transfer curve,
-/// and the f32 → u8 quantization in one traversal. A multi-step conversion
-/// via intermediate f32 buffers would allocate hundreds of MB at high
-/// resolutions; this avoids that.
-pub fn encode_linear_rec2020_to_srgb_rgb8(linear_rec2020: &Rgb32FImage) -> RgbImage {
+/// Encode a linear Rec.2020 f32 image to an 8-bit `RgbImage` in a single fused
+/// pass: `matrix` (Rec.2020 → target linear) → `curve` (target transfer, applied
+/// sign-preserving) → `quantize_u8`. Allocating intermediate f32 buffers would
+/// cost hundreds of MB at high resolution; this avoids that.
+fn encode_linear_rec2020_to_rgb8(
+    linear_rec2020: &Rgb32FImage,
+    matrix: &[[f32; 3]; 3],
+    curve: fn(f32) -> f32,
+) -> RgbImage {
     let (w, h) = linear_rec2020.dimensions();
-    let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
+    let m = matrix;
     RgbImage::from_fn(w, h, |x, y| {
         let p = linear_rec2020.get_pixel(x, y);
         let r = p.0[0];
         let g = p.0[1];
         let b = p.0[2];
-        // linear Rec.2020 → linear sRGB
-        let r_s = m[0][0] * r + m[0][1] * g + m[0][2] * b;
-        let g_s = m[1][0] * r + m[1][1] * g + m[1][2] * b;
-        let b_s = m[2][0] * r + m[2][1] * g + m[2][2] * b;
-        // linear sRGB → sRGB gamma (sign-preserving) → clamp + quantize via quantize_u8
+        let r_t = m[0][0] * r + m[0][1] * g + m[0][2] * b;
+        let g_t = m[1][0] * r + m[1][1] * g + m[1][2] * b;
+        let b_t = m[2][0] * r + m[2][1] * g + m[2][2] * b;
         Rgb([
-            quantize_u8(srgb_curve_signed(r_s)),
-            quantize_u8(srgb_curve_signed(g_s)),
-            quantize_u8(srgb_curve_signed(b_s)),
+            quantize_u8(curve(r_t)),
+            quantize_u8(curve(g_t)),
+            quantize_u8(curve(b_t)),
         ])
     })
+}
+
+/// Encode a linear Rec.2020 f32 image to 8-bit sRGB. Thin wrapper over the
+/// generalized pass; preserves the long-standing public entry point.
+pub fn encode_linear_rec2020_to_srgb_rgb8(linear_rec2020: &Rgb32FImage) -> RgbImage {
+    encode_linear_rec2020_to_rgb8(
+        linear_rec2020,
+        &LINEAR_REC2020_TO_LINEAR_SRGB,
+        srgb_curve_signed,
+    )
+}
+
+/// The (matrix, transfer-curve) pair that realizes an output gamut. Display P3
+/// reuses the sRGB transfer curve by design (it differs from sRGB only in
+/// primaries); Adobe RGB uses its own gamma curve.
+fn gamut_recipe(gamut: OutputGamut) -> (&'static [[f32; 3]; 3], fn(f32) -> f32) {
+    match gamut {
+        OutputGamut::Srgb => (&LINEAR_REC2020_TO_LINEAR_SRGB, srgb_curve_signed),
+        OutputGamut::DisplayP3 => (&LINEAR_REC2020_TO_LINEAR_P3, srgb_curve_signed),
+        OutputGamut::AdobeRgb => (&LINEAR_REC2020_TO_LINEAR_ADOBE_RGB, adobe_rgb_curve_signed),
+    }
 }
 
 /// Encode a linear Rec.2020 f32 image to a file with full options.
@@ -780,6 +803,41 @@ mod tests {
         use std::str::FromStr;
         let err = OutputGamut::from_str("rec2020").unwrap_err();
         assert!(err.contains("rec2020"));
+    }
+
+    #[test]
+    fn srgb_recipe_matches_legacy_srgb_encode() {
+        // The generalized path, called with the sRGB recipe, must reproduce the
+        // dedicated sRGB function byte-for-byte (the zero-churn guarantee).
+        use crate::color_space::{srgb_curve_signed, LINEAR_REC2020_TO_LINEAR_SRGB};
+        let mut img = Rgb32FImage::new(4, 4);
+        for (i, p) in img.pixels_mut().enumerate() {
+            let v = i as f32 / 16.0;
+            *p = Rgb([v, 1.0 - v, 0.5 * v]);
+        }
+        let legacy = encode_linear_rec2020_to_srgb_rgb8(&img);
+        let generic =
+            encode_linear_rec2020_to_rgb8(&img, &LINEAR_REC2020_TO_LINEAR_SRGB, srgb_curve_signed);
+        assert_eq!(legacy.into_raw(), generic.into_raw());
+    }
+
+    #[test]
+    fn gamut_recipe_selects_distinct_matrices() {
+        // p3 and adobe-rgb must produce different bytes than srgb for a saturated
+        // input (proves the recipe actually switches the conversion).
+        let mut img = Rgb32FImage::new(2, 2);
+        for p in img.pixels_mut() {
+            *p = Rgb([0.9, 0.1, 0.2]);
+        }
+        let srgb = {
+            let (m, c) = gamut_recipe(OutputGamut::Srgb);
+            encode_linear_rec2020_to_rgb8(&img, m, c).into_raw()
+        };
+        for g in [OutputGamut::DisplayP3, OutputGamut::AdobeRgb] {
+            let (m, c) = gamut_recipe(g);
+            let out = encode_linear_rec2020_to_rgb8(&img, m, c).into_raw();
+            assert_ne!(srgb, out, "{g} should differ from srgb");
+        }
     }
 
     /// Pin pixel data unchanged after the ICC embed. Encode a colored
