@@ -46,8 +46,8 @@ pub struct OutputOpts {
     /// Output format (jpeg, png, tiff). Inferred from extension if not specified.
     #[arg(long)]
     format: Option<String>,
-    /// Output color space: srgb (default), p3, or adobe-rgb. Converts the image
-    /// into the chosen gamut and embeds the matching ICC profile.
+    /// Output color space: srgb (default), p3 (Display P3), or adobe-rgb.
+    /// Converts the image into the chosen gamut and embeds the matching ICC.
     #[arg(long, default_value_t = agx::encode::OutputGamut::Srgb)]
     pub output_gamut: agx::encode::OutputGamut,
     /// Write profiling timing data to this JSON file (requires --features profiling)
