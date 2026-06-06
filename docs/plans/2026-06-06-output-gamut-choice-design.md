@@ -124,23 +124,24 @@ Key facts pinned here:
 
 ```rust
 /// Output color space (gamut + transfer curve + embedded ICC) for encoding.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputGamut {
     /// sRGB — universal, default. Output is byte-identical to pre-SP4.
     #[default]
     Srgb,
     /// Display P3 — DCI-P3 primaries, D65, sRGB transfer curve.
-    #[value(name = "p3")]
     DisplayP3,
     /// Adobe RGB (1998).
-    #[value(name = "adobe-rgb")]
     AdobeRgb,
 }
+// + impl Display ("srgb"/"p3"/"adobe-rgb") and FromStr.
 ```
 
-(`clap::ValueEnum` is derived in the core crate, consistent with how
-`VignetteShape` / `GrainType` already derive clap traits there. No serde — the
-enum is not part of the preset schema.)
+The core crate has **no `clap` dependency**, so `OutputGamut` implements
+`std::str::FromStr` + `Display` (accepting `srgb` / `p3` / `adobe-rgb`) — exactly
+the pattern `VignetteShape` and `GrainType` already use. The CLI binds the flag
+to this type via `default_value_t = OutputGamut::Srgb`, letting clap parse through
+`FromStr`. No serde — the enum is not part of the preset schema.
 
 ### Color math (`crates/agx/src/color_space.rs`)
 
