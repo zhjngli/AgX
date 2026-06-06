@@ -54,12 +54,16 @@ Parse embedded ICC profiles from inputs and convert into the working space, repl
 
 Let the user pick the output color space at apply time (default sRGB, with Display P3 and Adobe RGB as options). Embeds the matching ICC.
 
-- [ ] Add a CLI flag (`--output-gamut srgb|p3|adobe-rgb`) and / or a preset apply-time field.
-- [ ] Convert working space → target at encode.
-- [ ] Embed matching ICC profile (depends on sub-project 2).
-- [ ] Extend e2e matrix to cover each output gamut option (or a representative subset).
+- [x] Add a CLI flag (`--output-gamut srgb|p3|adobe-rgb`) and / or a preset apply-time field.
+- [x] Convert working space → target at encode.
+- [x] Embed matching ICC profile (depends on sub-project 2).
+- [x] Extend e2e matrix to cover each output gamut option (or a representative subset).
 
 **Acceptance:** `agx apply --output-gamut p3 ...` produces a Display P3 JPEG that Preview / Photoshop identifies correctly. Default behavior unchanged (sRGB output). Wide-gamut e2e goldens added.
+
+## Bug fixes
+
+- `batch.rs` `run_batch_apply` / `run_batch_edit` carry 11–12 positional args (with `#[allow(clippy::too_many_arguments)]`); consolidate the encode-side params (quality, format, output_gamut) into a struct (or pass `EncodeOptions` directly) to remove the allow and the positional-transposition risk.
 
 ## Parked
 

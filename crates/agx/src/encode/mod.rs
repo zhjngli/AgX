@@ -1,7 +1,8 @@
 //! Image encoding: writing rendered output to JPEG, PNG, TIFF.
 //!
 //! Input contract: linear Rec.2020 `Rgb32FImage`. This module converts to
-//! 8-bit sRGB-encoded output via a fused matrix → curve → quantize pass.
+//! 8-bit output in the chosen output gamut (default sRGB), embedding the
+//! matching ICC profile, via a fused matrix → curve → quantize pass.
 
 use std::io::Cursor;
 use std::path::PathBuf;
