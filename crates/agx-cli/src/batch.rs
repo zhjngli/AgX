@@ -173,6 +173,7 @@ fn process_single(
     output: &Path,
     quality: u8,
     format: Option<agx::encode::OutputFormat>,
+    output_gamut: agx::encode::OutputGamut,
     use_gpu: bool,
     configure: impl FnOnce(&mut agx::Engine),
 ) -> Result<Duration, String> {
@@ -186,7 +187,7 @@ fn process_single(
     let opts = agx::encode::EncodeOptions {
         jpeg_quality: quality,
         format,
-        output_gamut: agx::encode::OutputGamut::Srgb,
+        output_gamut,
     };
 
     if let Some(parent) = output.parent() {
@@ -289,6 +290,7 @@ pub fn run_batch_apply(
     recursive: bool,
     quality: u8,
     format: Option<agx::encode::OutputFormat>,
+    output_gamut: agx::encode::OutputGamut,
     suffix: Option<&str>,
     jobs: usize,
     skip_errors: bool,
@@ -321,9 +323,17 @@ pub fn run_batch_apply(
         skip_errors,
     };
     run_batch(&opts, |input, output| {
-        process_single(input, output, quality, format, use_gpu, |engine| {
-            engine.apply_preset(&preset);
-        })
+        process_single(
+            input,
+            output,
+            quality,
+            format,
+            output_gamut,
+            use_gpu,
+            |engine| {
+                engine.apply_preset(&preset);
+            },
+        )
     })
 }
 
@@ -337,6 +347,7 @@ pub fn run_batch_edit(
     lut: Option<Arc<agx::Lut3D>>,
     quality: u8,
     format: Option<agx::encode::OutputFormat>,
+    output_gamut: agx::encode::OutputGamut,
     suffix: Option<&str>,
     jobs: usize,
     skip_errors: bool,
@@ -352,12 +363,20 @@ pub fn run_batch_edit(
         skip_errors,
     };
     run_batch(&opts, |input, output| {
-        process_single(input, output, quality, format, use_gpu, |engine| {
-            engine.set_params(params.clone());
-            if let Some(l) = &lut {
-                engine.set_lut(Some(Arc::clone(l)));
-            }
-        })
+        process_single(
+            input,
+            output,
+            quality,
+            format,
+            output_gamut,
+            use_gpu,
+            |engine| {
+                engine.set_params(params.clone());
+                if let Some(l) = &lut {
+                    engine.set_lut(Some(Arc::clone(l)));
+                }
+            },
+        )
     })
 }
 
@@ -535,6 +554,7 @@ mod tests {
             false,
             92,
             None,
+            agx::encode::OutputGamut::Srgb,
             None,
             1,
             false,
@@ -567,6 +587,7 @@ mod tests {
             None,
             92,
             None,
+            agx::encode::OutputGamut::Srgb,
             None,
             1,
             false,
