@@ -57,7 +57,9 @@ pub fn srgb_curve_signed_inverse(x: f32) -> f32 {
 /// `srgb_curve_signed` convention: `sign(x) * |x|^(1/2.19921875)`.
 pub fn adobe_rgb_curve_signed(x: f32) -> f32 {
     let sign_factor = if x < 0.0 { -1.0 } else { 1.0 };
-    sign_factor * x.abs().powf(1.0 / 2.19921875)
+    // Encode exponent 1/gamma = 256/563, written as the exact rational so the
+    // literal is lint-clean (clippy::excessive_precision) and self-documenting.
+    sign_factor * x.abs().powf(256.0 / 563.0)
 }
 
 /// Linear Display P3 → linear Rec.2020.
@@ -98,7 +100,7 @@ pub const LINEAR_REC2020_TO_LINEAR_P3: [[f32; 3]; 3] = [
 /// (run under `--features icc`).
 pub const LINEAR_REC2020_TO_LINEAR_ADOBE_RGB: [[f32; 3]; 3] = [
     [1.151978, -0.097503, -0.054475],
-    [-0.124550, 1.132900, -0.008349],
+    [-0.124550, 1.1329, -0.008349],
     [-0.022530, -0.049807, 1.072337],
 ];
 
@@ -370,7 +372,7 @@ mod tests {
                 inv[2][0] * mid[0] + inv[2][1] * mid[1] + inv[2][2] * mid[2],
             ];
             for c in 0..3 {
-                assert!((out[c] - v[c]).abs() < 1e-3, "round-trip drift at {c}");
+                assert!((out[c] - v[c]).abs() < 1e-4, "round-trip drift at {c}");
             }
         }
     }
@@ -380,7 +382,7 @@ mod tests {
         let pos = adobe_rgb_curve_signed(0.5);
         let neg = adobe_rgb_curve_signed(-0.5);
         assert!((pos + neg).abs() < 1e-6, "curve must be odd");
-        let decoded = pos.powf(2.19921875); // inverse gamma
+        let decoded = pos.powf(563.0 / 256.0); // inverse gamma (563/256)
         assert!((decoded - 0.5).abs() < 1e-4, "round-trip drift: {decoded}");
     }
 
