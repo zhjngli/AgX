@@ -493,6 +493,8 @@ mod icc_crosscheck_tests {
                 m[2][0] * color[0] + m[2][1] * color[1] + m[2][2] * color[2],
             ];
             for c in 0..3 {
+                // Our f32 matrix multiply vs lcms2's f64 internals: 2e-3 headroom
+                // covers the rounding difference for a pure 3x3 primary conversion.
                 assert!(
                     (lcms[c] - ours[c]).abs() < 2e-3,
                     "channel {c}: lcms2 {} vs ours {}",
