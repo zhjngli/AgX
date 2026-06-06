@@ -98,6 +98,8 @@ pub struct EncodeOptions {
     pub jpeg_quality: u8,
     /// Explicit output format. If `None`, inferred from file extension.
     pub format: Option<OutputFormat>,
+    /// Output color space + embedded ICC. Default: sRGB (byte-identical to pre-SP4).
+    pub output_gamut: OutputGamut,
 }
 
 impl Default for EncodeOptions {
@@ -105,6 +107,7 @@ impl Default for EncodeOptions {
         Self {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         }
     }
 }
@@ -211,10 +214,6 @@ type GamutRecipe = (&'static [[f32; 3]; 3], fn(f32) -> f32);
 /// The (matrix, transfer-curve) pair that realizes an output gamut. Display P3
 /// reuses the sRGB transfer curve by design (it differs from sRGB only in
 /// primaries); Adobe RGB uses its own gamma curve.
-//
-// Wired into `encode_to_file_with_options` once `EncodeOptions.output_gamut`
-// lands; until then only the unit tests exercise it.
-#[allow(dead_code)]
 fn gamut_recipe(gamut: OutputGamut) -> GamutRecipe {
     match gamut {
         OutputGamut::Srgb => (&LINEAR_REC2020_TO_LINEAR_SRGB, srgb_curve_signed),
@@ -237,7 +236,9 @@ pub fn encode_to_file_with_options(
 ) -> Result<PathBuf> {
     let (final_path, format) = resolve_output(path, options.format);
 
-    let rgb8 = encode_linear_rec2020_to_srgb_rgb8(linear);
+    let (matrix, curve) = gamut_recipe(options.output_gamut);
+    let rgb8 = encode_linear_rec2020_to_rgb8(linear, matrix, curve);
+    let icc = icc::icc_for(options.output_gamut);
 
     // Encode to in-memory buffer with format-specific encoder
     let buf = match format {
@@ -271,7 +272,7 @@ pub fn encode_to_file_with_options(
                     .new_image::<colortype::RGB8>(w, h)
                     .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
                 img.encoder()
-                    .write_tag(Tag::IccProfile, crate::encode::icc::SRGB_V4_ICC)
+                    .write_tag(Tag::IccProfile, icc)
                     .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
                 img.write_data(&raw)
                     .map_err(|e| crate::error::AgxError::Encode(e.to_string()))?;
@@ -281,8 +282,8 @@ pub fn encode_to_file_with_options(
     };
 
     let buf = match format {
-        OutputFormat::Jpeg => inject_jpeg_icc_and_exif(buf, metadata)?,
-        OutputFormat::Png => inject_png_icc_and_exif(buf, metadata)?,
+        OutputFormat::Jpeg => inject_jpeg_icc_and_exif(buf, icc, metadata)?,
+        OutputFormat::Png => inject_png_icc_and_exif(buf, icc, metadata)?,
         OutputFormat::Tiff => buf,
     };
 
@@ -306,15 +307,19 @@ pub fn encode_to_file(linear: &Rgb32FImage, path: &std::path::Path) -> Result<()
     Ok(())
 }
 
-/// Inject sRGB ICC + optional EXIF into a JPEG buffer. ICC is unconditional
+/// Inject ICC + optional EXIF into a JPEG buffer. ICC is unconditional
 /// per the encode module's output-labeling contract; EXIF passes through
 /// only if input metadata carried it.
-fn inject_jpeg_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
+fn inject_jpeg_icc_and_exif(
+    buf: Vec<u8>,
+    icc: &[u8],
+    metadata: Option<&ImageMetadata>,
+) -> Result<Vec<u8>> {
     use img_parts::{ImageEXIF, ImageICC};
 
     let mut jpeg = img_parts::jpeg::Jpeg::from_bytes(buf.into())
         .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-    jpeg.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    jpeg.set_icc_profile(Some(icc.to_vec().into()));
     if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
         jpeg.set_exif(Some(exif.clone().into()));
     }
@@ -325,13 +330,17 @@ fn inject_jpeg_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> R
     Ok(out)
 }
 
-/// Inject sRGB ICC + optional EXIF into a PNG buffer. Mirrors the JPEG path.
-fn inject_png_icc_and_exif(buf: Vec<u8>, metadata: Option<&ImageMetadata>) -> Result<Vec<u8>> {
+/// Inject ICC + optional EXIF into a PNG buffer. Mirrors the JPEG path.
+fn inject_png_icc_and_exif(
+    buf: Vec<u8>,
+    icc: &[u8],
+    metadata: Option<&ImageMetadata>,
+) -> Result<Vec<u8>> {
     use img_parts::{ImageEXIF, ImageICC};
 
     let mut png = img_parts::png::Png::from_bytes(buf.into())
         .map_err(|e| crate::error::AgxError::Encode(format!("metadata injection: {e}")))?;
-    png.set_icc_profile(Some(crate::encode::icc::SRGB_V4_ICC.to_vec().into()));
+    png.set_icc_profile(Some(icc.to_vec().into()));
     if let Some(exif) = metadata.and_then(|m| m.exif.as_ref()) {
         png.set_exif(Some(exif.clone().into()));
     }
@@ -523,6 +532,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 95,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let result = encode_to_file_with_options(&linear, &temp_path, &opts, None);
         assert!(result.is_ok());
@@ -541,10 +551,12 @@ mod tests {
         let opts_low = EncodeOptions {
             jpeg_quality: 50,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let opts_high = EncodeOptions {
             jpeg_quality: 95,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
 
         encode_to_file_with_options(&linear, &path_low, &opts_low, None).unwrap();
@@ -568,6 +580,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert!(final_path.exists());
@@ -583,6 +596,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert!(final_path.exists());
@@ -598,6 +612,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Jpeg),
+            output_gamut: OutputGamut::Srgb,
         };
         let final_path = encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
         assert_eq!(
@@ -625,6 +640,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: None,
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
 
@@ -680,6 +696,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Tiff),
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
 
@@ -715,6 +732,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Tiff),
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, Some(&meta)).unwrap();
 
@@ -739,6 +757,7 @@ mod tests {
         let opts = EncodeOptions {
             jpeg_quality: 92,
             format: Some(OutputFormat::Png),
+            output_gamut: OutputGamut::Srgb,
         };
         encode_to_file_with_options(&linear, &temp_path, &opts, None).unwrap();
 
@@ -828,6 +847,32 @@ mod tests {
     }
 
     #[test]
+    fn encode_jpeg_embeds_selected_gamut_icc() {
+        use crate::encode::icc::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+        use img_parts::ImageICC;
+
+        let img = Rgb32FImage::from_pixel(2, 2, Rgb([0.5, 0.4, 0.3]));
+        let dir = tempfile::tempdir().unwrap();
+
+        for (gamut, expected) in [
+            (OutputGamut::DisplayP3, DISPLAY_P3_V4_ICC),
+            (OutputGamut::AdobeRgb, ADOBE_RGB_V4_ICC),
+        ] {
+            let path = dir.path().join(format!("{gamut}.jpg"));
+            let opts = EncodeOptions {
+                jpeg_quality: 92,
+                format: Some(OutputFormat::Jpeg),
+                output_gamut: gamut,
+            };
+            encode_to_file_with_options(&img, &path, &opts, None).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
+            let icc = jpeg.icc_profile().expect("jpeg has icc");
+            assert_eq!(&icc[..], expected, "{gamut} must embed its own ICC");
+        }
+    }
+
+    #[test]
     fn gamut_recipe_selects_distinct_matrices() {
         // p3 and adobe-rgb must produce different bytes than srgb for a saturated
         // input (proves the recipe actually switches the conversion).
@@ -869,6 +914,7 @@ mod tests {
             let opts = EncodeOptions {
                 jpeg_quality: 100,
                 format: Some(fmt),
+                output_gamut: OutputGamut::Srgb,
             };
             encode_to_file_with_options(&linear, &path, &opts, None).unwrap();
 

@@ -186,6 +186,7 @@ fn process_single(
     let opts = agx::encode::EncodeOptions {
         jpeg_quality: quality,
         format,
+        output_gamut: agx::encode::OutputGamut::Srgb,
     };
 
     if let Some(parent) = output.parent() {

@@ -17,6 +17,22 @@
 /// contract.
 pub(crate) const SRGB_V4_ICC: &[u8] = include_bytes!("profiles/srgb_v4.icc");
 
+/// Display P3 v4 ICC profile, embedded at compile time.
+pub(crate) const DISPLAY_P3_V4_ICC: &[u8] = include_bytes!("profiles/display_p3_v4.icc");
+
+/// Adobe RGB (1998) v4 ICC profile, embedded at compile time.
+pub(crate) const ADOBE_RGB_V4_ICC: &[u8] = include_bytes!("profiles/adobe_rgb_v4.icc");
+
+/// The ICC blob that labels output encoded in `gamut`.
+pub(crate) fn icc_for(gamut: crate::encode::OutputGamut) -> &'static [u8] {
+    use crate::encode::OutputGamut;
+    match gamut {
+        OutputGamut::Srgb => SRGB_V4_ICC,
+        OutputGamut::DisplayP3 => DISPLAY_P3_V4_ICC,
+        OutputGamut::AdobeRgb => ADOBE_RGB_V4_ICC,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::SRGB_V4_ICC;

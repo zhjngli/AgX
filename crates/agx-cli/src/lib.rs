@@ -63,6 +63,7 @@ impl OutputOpts {
         Ok(agx::encode::EncodeOptions {
             jpeg_quality: self.quality,
             format: self.parse_format()?,
+            output_gamut: agx::encode::OutputGamut::Srgb,
         })
     }
 }
