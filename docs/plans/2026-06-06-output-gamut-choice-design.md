@@ -200,8 +200,8 @@ pub(crate) fn icc_for(gamut: OutputGamut) -> &'static [u8];
 
 ### CLI (`crates/agx-cli/src/lib.rs`)
 
-- `OutputOpts` gains `--output-gamut` (clap `ValueEnum`, `default_value_t =
-  OutputGamut::Srgb`).
+- `OutputOpts` gains `--output-gamut` (bound via `OutputGamut`'s `FromStr` +
+  `Display`, `default_value_t = OutputGamut::Srgb`).
 - `OutputOpts::encode_options()` sets `output_gamut`. Because `apply`, `edit`,
   and the batch commands all flatten `OutputOpts`, the flag reaches every
   relevant subcommand automatically.

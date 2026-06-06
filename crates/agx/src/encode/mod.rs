@@ -150,9 +150,9 @@ pub fn resolve_output(
     }
 }
 
-/// Convert a single post-curve f32 channel value to 8-bit u8 with clamping;
-/// NaN/inf inputs map to 255, negative inputs to 0. Called from
-/// `encode_linear_rec2020_to_rgb8` after the matrix and transfer-curve
+/// Convert a single post-curve f32 channel value to 8-bit u8 with clamping:
+/// NaN and +inf map to 255; negatives (including -inf) and values <= 0 map to 0.
+/// Called from `encode_linear_rec2020_to_rgb8` after the matrix and transfer-curve
 /// passes (i.e. the input is already post-matrix, post-curve gamma).
 ///
 /// Reproduces the rounding/clamping that `image::DynamicImage::to_rgb8()`
@@ -871,6 +871,60 @@ mod tests {
             let jpeg = img_parts::jpeg::Jpeg::from_bytes(bytes.into()).unwrap();
             let icc = jpeg.icc_profile().expect("jpeg has icc");
             assert_eq!(&icc[..], expected, "{gamut} must embed its own ICC");
+        }
+    }
+
+    #[test]
+    fn encode_png_embeds_selected_gamut_icc() {
+        use crate::encode::icc::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+        use img_parts::ImageICC;
+
+        let img = Rgb32FImage::from_pixel(2, 2, Rgb([0.5, 0.4, 0.3]));
+        let dir = tempfile::tempdir().unwrap();
+
+        for (gamut, expected) in [
+            (OutputGamut::DisplayP3, DISPLAY_P3_V4_ICC),
+            (OutputGamut::AdobeRgb, ADOBE_RGB_V4_ICC),
+        ] {
+            let path = dir.path().join(format!("{gamut}.png"));
+            let opts = EncodeOptions {
+                jpeg_quality: 92,
+                format: Some(OutputFormat::Png),
+                output_gamut: gamut,
+            };
+            encode_to_file_with_options(&img, &path, &opts, None).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let png = img_parts::png::Png::from_bytes(bytes.into()).unwrap();
+            let icc = png.icc_profile().expect("png has icc");
+            assert_eq!(&icc[..], expected, "{gamut} must embed its own ICC");
+        }
+    }
+
+    #[test]
+    fn encode_tiff_embeds_selected_gamut_icc() {
+        use crate::encode::icc::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+
+        let img = Rgb32FImage::from_pixel(2, 2, Rgb([0.5, 0.4, 0.3]));
+        let dir = tempfile::tempdir().unwrap();
+
+        for (gamut, expected) in [
+            (OutputGamut::DisplayP3, DISPLAY_P3_V4_ICC),
+            (OutputGamut::AdobeRgb, ADOBE_RGB_V4_ICC),
+        ] {
+            let path = dir.path().join(format!("{gamut}.tiff"));
+            let opts = EncodeOptions {
+                jpeg_quality: 92,
+                format: Some(OutputFormat::Tiff),
+                output_gamut: gamut,
+            };
+            encode_to_file_with_options(&img, &path, &opts, None).unwrap();
+            let bytes = std::fs::read(&path).unwrap();
+            let mut decoder = tiff::decoder::Decoder::new(std::io::Cursor::new(bytes))
+                .expect("output must be parseable as TIFF");
+            let icc = decoder
+                .get_tag_u8_vec(tiff::tags::Tag::IccProfile)
+                .expect("output TIFF must carry an ICCProfile tag");
+            assert_eq!(icc, expected, "{gamut} must embed its own ICC");
         }
     }
 
