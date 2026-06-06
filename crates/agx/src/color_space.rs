@@ -428,3 +428,90 @@ mod tests {
         );
     }
 }
+
+/// Cross-check the hand-baked Rec.2020 → target matrices against lcms2. Gated on
+/// `icc` because lcms2 is only available behind that feature. Run with:
+/// `cargo test -p agx-photo --features icc --lib color_space::icc_crosscheck_tests`.
+#[cfg(all(test, feature = "icc"))]
+mod icc_crosscheck_tests {
+    use super::*;
+    use lcms2::{CIExyY, CIExyYTRIPLE, Intent, PixelFormat, Profile, ToneCurve, Transform};
+
+    const D65: CIExyY = CIExyY {
+        x: 0.3127,
+        y: 0.3290,
+        Y: 1.0,
+    };
+
+    fn linear_profile(r: (f64, f64), g: (f64, f64), b: (f64, f64)) -> Profile {
+        let primaries = CIExyYTRIPLE {
+            Red: CIExyY {
+                x: r.0,
+                y: r.1,
+                Y: 1.0,
+            },
+            Green: CIExyY {
+                x: g.0,
+                y: g.1,
+                Y: 1.0,
+            },
+            Blue: CIExyY {
+                x: b.0,
+                y: b.1,
+                Y: 1.0,
+            },
+        };
+        let linear = ToneCurve::new(1.0);
+        Profile::new_rgb(&D65, &primaries, &[&linear, &linear, &linear])
+            .expect("build linear profile")
+    }
+
+    fn assert_matrix_matches_lcms2(target: Profile, m: &[[f32; 3]; 3]) {
+        // Linear Rec.2020 source so the transform is the pure primary matrix.
+        let src = linear_profile((0.708, 0.292), (0.170, 0.797), (0.131, 0.046));
+        let t = Transform::new(
+            &src,
+            PixelFormat::RGB_FLT,
+            &target,
+            PixelFormat::RGB_FLT,
+            Intent::RelativeColorimetric,
+        )
+        .expect("build transform");
+
+        for color in [
+            [0.5_f32, 0.2, 0.1],
+            [0.1, 0.6, 0.3],
+            [0.9, 0.8, 0.2],
+            [0.3, 0.3, 0.3],
+        ] {
+            let mut buf = [color];
+            t.transform_in_place(&mut buf[..]);
+            let lcms = buf[0];
+            let ours = [
+                m[0][0] * color[0] + m[0][1] * color[1] + m[0][2] * color[2],
+                m[1][0] * color[0] + m[1][1] * color[1] + m[1][2] * color[2],
+                m[2][0] * color[0] + m[2][1] * color[1] + m[2][2] * color[2],
+            ];
+            for c in 0..3 {
+                assert!(
+                    (lcms[c] - ours[c]).abs() < 2e-3,
+                    "channel {c}: lcms2 {} vs ours {}",
+                    lcms[c],
+                    ours[c]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rec2020_to_p3_matrix_matches_lcms2() {
+        let p3 = linear_profile((0.680, 0.320), (0.265, 0.690), (0.150, 0.060));
+        assert_matrix_matches_lcms2(p3, &LINEAR_REC2020_TO_LINEAR_P3);
+    }
+
+    #[test]
+    fn rec2020_to_adobe_matrix_matches_lcms2() {
+        let adobe = linear_profile((0.640, 0.330), (0.210, 0.710), (0.150, 0.060));
+        assert_matrix_matches_lcms2(adobe, &LINEAR_REC2020_TO_LINEAR_ADOBE_RGB);
+    }
+}
