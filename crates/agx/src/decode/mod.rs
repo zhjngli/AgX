@@ -180,7 +180,8 @@ mod tests {
 
     #[test]
     fn decode_png_to_linear_f32() {
-        let temp_path = std::env::temp_dir().join("agx_test_decode.png");
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("agx_test_decode.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -197,8 +198,6 @@ mod tests {
             "Expected ~0.2159, got {}",
             pixel.0[0]
         );
-
-        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]
@@ -206,7 +205,8 @@ mod tests {
         // Asymmetric per-pixel and per-channel values catch in-place loop bugs
         // (channel swap, off-by-one indexing) that decode_png_to_linear_f32's
         // uniform-color image would not.
-        let temp_path = std::env::temp_dir().join("agx_test_decode_asymmetric.png");
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("agx_test_decode_asymmetric.png");
         let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(2, 2);
         img.put_pixel(0, 0, Rgb([255, 0, 0])); // red
         img.put_pixel(1, 0, Rgb([0, 255, 0])); // green
@@ -261,8 +261,6 @@ mod tests {
                 black_expected[c]
             );
         }
-
-        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]
@@ -272,7 +270,8 @@ mod tests {
         // decoded value is in linear Rec.2020 rather than linear sRGB. Applying
         // the inverse matrix should recover linear sRGB ≈ (1, 0, 0).
 
-        let temp_path = std::env::temp_dir().join("agx_test_decode_round_trip.png");
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("agx_test_decode_round_trip.png");
         let mut img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(1, 1);
         img.put_pixel(0, 0, Rgb([255, 0, 0]));
         img.save(&temp_path).unwrap();
@@ -290,8 +289,6 @@ mod tests {
         assert!((back[0] - 1.0).abs() < 1e-4, "red: got {}", back[0]);
         assert!(back[1].abs() < 1e-4, "green: got {}", back[1]);
         assert!(back[2].abs() < 1e-4, "blue: got {}", back[2]);
-
-        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]
@@ -302,7 +299,8 @@ mod tests {
 
     #[test]
     fn decode_without_icc_uses_srgb_fallback() {
-        let temp_path = std::env::temp_dir().join("agx_test_no_icc.png");
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("agx_test_no_icc.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
@@ -314,7 +312,6 @@ mod tests {
             "no-ICC decode must use sRGB fallback, got {}",
             pixel.0[0]
         );
-        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[cfg(feature = "icc")]
@@ -333,7 +330,8 @@ mod tests {
         let mut tagged = Vec::new();
         png.encoder().write_to(&mut tagged).unwrap();
 
-        let temp_path = std::env::temp_dir().join("agx_test_adobe_rgb.png");
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("agx_test_adobe_rgb.png");
         std::fs::write(&temp_path, &tagged).unwrap();
 
         let decoded = decode_standard(&temp_path).unwrap();
@@ -345,7 +343,6 @@ mod tests {
             "Adobe RGB red should map wider than sRGB red (~0.627); got {}",
             p[0]
         );
-        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]
@@ -370,15 +367,14 @@ mod tests {
 
     #[test]
     fn decode_routes_png_to_standard() {
-        let temp_path = std::env::temp_dir().join("agx_test_unified.png");
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("agx_test_unified.png");
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
             ImageBuffer::from_pixel(2, 2, Rgb([128, 128, 128]));
         img.save(&temp_path).unwrap();
 
         let result = decode(&temp_path);
         assert!(result.is_ok());
-
-        let _ = std::fs::remove_file(&temp_path);
     }
 
     #[test]

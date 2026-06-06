@@ -275,8 +275,14 @@ impl HeifImageHandle {
     /// Read the raw embedded ICC profile bytes (rICC/prof box), if present.
     #[cfg(feature = "icc")]
     fn raw_color_profile(&self) -> Option<Vec<u8>> {
+        /// Upper bound on the embedded ICC profile size we will allocate for.
+        /// Real display/working profiles are KB to low-MB; anything larger is a
+        /// corrupt or hostile file, so treat it as "no profile" rather than
+        /// allocating an attacker-controlled amount of memory (OOM/DoS guard).
+        const MAX_ICC_BYTES: usize = 16 * 1024 * 1024;
+
         let size = unsafe { heif_image_handle_get_raw_color_profile_size(self.ptr) };
-        if size == 0 {
+        if size == 0 || size > MAX_ICC_BYTES {
             return None;
         }
         let mut buf = vec![0u8; size];
