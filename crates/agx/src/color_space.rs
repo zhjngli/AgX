@@ -49,6 +49,17 @@ pub fn srgb_curve_signed_inverse(x: f32) -> f32 {
     sign_factor * linear
 }
 
+/// Apply the Adobe RGB (1998) transfer curve, sign-preserving.
+///
+/// Adobe RGB encodes with a pure gamma of 563/256 (≈ 2.19921875); the encode
+/// direction raises to `1/2.19921875`. Sign-preserving for negative inputs that
+/// can arise from heavy edits in the wide working space, matching the
+/// `srgb_curve_signed` convention: `sign(x) * |x|^(1/2.19921875)`.
+pub fn adobe_rgb_curve_signed(x: f32) -> f32 {
+    let sign_factor = if x < 0.0 { -1.0 } else { 1.0 };
+    sign_factor * x.abs().powf(1.0 / 2.19921875)
+}
+
 /// Linear Display P3 → linear Rec.2020.
 ///
 /// Display P3 uses the DCI-P3 primaries with D65 white point. The Rec.2020
@@ -72,6 +83,24 @@ pub const LINEAR_P3_TO_LINEAR_REC2020: [[f32; 3]; 3] = [
 /// guards against that drift.
 pub const LINEAR_BT2020_TO_LINEAR_REC2020: [[f32; 3]; 3] =
     [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+/// Linear Rec.2020 → linear Display P3 (DCI-P3 primaries, D65). Inverse of
+/// `LINEAR_P3_TO_LINEAR_REC2020`. Derived from primaries and pinned against
+/// lcms2 by `color_space::icc_crosscheck_tests` (run under `--features icc`).
+pub const LINEAR_REC2020_TO_LINEAR_P3: [[f32; 3]; 3] = [
+    [1.343578, -0.282180, -0.061399],
+    [-0.065297, 1.075788, -0.010490],
+    [0.002822, -0.019598, 1.016777],
+];
+
+/// Linear Rec.2020 → linear Adobe RGB (1998) (Adobe primaries, D65). Derived
+/// from primaries and pinned against lcms2 by `color_space::icc_crosscheck_tests`
+/// (run under `--features icc`).
+pub const LINEAR_REC2020_TO_LINEAR_ADOBE_RGB: [[f32; 3]; 3] = [
+    [1.151978, -0.097503, -0.054475],
+    [-0.124550, 1.132900, -0.008349],
+    [-0.022530, -0.049807, 1.072337],
+];
 
 /// Apply a 3×3 matrix to every pixel of a `[[f32; 3]]` buffer in place.
 ///
@@ -303,6 +332,56 @@ mod tests {
             rec2020[0],
             srgb_red_in_rec2020,
         );
+    }
+
+    #[test]
+    fn rec2020_to_p3_and_adobe_preserve_white() {
+        // Each row must sum to ~1.0 so neutral (equal-RGB) values stay neutral.
+        for m in [
+            &LINEAR_REC2020_TO_LINEAR_P3,
+            &LINEAR_REC2020_TO_LINEAR_ADOBE_RGB,
+        ] {
+            for row in m.iter() {
+                let sum = row[0] + row[1] + row[2];
+                assert!((sum - 1.0).abs() < 1e-3, "row sum {sum} should be ~1.0");
+            }
+        }
+    }
+
+    #[test]
+    fn rec2020_p3_round_trip_is_identity() {
+        // LINEAR_REC2020_TO_LINEAR_P3 must invert the existing P3 -> Rec.2020 matrix.
+        let fwd = LINEAR_P3_TO_LINEAR_REC2020;
+        let inv = LINEAR_REC2020_TO_LINEAR_P3;
+        for v in &[
+            [1.0_f32, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.4, 0.6, 0.2],
+        ] {
+            let mid = [
+                fwd[0][0] * v[0] + fwd[0][1] * v[1] + fwd[0][2] * v[2],
+                fwd[1][0] * v[0] + fwd[1][1] * v[1] + fwd[1][2] * v[2],
+                fwd[2][0] * v[0] + fwd[2][1] * v[1] + fwd[2][2] * v[2],
+            ];
+            let out = [
+                inv[0][0] * mid[0] + inv[0][1] * mid[1] + inv[0][2] * mid[2],
+                inv[1][0] * mid[0] + inv[1][1] * mid[1] + inv[1][2] * mid[2],
+                inv[2][0] * mid[0] + inv[2][1] * mid[1] + inv[2][2] * mid[2],
+            ];
+            for c in 0..3 {
+                assert!((out[c] - v[c]).abs() < 1e-3, "round-trip drift at {c}");
+            }
+        }
+    }
+
+    #[test]
+    fn adobe_rgb_curve_signed_is_odd_and_round_trips() {
+        let pos = adobe_rgb_curve_signed(0.5);
+        let neg = adobe_rgb_curve_signed(-0.5);
+        assert!((pos + neg).abs() < 1e-6, "curve must be odd");
+        let decoded = pos.powf(2.19921875); // inverse gamma
+        assert!((decoded - 0.5).abs() < 1e-4, "round-trip drift: {decoded}");
     }
 
     #[test]
