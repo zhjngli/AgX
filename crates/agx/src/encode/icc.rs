@@ -1,10 +1,11 @@
-//! Embedded sRGB v4 ICC profile for output color labeling.
+//! Embedded ICC profiles for output color labeling.
 //!
-//! AgX encodes every JPEG / PNG / TIFF output as sRGB and embeds this
-//! profile so downstream tools (Preview, Photoshop, browsers) identify
-//! the color space explicitly rather than guessing.
+//! AgX embeds an ICC profile in every JPEG / PNG / TIFF output so downstream
+//! tools (Preview, Photoshop, browsers) identify the color space explicitly
+//! rather than guessing. The encoder selects the blob matching the chosen
+//! output gamut via [`icc_for`]: sRGB (the default), Display P3, or Adobe RGB.
 //!
-//! The blob is synthesized by `crates/agx-profile-gen` via the lcms2
+//! The blobs are synthesized by `crates/agx-profile-gen` via the lcms2
 //! crate (MIT). The generated output inherits MIT and ships as bytes;
 //! see `docs/contributing/asset-licensing.md` for the licensing rationale
 //! and `crates/agx/src/encode/profiles/README.md` for the regeneration
@@ -23,7 +24,8 @@ pub(crate) const DISPLAY_P3_V4_ICC: &[u8] = include_bytes!("profiles/display_p3_
 /// Adobe RGB (1998) v4 ICC profile, embedded at compile time.
 pub(crate) const ADOBE_RGB_V4_ICC: &[u8] = include_bytes!("profiles/adobe_rgb_v4.icc");
 
-/// The ICC blob that labels output encoded in `gamut`.
+/// The `'static` ICC blob (embedded at compile time) that labels output
+/// encoded in `gamut`.
 pub(crate) fn icc_for(gamut: crate::encode::OutputGamut) -> &'static [u8] {
     use crate::encode::OutputGamut;
     match gamut {
@@ -78,5 +80,28 @@ mod tests {
             "expected blob size in 500..=800, got {}",
             n
         );
+    }
+
+    /// The Display P3 and Adobe RGB blobs must also be valid v4 RGB display
+    /// profiles in the same size band — guards an accidental swap or a botched
+    /// regeneration of either new blob (the sibling sRGB checks above don't
+    /// cover them).
+    #[test]
+    fn new_gamut_blobs_are_v4_rgb_display_profiles() {
+        use super::{ADOBE_RGB_V4_ICC, DISPLAY_P3_V4_ICC};
+        for (name, blob) in [
+            ("display_p3", DISPLAY_P3_V4_ICC),
+            ("adobe_rgb", ADOBE_RGB_V4_ICC),
+        ] {
+            assert!(blob.len() >= 128, "{name}: ICC header is 128 bytes minimum");
+            assert_eq!(blob[8], 0x04, "{name}: expected v4 profile");
+            assert_eq!(&blob[12..16], b"mntr", "{name}: expected display class");
+            assert_eq!(&blob[16..20], b"RGB ", "{name}: expected RGB color space");
+            assert!(
+                (500..=800).contains(&blob.len()),
+                "{name}: expected blob size in 500..=800, got {}",
+                blob.len()
+            );
+        }
     }
 }
