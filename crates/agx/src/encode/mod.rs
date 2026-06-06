@@ -757,14 +757,6 @@ mod tests {
         let _ = std::fs::remove_file(&temp_path);
     }
 
-    /// Pin pixel data unchanged after the ICC embed. Encode a colored
-    /// (non-greyscale) Rec.2020 input across JPEG / PNG / TIFF; decode
-    /// back and assert each pixel matches what the public per-pixel
-    /// kernel `encode_linear_rec2020_to_srgb_rgb8` produces independently.
-    /// Colored input exercises the off-diagonal matrix terms — greyscale
-    /// would short-circuit them. JPEG gets a small tolerance because
-    /// chroma subsampling shifts colored pixels by ±2 even at q=100;
-    /// PNG and TIFF are lossless.
     #[test]
     fn output_gamut_default_is_srgb() {
         assert_eq!(OutputGamut::default(), OutputGamut::Srgb);
@@ -790,6 +782,14 @@ mod tests {
         assert!(err.contains("rec2020"));
     }
 
+    /// Pin pixel data unchanged after the ICC embed. Encode a colored
+    /// (non-greyscale) Rec.2020 input across JPEG / PNG / TIFF; decode
+    /// back and assert each pixel matches what the public per-pixel
+    /// kernel `encode_linear_rec2020_to_srgb_rgb8` produces independently.
+    /// Colored input exercises the off-diagonal matrix terms — greyscale
+    /// would short-circuit them. JPEG gets a small tolerance because
+    /// chroma subsampling shifts colored pixels by ±2 even at q=100;
+    /// PNG and TIFF are lossless.
     #[test]
     fn encode_pixel_bytes_unchanged_after_icc_embed() {
         let linear: Rgb32FImage = ImageBuffer::from_pixel(4, 4, Rgb([0.5f32, 0.1, 0.2]));
