@@ -13,6 +13,22 @@ use std::path::PathBuf;
 
 use lcms2::{CIExyY, CIExyYTRIPLE, Locale, Profile, Tag, TagSignature, ToneCurve, MLU};
 
+/// D65 white point in CIE xyY, shared by every bundled profile.
+const D65: CIExyY = CIExyY {
+    x: 0.31270,
+    y: 0.32900,
+    Y: 1.0,
+};
+
+/// The sRGB parametric transfer curve (IEC 61966-2.1, type 4). Shared by the
+/// sRGB and Display P3 profiles (Display P3 reuses the sRGB transfer function).
+///
+/// Parameters: gamma=2.4, a=1/1.055, b=0.055/1.055, c=1/12.92, d=0.04045.
+fn srgb_tone_curve() -> ToneCurve {
+    ToneCurve::new_parametric(4, &[2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045])
+        .expect("build sRGB tone curve")
+}
+
 /// (relative output path, serialized profile bytes) for every bundled profile.
 fn profiles() -> Vec<(&'static str, Vec<u8>)> {
     vec![
@@ -60,21 +76,9 @@ fn build_srgb_v4_profile() -> Vec<u8> {
             Y: 1.0,
         },
     };
-    let d65 = CIExyY {
-        x: 0.31270,
-        y: 0.32900,
-        Y: 1.0,
-    };
+    let srgb_curve = srgb_tone_curve();
 
-    // sRGB parametric transfer curve, type 4 (IEC 61966-2.1):
-    //   if x >= d: y = (a*x + b)^gamma
-    //   else:      y = c*x
-    // Parameters: gamma=2.4, a=1/1.055, b=0.055/1.055, c=1/12.92, d=0.04045.
-    let srgb_curve =
-        ToneCurve::new_parametric(4, &[2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045])
-            .expect("build sRGB tone curve");
-
-    let mut profile = Profile::new_rgb(&d65, &primaries, &[&srgb_curve, &srgb_curve, &srgb_curve])
+    let mut profile = Profile::new_rgb(&D65, &primaries, &[&srgb_curve, &srgb_curve, &srgb_curve])
         .expect("build RGB profile");
 
     // Force v4 explicitly. lcms2 currently defaults new profiles to v4.3,
@@ -122,15 +126,8 @@ fn build_display_p3_v4_profile() -> Vec<u8> {
             Y: 1.0,
         },
     };
-    let d65 = CIExyY {
-        x: 0.31270,
-        y: 0.32900,
-        Y: 1.0,
-    };
-    let srgb_curve =
-        ToneCurve::new_parametric(4, &[2.4, 1.0 / 1.055, 0.055 / 1.055, 1.0 / 12.92, 0.04045])
-            .expect("build sRGB tone curve");
-    let mut profile = Profile::new_rgb(&d65, &primaries, &[&srgb_curve, &srgb_curve, &srgb_curve])
+    let srgb_curve = srgb_tone_curve();
+    let mut profile = Profile::new_rgb(&D65, &primaries, &[&srgb_curve, &srgb_curve, &srgb_curve])
         .expect("build P3 profile");
     // Pin v4 explicitly (see build_srgb_v4_profile for the rationale).
     profile.set_version(4.3);
@@ -171,13 +168,8 @@ fn build_adobe_rgb_v4_profile() -> Vec<u8> {
             Y: 1.0,
         },
     };
-    let d65 = CIExyY {
-        x: 0.31270,
-        y: 0.32900,
-        Y: 1.0,
-    };
     let gamma = ToneCurve::new(563.0 / 256.0);
-    let mut profile = Profile::new_rgb(&d65, &primaries, &[&gamma, &gamma, &gamma])
+    let mut profile = Profile::new_rgb(&D65, &primaries, &[&gamma, &gamma, &gamma])
         .expect("build Adobe RGB profile");
     // Pin v4 explicitly (see build_srgb_v4_profile for the rationale).
     profile.set_version(4.3);

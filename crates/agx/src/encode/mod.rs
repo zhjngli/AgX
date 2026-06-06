@@ -225,7 +225,8 @@ fn gamut_recipe(gamut: OutputGamut) -> GamutRecipe {
 
 /// Encode a linear Rec.2020 f32 image to a file with full options.
 ///
-/// Converts to 8-bit sRGB via a fused matrix → curve → quantize pass; resolves
+/// Converts to 8-bit output in `options.output_gamut` (default sRGB) via a fused
+/// matrix → curve → quantize pass and embeds the matching ICC profile; resolves
 /// the output format and path, encodes with the appropriate encoder, and
 /// optionally injects metadata. Returns the final output path (which may
 /// differ from the input path if an extension was appended).
