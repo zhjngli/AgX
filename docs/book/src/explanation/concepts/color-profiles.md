@@ -20,9 +20,9 @@ So AgX reads the embedded profile and converts the image into its internal worki
 
 Every image AgX produces is tagged with the color space the pixels actually live in, so viewers and professional tools render it correctly without guessing. By default that space is sRGB — the safe, universal choice that every screen, printer, and application understands.
 
-When you're delivering to a wide-gamut display or a workflow where the next tool (Photoshop, a RIP, another editor) will handle the full gamut, sRGB clips or compresses any color that sits outside its triangle. Display P3, which covers roughly 25% more of visible color than sRGB, is the standard choice for modern consumer devices — iPhones, recent MacBooks, and most premium monitors since 2015 can display it. Adobe RGB is wider still in the green-cyan region, and has long been the choice for print workflows and stock photography.
+When you're delivering to a wide-gamut display or a workflow where the next tool (Photoshop, a RIP, another editor) will handle the full gamut, sRGB clips any color that sits outside its triangle. Display P3, which covers roughly 25% more of visible color than sRGB, is the standard choice for modern consumer devices — iPhones, recent MacBooks, and most premium monitors since 2015 can display it. Adobe RGB is wider still in the green-cyan region, and has long been the choice for print workflows and stock photography.
 
-AgX encodes the pixels into the chosen gamut and embeds the matching ICC profile — sRGB, Display P3, or Adobe RGB — so the embedded profile names the color space the pixels actually live in. The default sRGB output is byte-identical to what AgX has always produced. The gamut choice is made at export time; the internal editing math is unaffected. See the [CLI reference](../../reference/cli.md) for the `--output-gamut` flag.
+AgX encodes the pixels into the chosen gamut and embeds the matching ICC profile — sRGB, Display P3, or Adobe RGB — so the embedded profile names the color space the pixels actually live in. The default sRGB output is byte-identical to what AgX has always produced. The gamut choice is made when the file is written; the internal editing math is unaffected. See the [CLI reference](../../reference/cli.md) for the `--output-gamut` flag.
 
 ## What AgX embeds
 
