@@ -61,10 +61,6 @@ Let the user pick the output color space at apply time (default sRGB, with Displ
 
 **Acceptance:** `agx apply --output-gamut p3 ...` produces a Display P3 JPEG that Preview / Photoshop identifies correctly. Default behavior unchanged (sRGB output). Wide-gamut e2e goldens added.
 
-## Bug fixes
-
-- `batch.rs` `run_batch_apply` / `run_batch_edit` carry 11–12 positional args (with `#[allow(clippy::too_many_arguments)]`); consolidate the encode-side params (quality, format, output_gamut) into a struct (or pass `EncodeOptions` directly) to remove the allow and the positional-transposition risk.
-
 ## Parked
 
 - **Out-of-gamut-tolerant HSL.** The wide working space sub-project (sub-project 1) clamps RGB → HSL conversion at entry; the HSL adjustment loses wide-gamut headroom for its stage specifically (every other stage benefits from the wider working space). The fix is a perceptually-uniform color space defined over the full positive RGB range — **OKHsl** (polar OKLab) is the modern industry answer; IPT and JzAzBz are alternatives. Cost: OKLab ↔ linear RGB conversions, OKHsl ↔ OKLab polar form, redo of the per-channel hue / saturation / luminance math in OK-space, golden regeneration for HSL-using presets. A simpler decompose-and-recombine approach (apply HSL to the clamped in-gamut portion of each pixel, add the out-of-gamut residual back unchanged) was considered during the SP1 brainstorm and rejected: it produces semantically wrong output for hue shifts, because the OOG residual still carries the original hue direction, which shouldn't survive a hue rotation.
