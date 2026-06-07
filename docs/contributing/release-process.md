@@ -1,8 +1,21 @@
 # Release Process
 
-This document describes how to ship a release of `agx-photo` or `agx-cli` to crates.io. Releases are local-only — execution runs from the maintainer's laptop, no CI involvement. Per-crate independent versioning: each publishable crate has its own version timeline.
+This document describes how to ship a release of `agx-photo` or `agx-cli` to crates.io. The version bump and changelog reach `main` through a pull request (`main` is branch-protected — see [Branch protection](#branch-protection-releases-go-through-a-pr)); tagging and the crates.io publish then run from the maintainer's laptop. Per-crate independent versioning: each publishable crate has its own version timeline.
 
 The high-level summary lives in [`developer-workflow.md`](developer-workflow.md) Step 6. This document has the operational detail.
+
+## Branch protection: releases go through a PR
+
+`main` is governed by a ruleset that requires a pull request for every change and has **no bypass actors** — not even repo admins can push to `main` directly. This is deliberate: the maintainer works alongside coding agents that act under the maintainer's identity, and a bypass would let an agent push unreviewed code to `main`. So the version-bump + changelog commits that a release produces **cannot be pushed straight to `main`** the way a vanilla `cargo release --execute` expects.
+
+Releases therefore split into two halves:
+
+1. **File edits via a PR.** The version bump, `CHANGELOG.md` stamp, and (for `agx-photo`) the `agx-cli` dep-pin bump are produced on a short-lived release branch — using `cargo-release` purely for the edits, with publishing, tagging, and pushing disabled — then merged to `main` through a normal PR. Required checks must pass, and the ruleset requires linear history, so squash- or rebase-merge.
+2. **Tag + publish from merged `main`.** After the PR merges, tag the merged commit and run `cargo publish` locally. Tags are not covered by the branch ruleset, so `git push origin <tag>` works; and `cargo publish` talks to crates.io directly, independent of any git push.
+
+The per-step recipe is in [Release steps](#release-steps-single-crate) below.
+
+> If a future maintainer adds a bypass actor to the ruleset (e.g. a release service account that agents can't impersonate), the original all-in-one `cargo release --execute` flow — bump, tag, publish, and push to `main` in one shot — becomes viable again. The split flow below assumes no bypass.
 
 ## When to release
 
@@ -97,37 +110,47 @@ For a release of `agx-cli`:
 
      Otherwise the published changelog will have an entry header with no body.
 
-5. **Commit the changelog edit:**
+5. **Make the bump on a release branch.** Releases can't be pushed to `main` directly (see [Branch protection](#branch-protection-releases-go-through-a-pr)), so produce the bump on a branch. Commit the curated changelog, then run `cargo-release` with tag/publish/push disabled — it bumps `Cargo.toml`, rewrites `[Unreleased]` to a dated section, updates dependent dep-pins, and commits, stopping there:
 
    ```bash
+   git checkout -b release/agx-cli-vX.Y.Z
    git add crates/agx-cli/CHANGELOG.md
    git commit -m "docs(agx-cli): changelog for vX.Y.Z"
+
+   # Dry-run the edits:
+   cargo release <patch|minor|major> -p agx-cli --allow-branch 'release/*' --no-tag --no-publish --no-push
+   # Execute them (commits the bump; no tag, no publish, no push):
+   cargo release <patch|minor|major> -p agx-cli --allow-branch 'release/*' --no-tag --no-publish --no-push --execute
    ```
 
-6. **Run cargo-release.** This bumps `Cargo.toml`, rewrites `[Unreleased]` to a dated section in `CHANGELOG.md`, commits the version bump, tags as `agx-cli-vX.Y.Z`, and publishes to crates.io:
+   `--allow-branch 'release/*'` overrides `release.toml`'s `allow-branch = ["main"]` for the release branch. It's safe because `--no-publish` independently removes the risk that gate guards against — an accidental crates.io upload from a non-`main` branch. `cargo-release` adds one `chore: Release` commit (the version bump + changelog date-stamp) on top of the changelog-curation commit you made earlier in this step; nothing is tagged, published, or pushed. **Run `cargo release` exactly once per crate** — re-running bumps again.
+
+6. **Open the release PR and merge it.** Push the branch, open a PR, let the required checks pass, and merge. The ruleset requires linear history, so squash- or rebase-merge (not a merge commit):
 
    ```bash
-   # Dry run first — prints planned actions without bumping or publishing:
-   cargo release <patch|minor|major> -p agx-cli
-
-   # Then commit to it:
-   cargo release <patch|minor|major> -p agx-cli --execute
+   git push -u origin release/agx-cli-vX.Y.Z
+   gh pr create --title "release: agx-cli vX.Y.Z" --body "Version bump + changelog for agx-cli vX.Y.Z."
+   # after checks pass + review:
+   gh pr merge --squash
    ```
 
-   Without `--execute`, cargo-release runs in dry-run mode and shows what it would do. With `--execute`, it prompts before each side-effecting step. Once `cargo publish` runs (the last prompt), the version is on crates.io permanently — yank-only, not deletable. Read each prompt before confirming.
+   The merged commit on `main` now carries the version bump and the dated changelog entry.
 
-   Each release leaves two commits on `main`: your changelog edit from step 5 and `cargo-release`'s auto-generated `chore: Release <crate> version X.Y.Z`. That's expected; `release.toml` does not set `consolidate-commits = true` and no amending is needed.
-
-   `cargo-release` runs `cargo publish --verify` as part of step 6, which performs a from-scratch verification build inside `target/package/`. Expect 1-3 minutes between prompts during this phase — it's not hung. The verify step is intentional (catches "works on my machine, breaks for downstream") and is on by default.
-
-7. **Push the tag.** `release.toml` has `push = false`, so the tag is local only after `cargo-release`. Push the specific tag and the bumped main commit:
+7. **Tag and publish from merged `main`.** Update local `main`, tag the *merged release commit explicitly*, push the tag (tags aren't covered by the branch ruleset), and publish:
 
    ```bash
-   git push origin agx-cli-vX.Y.Z
-   git push origin main
+   git checkout main && git pull --ff-only
+   # Resolve the merged release commit by SHA — don't tag HEAD, which may have
+   # advanced if another PR merged in the window between merge and tagging.
+   REL=$(gh pr view <release-PR#> --json mergeCommit --jq .mergeCommit.oid)
+   git tag agx-cli-vX.Y.Z "$REL"
+   git push origin agx-cli-vX.Y.Z   # tag push is allowed by the ruleset
+   cargo publish -p agx-cli         # runs cargo publish --verify; irreversible
    ```
 
-   Don't use `git push --tags` here — it pushes all local tags, including any in-progress or unvetted ones from a multi-crate workspace.
+   Use plain `cargo publish` here, not `cargo release --execute` — the bump already merged, so cargo-release would bump again. `cargo publish` talks to crates.io directly (independent of git push) and runs a from-scratch verification build inside `target/package/` (1-3 minutes; not hung). Once it uploads, the version is on crates.io permanently — yank-only, not deletable.
+
+   Don't use `git push --tags` — it pushes every local tag, including unvetted ones from a multi-crate workspace.
 
 For a release of `agx-photo`, the same flow applies with substitutions:
 
@@ -142,15 +165,32 @@ For a release of `agx-photo`, the same flow applies with substitutions:
 
 ## Multi-crate releases
 
-When `agx-photo` ships changes that `agx-cli` consumes, both crates ship. The order matters because `agx-cli`'s dep pin must resolve on crates.io.
+When `agx-photo` ships changes that `agx-cli` consumes, both crates ship in **one release PR**, and the crates.io publish order matters because `agx-cli`'s dep pin must resolve on the index.
 
-1. **Release `agx-photo` first.** Follow the single-crate steps above for `agx-photo`. After `cargo publish` succeeds, the new lib version is on crates.io.
+1. **Bump both on one release branch.** On a single `release/...` branch, run the step-5 `cargo-release` edit command for `agx-photo` first, then for `agx-cli`:
 
-   Side effect to expect: the `agx-photo` release commit also rewrites `crates/agx-cli/Cargo.toml`'s `agx-photo` dep pin in place (e.g., `version = "0.1.0"` → `version = "0.1.1"`). This is intentional — `release.toml` sets `dependent-version = "upgrade"`, which keeps the workspace internally consistent. Don't revert the change. The subsequent `agx-cli` release commit will then carry only the `agx-cli` version bump and CHANGELOG rewrite.
+   ```bash
+   cargo release <bump> -p agx-photo --allow-branch 'release/*' --no-tag --no-publish --no-push --execute
+   cargo release <bump> -p agx-cli   --allow-branch 'release/*' --no-tag --no-publish --no-push --execute
+   ```
 
-2. **Wait for the index.** crates.io's sparse index updates within seconds; the legacy git index can take up to a minute. `cargo-release` for `agx-cli` will retry automatically.
+   Running `agx-photo` first matters: its edit rewrites `crates/agx-cli/Cargo.toml`'s `agx-photo` dep pin in place (e.g. `version = "0.1.0"` → `"0.2.0"`) because `release.toml` sets `dependent-version = "upgrade"`. Don't revert that — it keeps the workspace consistent. The `agx-cli` command then adds only the `agx-cli` version bump and CHANGELOG entry. Even if `agx-cli`'s own source didn't change, ship at least a patch bump so `cargo install agx-cli` picks up the new lib transitively (write a one-line `[Unreleased]` entry first — see step 4).
 
-3. **Release `agx-cli`.** Follow the single-crate steps above for `agx-cli`. The dep pin was already updated in step 1, so this commit only adds the `agx-cli` version bump and CHANGELOG entry. Even if `agx-cli`'s own source did not change, ship a patch bump so users running `cargo install agx-cli` pick up the new lib transitively. (See the empty-`[Unreleased]` note in step 4 of the single-crate flow for this exact scenario.)
+2. **One PR, merge it.** Push the branch and merge the PR (squash/rebase) per step 6. CI builds fine even though `agx-photo`'s new version isn't on crates.io yet: in the workspace, `agx-cli` resolves `agx-photo` via the **path** dependency locally; the `version` pin only matters for the *published* crate.
+
+3. **Publish from merged `main`, `agx-photo` first.** Both tags point at the *same* merged release commit, so resolve it once and reuse it for both — don't let `HEAD` drift between the two publishes if another PR merges in between:
+
+   ```bash
+   git checkout main && git pull --ff-only
+   REL=$(gh pr view <release-PR#> --json mergeCommit --jq .mergeCommit.oid)
+   git tag agx-photo-vX.Y.Z "$REL" && git push origin agx-photo-vX.Y.Z
+   cargo publish -p agx-photo
+   # wait for the index (sparse: seconds; legacy git index: ~a minute), then:
+   git tag agx-cli-vA.B.C "$REL" && git push origin agx-cli-vA.B.C   # independent version
+   cargo publish -p agx-cli
+   ```
+
+   Publishing `agx-cli` before `agx-photo` is on the index fails with "dependency not found in registry."
 
 ## Troubleshooting
 
