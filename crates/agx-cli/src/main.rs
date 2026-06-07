@@ -279,20 +279,18 @@ fn run_batch_apply(
     use_gpu: bool,
 ) -> agx::Result<()> {
     warn_unknown_preset_fields(preset_path);
-    let fmt = batch.output.parse_format()?;
-    let summary = batch::run_batch_apply(
-        &batch.input_dir,
-        preset_path,
-        &batch.output_dir,
-        batch.recursive,
-        batch.output.quality,
-        fmt,
-        batch.output.output_gamut,
-        batch.suffix.as_deref(),
-        batch.jobs,
-        batch.skip_errors,
+    let encode = batch.output.encode_options()?;
+    let run = batch::BatchRun {
+        input_dir: &batch.input_dir,
+        output_dir: &batch.output_dir,
+        recursive: batch.recursive,
+        encode: &encode,
+        suffix: batch.suffix.as_deref(),
+        jobs: batch.jobs,
+        skip_errors: batch.skip_errors,
         use_gpu,
-    );
+    };
+    let summary = batch::run_batch_apply(&run, preset_path);
     if !summary.failed.is_empty() {
         process::exit(1);
     }
@@ -302,21 +300,18 @@ fn run_batch_apply(
 fn run_batch_edit(edit: &EditArgs, batch: &BatchOpts, use_gpu: bool) -> agx::Result<()> {
     let params = edit.to_params()?;
     let lut_data = edit.load_lut()?;
-    let fmt = batch.output.parse_format()?;
-    let summary = batch::run_batch_edit(
-        &batch.input_dir,
-        &batch.output_dir,
-        batch.recursive,
-        &params,
-        lut_data,
-        batch.output.quality,
-        fmt,
-        batch.output.output_gamut,
-        batch.suffix.as_deref(),
-        batch.jobs,
-        batch.skip_errors,
+    let encode = batch.output.encode_options()?;
+    let run = batch::BatchRun {
+        input_dir: &batch.input_dir,
+        output_dir: &batch.output_dir,
+        recursive: batch.recursive,
+        encode: &encode,
+        suffix: batch.suffix.as_deref(),
+        jobs: batch.jobs,
+        skip_errors: batch.skip_errors,
         use_gpu,
-    );
+    };
+    let summary = batch::run_batch_edit(&run, &params, lut_data);
     if !summary.failed.is_empty() {
         process::exit(1);
     }

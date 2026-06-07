@@ -171,9 +171,7 @@ fn num_cpus() -> usize {
 fn process_single(
     input: &Path,
     output: &Path,
-    quality: u8,
-    format: Option<agx::encode::OutputFormat>,
-    output_gamut: agx::encode::OutputGamut,
+    encode: &agx::encode::EncodeOptions,
     use_gpu: bool,
     configure: impl FnOnce(&mut agx::Engine),
 ) -> Result<Duration, String> {
@@ -184,17 +182,12 @@ fn process_single(
     configure(&mut engine);
     let result = engine.render();
     let rendered = result.image;
-    let opts = agx::encode::EncodeOptions {
-        jpeg_quality: quality,
-        format,
-        output_gamut,
-    };
 
     if let Some(parent) = output.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    agx::encode::encode_to_file_with_options(&rendered, output, &opts, metadata.as_ref())
+    agx::encode::encode_to_file_with_options(&rendered, output, encode, metadata.as_ref())
         .map_err(|e| e.to_string())?;
     Ok(start.elapsed())
 }
@@ -208,6 +201,44 @@ struct BatchContext<'a> {
     suffix: Option<&'a str>,
     jobs: usize,
     skip_errors: bool,
+}
+
+impl<'a> BatchContext<'a> {
+    fn from_run(run: &BatchRun<'a>) -> Self {
+        Self {
+            input_dir: run.input_dir,
+            output_dir: run.output_dir,
+            recursive: run.recursive,
+            format_ext: run.encode.format.map(|f| f.extension()),
+            suffix: run.suffix,
+            jobs: run.jobs,
+            skip_errors: run.skip_errors,
+        }
+    }
+}
+
+/// Shared configuration for a batch run: where to read and write, how many
+/// workers to use, and how to encode each output. Bundles the parameters common
+/// to batch-apply and batch-edit so the public runners take a few named fields
+/// instead of a long positional list (which is easy to transpose as more
+/// encode-side knobs are added).
+pub struct BatchRun<'a> {
+    /// Directory to read input images from.
+    pub input_dir: &'a Path,
+    /// Directory to write outputs to (created if missing).
+    pub output_dir: &'a Path,
+    /// Recurse into subdirectories.
+    pub recursive: bool,
+    /// Encoding options (quality, format, output gamut) applied to every output.
+    pub encode: &'a agx::encode::EncodeOptions,
+    /// Optional suffix appended to each output filename (e.g. `_edited`).
+    pub suffix: Option<&'a str>,
+    /// Worker count (0 = auto-detect CPU cores).
+    pub jobs: usize,
+    /// Continue processing after individual files fail.
+    pub skip_errors: bool,
+    /// Use the GPU pipeline.
+    pub use_gpu: bool,
 }
 
 /// Generic batch processing: discover images, process in parallel, summarize.
@@ -282,25 +313,12 @@ where
 }
 
 /// Run batch-apply: apply a preset to all images in a directory, in parallel.
-#[allow(clippy::too_many_arguments)]
-pub fn run_batch_apply(
-    input_dir: &Path,
-    preset_path: &Path,
-    output_dir: &Path,
-    recursive: bool,
-    quality: u8,
-    format: Option<agx::encode::OutputFormat>,
-    output_gamut: agx::encode::OutputGamut,
-    suffix: Option<&str>,
-    jobs: usize,
-    skip_errors: bool,
-    use_gpu: bool,
-) -> BatchSummary {
+pub fn run_batch_apply(run: &BatchRun, preset_path: &Path) -> BatchSummary {
     let preset = match agx::Preset::load_from_file(preset_path) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("Failed to load preset: {e}");
-            let images = discover_images(input_dir, recursive);
+            let images = discover_images(run.input_dir, run.recursive);
             return BatchSummary {
                 total: images.len(),
                 succeeded: 0,
@@ -313,70 +331,28 @@ pub fn run_batch_apply(
         }
     };
 
-    let opts = BatchContext {
-        input_dir,
-        output_dir,
-        recursive,
-        format_ext: format.map(|f| f.extension()),
-        suffix,
-        jobs,
-        skip_errors,
-    };
+    let opts = BatchContext::from_run(run);
     run_batch(&opts, |input, output| {
-        process_single(
-            input,
-            output,
-            quality,
-            format,
-            output_gamut,
-            use_gpu,
-            |engine| {
-                engine.apply_preset(&preset);
-            },
-        )
+        process_single(input, output, run.encode, run.use_gpu, |engine| {
+            engine.apply_preset(&preset);
+        })
     })
 }
 
 /// Run batch-edit: apply inline parameters to all images in a directory, in parallel.
-#[allow(clippy::too_many_arguments)]
 pub fn run_batch_edit(
-    input_dir: &Path,
-    output_dir: &Path,
-    recursive: bool,
+    run: &BatchRun,
     params: &agx::Parameters,
     lut: Option<Arc<agx::Lut3D>>,
-    quality: u8,
-    format: Option<agx::encode::OutputFormat>,
-    output_gamut: agx::encode::OutputGamut,
-    suffix: Option<&str>,
-    jobs: usize,
-    skip_errors: bool,
-    use_gpu: bool,
 ) -> BatchSummary {
-    let opts = BatchContext {
-        input_dir,
-        output_dir,
-        recursive,
-        format_ext: format.map(|f| f.extension()),
-        suffix,
-        jobs,
-        skip_errors,
-    };
+    let opts = BatchContext::from_run(run);
     run_batch(&opts, |input, output| {
-        process_single(
-            input,
-            output,
-            quality,
-            format,
-            output_gamut,
-            use_gpu,
-            |engine| {
-                engine.set_params(params.clone());
-                if let Some(l) = &lut {
-                    engine.set_lut(Some(Arc::clone(l)));
-                }
-            },
-        )
+        process_single(input, output, run.encode, run.use_gpu, |engine| {
+            engine.set_params(params.clone());
+            if let Some(l) = &lut {
+                engine.set_lut(Some(Arc::clone(l)));
+            }
+        })
     })
 }
 
@@ -547,19 +523,18 @@ mod tests {
         )
         .unwrap();
 
-        let summary = run_batch_apply(
-            &input_dir,
-            &preset_path,
-            &output_dir,
-            false,
-            92,
-            None,
-            agx::encode::OutputGamut::Srgb,
-            None,
-            1,
-            false,
-            false,
-        );
+        let encode = agx::encode::EncodeOptions::default();
+        let run = BatchRun {
+            input_dir: &input_dir,
+            output_dir: &output_dir,
+            recursive: false,
+            encode: &encode,
+            suffix: None,
+            jobs: 1,
+            skip_errors: false,
+            use_gpu: false,
+        };
+        let summary = run_batch_apply(&run, &preset_path);
 
         assert_eq!(summary.total, 2);
         assert_eq!(summary.succeeded, 2);
@@ -579,20 +554,18 @@ mod tests {
 
         let params = agx::Parameters::default();
 
-        let summary = run_batch_edit(
-            &input_dir,
-            &output_dir,
-            false,
-            &params,
-            None,
-            92,
-            None,
-            agx::encode::OutputGamut::Srgb,
-            None,
-            1,
-            false,
-            false,
-        );
+        let encode = agx::encode::EncodeOptions::default();
+        let run = BatchRun {
+            input_dir: &input_dir,
+            output_dir: &output_dir,
+            recursive: false,
+            encode: &encode,
+            suffix: None,
+            jobs: 1,
+            skip_errors: false,
+            use_gpu: false,
+        };
+        let summary = run_batch_edit(&run, &params, None);
 
         assert_eq!(summary.total, 1);
         assert_eq!(summary.succeeded, 1);
