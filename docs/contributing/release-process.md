@@ -123,7 +123,7 @@ For a release of `agx-cli`:
    cargo release <patch|minor|major> -p agx-cli --allow-branch 'release/*' --no-tag --no-publish --no-push --execute
    ```
 
-   `--allow-branch 'release/*'` overrides `release.toml`'s `allow-branch = ["main"]` for the release branch. It's safe because `--no-publish` independently removes the risk that gate guards against — an accidental crates.io upload from a non-`main` branch. The result is a single `chore: Release` commit carrying the bump + changelog stamp; nothing is tagged, published, or pushed. **Run `cargo release` exactly once per crate** — re-running bumps again.
+   `--allow-branch 'release/*'` overrides `release.toml`'s `allow-branch = ["main"]` for the release branch. It's safe because `--no-publish` independently removes the risk that gate guards against — an accidental crates.io upload from a non-`main` branch. `cargo-release` adds one `chore: Release` commit (the version bump + changelog date-stamp) on top of the changelog-curation commit you made earlier in this step; nothing is tagged, published, or pushed. **Run `cargo release` exactly once per crate** — re-running bumps again.
 
 6. **Open the release PR and merge it.** Push the branch, open a PR, let the required checks pass, and merge. The ruleset requires linear history, so squash- or rebase-merge (not a merge commit):
 
@@ -136,11 +136,14 @@ For a release of `agx-cli`:
 
    The merged commit on `main` now carries the version bump and the dated changelog entry.
 
-7. **Tag and publish from merged `main`.** Update local `main`, tag the merged commit, push the tag (tags aren't covered by the branch ruleset), and publish:
+7. **Tag and publish from merged `main`.** Update local `main`, tag the *merged release commit explicitly*, push the tag (tags aren't covered by the branch ruleset), and publish:
 
    ```bash
    git checkout main && git pull --ff-only
-   git tag agx-cli-vX.Y.Z           # tags the merged release commit
+   # Resolve the merged release commit by SHA — don't tag HEAD, which may have
+   # advanced if another PR merged in the window between merge and tagging.
+   REL=$(gh pr view <release-PR#> --json mergeCommit --jq .mergeCommit.oid)
+   git tag agx-cli-vX.Y.Z "$REL"
    git push origin agx-cli-vX.Y.Z   # tag push is allowed by the ruleset
    cargo publish -p agx-cli         # runs cargo publish --verify; irreversible
    ```
@@ -175,7 +178,19 @@ When `agx-photo` ships changes that `agx-cli` consumes, both crates ship in **on
 
 2. **One PR, merge it.** Push the branch and merge the PR (squash/rebase) per step 6. CI builds fine even though `agx-photo`'s new version isn't on crates.io yet: in the workspace, `agx-cli` resolves `agx-photo` via the **path** dependency locally; the `version` pin only matters for the *published* crate.
 
-3. **Publish from merged `main`, `agx-photo` first.** Per step 7, tag and `cargo publish -p agx-photo`. Then **wait for the index** (sparse index updates in seconds; the legacy git index can take ~a minute), then tag and `cargo publish -p agx-cli`. Publishing `agx-cli` before `agx-photo` is on the index fails with "dependency not found in registry."
+3. **Publish from merged `main`, `agx-photo` first.** Both tags point at the *same* merged release commit, so resolve it once and reuse it for both — don't let `HEAD` drift between the two publishes if another PR merges in between:
+
+   ```bash
+   git checkout main && git pull --ff-only
+   REL=$(gh pr view <release-PR#> --json mergeCommit --jq .mergeCommit.oid)
+   git tag agx-photo-v0.2.0 "$REL" && git push origin agx-photo-v0.2.0
+   cargo publish -p agx-photo
+   # wait for the index (sparse: seconds; legacy git index: ~a minute), then:
+   git tag agx-cli-v0.3.0 "$REL" && git push origin agx-cli-v0.3.0
+   cargo publish -p agx-cli
+   ```
+
+   Publishing `agx-cli` before `agx-photo` is on the index fails with "dependency not found in registry."
 
 ## Troubleshooting
 
