@@ -84,7 +84,7 @@ Pre-1.0, Cargo treats `0.x.y` as compatible within `0.x` and incompatible across
 
 That's why the [checklist](#checklist) splits releasing into two halves:
 
-1. **File edits via a PR** (steps 2–5) — the bump, `CHANGELOG.md` stamp, and (for `agx-photo`) the `agx-cli` dep-pin bump are produced on a release branch and merged through a normal PR. Required checks must pass, and the ruleset requires linear history, so **squash- or rebase-merge** (not a merge commit).
+1. **File edits via a PR** (steps 2–5) — the bump, `CHANGELOG.md` stamp, and (for `agx-photo`) the `agx-cli` dep-pin bump are produced on a release branch and merged through a normal PR. Required checks must pass, and the ruleset requires linear history (no merge commits) — **squash-merge** (a rebase-merge also satisfies it).
 
 2. **Tag + publish from merged `main`** (step 6) — tags are *not* covered by the branch ruleset, so `git push origin <tag>` works; and `cargo publish` talks to crates.io directly, independent of any git push.
 
