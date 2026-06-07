@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`validate` subcommand** — check one or more preset files for unknown fields, type mismatches, and out-of-range values without rendering. Apply-time commands also warn on unknown preset fields instead of silently ignoring them.
+- **HEIC/HEIF input support** — `edit`, `apply`, `multi-apply`, and the batch commands accept iPhone HEIC and other HEIF captures (enabled in the published binary).
+- **`--output-gamut srgb|p3|adobe-rgb`** on `apply`, `edit`, `batch-apply`, and `batch-edit` — choose the output color space; AgX converts to it and embeds the matching ICC profile. Default `srgb`, byte-identical to before.
+
+### Changed
+
+- **Inputs are color-managed by default.** The published binary now honors embedded ICC profiles on JPEG/PNG/TIFF/HEIF inputs and converts them into the working space; previously every input was assumed to be sRGB. Untagged inputs still assume sRGB.
+
 ## [0.2.0] - 2026-04-29
 
 ### Changed
@@ -26,6 +36,7 @@ First public release of `agx-cli` to crates.io.
 - **Parallel batch.** `batch-apply` and `batch-edit` use `--jobs N` to render multiple images concurrently (default: auto-detect CPU cores). `multi-apply` accepts `--jobs N` to run multiple preset renders concurrently for the same image (default: serial).
 - **Output formats.** JPEG, PNG, TIFF.
 
-[Unreleased]: https://github.com/zhjngli/AgX/compare/agx-cli-v0.2.0...HEAD
+[Unreleased]: https://github.com/zhjngli/AgX/compare/agx-cli-v0.3.0...HEAD
+[0.3.0]: https://github.com/zhjngli/AgX/releases/tag/agx-cli-v0.3.0
 [0.2.0]: https://github.com/zhjngli/AgX/releases/tag/agx-cli-v0.2.0
 [0.1.0]: https://github.com/zhjngli/AgX/releases/tag/agx-cli-v0.1.0
