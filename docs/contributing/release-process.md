@@ -106,7 +106,7 @@ The draft groups `feat:`/`fix:`/`refactor:`/`perf:` commits under Keep-a-Changel
 
 At curate time, also:
 
-- **Strip `(#N)` PR references** from commit subjects. Project convention bans `#N` in commits/PR bodies (GitHub auto-links every `#N`).
+- **Strip any `(#N)` from the curated entry.** `git-cliff` copies commit subjects into the draft verbatim, and a `#N` in a published changelog auto-links to an unrelated issue/PR. (This edits the changelog draft, not the already-merged commits — the same convention keeps `#N` out of commit subjects in the first place.)
 - **Update the link refs** at the bottom of `CHANGELOG.md`: point the `[Unreleased]: …compare/<previous-tag>...HEAD` line at the new tag, and add a `[X.Y.Z]: …releases/tag/<crate>-vX.Y.Z` line. `cargo-release` does not maintain these.
 - If `[Unreleased]` would otherwise be **empty** (e.g. a no-source-change `agx-cli` re-release to pick up a new `agx-photo`), write a one-line entry so the published section isn't a bare header — for example, an `### Changed` entry reading "Updated agx-photo dependency to X.Y.Z."
 
