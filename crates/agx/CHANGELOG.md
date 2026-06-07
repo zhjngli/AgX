@@ -5,10 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+This release widens AgX's internal working space to Rec.2020 and adds end-to-end
+ICC color management — wide-gamut inputs survive the pipeline, outputs
+self-identify, and the delivery gamut is selectable. It also adds HEIC/HEIF
+decode and a preset-validation API. Consumers upgrading from 0.1.0 should read
+the breaking changes below.
+
 ### Changed (breaking)
 
-- **Working space widened to linear Rec.2020.** Stages 1–4 (white balance, exposure, dehaze, noise reduction) run in linear Rec.2020; stages 5–8 (per-pixel adjustments, detail, grain, vignette) run in gamma-encoded Rec.2020. Decode converts every input format to linear Rec.2020 at the boundary; encode converts linear Rec.2020 to 8-bit sRGB at output. The public function `linear_to_srgb_rgb8` was renamed to `encode_linear_rec2020_to_srgb_rgb8` and its input contract changed from linear sRGB to linear Rec.2020. Library consumers must migrate at this release.
+- **Working space widened to linear Rec.2020.** Stages 1–4 (white balance, exposure, dehaze, noise reduction) run in linear Rec.2020; stages 5–8 (per-pixel adjustments, detail, grain, vignette) run in gamma-encoded Rec.2020. Decode converts every input format to linear Rec.2020 at the boundary; encode converts linear Rec.2020 to the chosen output gamut (default sRGB) at output. The public function `linear_to_srgb_rgb8` was renamed to `encode_linear_rec2020_to_srgb_rgb8` and its input contract changed from linear sRGB to linear Rec.2020. Library consumers must migrate at this release.
 - **`ColorSpace` enum gained `LinearRec2020` and `GammaRec2020` variants.** Downstream `match` expressions over `engine::ColorSpace` (re-exported from the crate root) must add arms for the new variants or use a wildcard arm. Existing `LinearSrgb` and `SrgbGamma` variants remain — they're still used as encode-side intermediates and inside the LUT-wrap conversion bracket.
+- **`ImageMetadata.icc_profile` removed.** Output color labeling is owned by the encoder, which embeds an ICC profile matching the chosen output gamut; input metadata no longer carries or influences the output profile.
+- **`EncodeOptions` gained an `output_gamut` field.** Code constructing `EncodeOptions` with a struct literal must add the field (or spread `..Default::default()`); the default `OutputGamut::Srgb` keeps output byte-identical to before.
 - **HEIC Display P3 inputs preserve wide gamut end-to-end.** The decoder previously squashed P3 to sRGB at the boundary; iPhone HEIC captures now keep their wider gamut through the entire pipeline.
 - **Aesthetic intermediate clamps removed.** Stage outputs no longer clip wide-gamut headroom; only domain-safety clamps (LUT-index, HSL `[0, 1]` palette guard, color-grading luminance weight) remain. The final clamp to display gamut happens at encode.
 - **GPU and CPU pipeline stage names retagged.** The two transfer stages were renamed to reflect their new contract:
@@ -19,14 +27,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `crate::color_space` module exposing:
+- **`crate::color_space` module** exposing:
   - Rec.2020 ↔ sRGB conversion matrices: `LINEAR_REC2020_TO_LINEAR_SRGB`, `LINEAR_SRGB_TO_LINEAR_REC2020`.
-  - Direct decode-boundary matrices for wide-gamut inputs: `LINEAR_P3_TO_LINEAR_REC2020`, `LINEAR_BT2020_TO_LINEAR_REC2020` (identity, since BT.2020 primaries match Rec.2020).
-  - Sign-preserving sRGB transfer curve: `srgb_curve_signed`, `srgb_curve_signed_inverse`. Handles wide-gamut negative components that arise from matrix-converting saturated colors.
-  - `wrap_lut_lookup` helper that brackets a 3D-LUT sample with the gamma-Rec.2020 ↔ gamma-sRGB conversion chain (8 steps), so existing sRGB-authored `.cube` LUTs remain portable.
+  - Decode-boundary matrices for wide-gamut inputs: `LINEAR_P3_TO_LINEAR_REC2020`, `LINEAR_BT2020_TO_LINEAR_REC2020` (identity, since BT.2020 primaries match Rec.2020).
+  - Output-gamut matrices: `LINEAR_REC2020_TO_LINEAR_P3`, `LINEAR_REC2020_TO_LINEAR_ADOBE_RGB`.
+  - Sign-preserving transfer curves: `srgb_curve_signed`, `srgb_curve_signed_inverse`, `adobe_rgb_curve_signed`. Handle wide-gamut negative components that arise from matrix-converting saturated colors.
+  - `wrap_lut_lookup` helper that brackets a 3D-LUT sample with the gamma-Rec.2020 ↔ gamma-sRGB conversion chain, so existing sRGB-authored `.cube` LUTs remain portable.
   - `apply_matrix_3x3` in-place per-buffer matrix helper used at decode/encode boundaries.
 - `LinearRec2020` and `GammaRec2020` variants on the `ColorSpace` enum.
-- Synthetic Display P3 HEIC e2e fixture (`synthetic_p3_red.heic`) demonstrating wide-gamut preservation.
+- **Input ICC profiles are honored** (`icc` feature, backed by LittleCMS/lcms2): embedded profiles on JPEG, PNG, TIFF, and HEIF inputs are parsed and converted into the working space; a missing or unsupported profile falls back to sRGB.
+- **Output self-identifies with its color space.** Every JPEG, PNG, and TIFF embeds an ICC profile matching the selected output gamut. `OutputGamut` (sRGB / Display P3 / Adobe RGB) and `EncodeOptions::output_gamut` select it; the bundled profiles are generated by the `agx-profile-gen` dev tool via lcms2.
+- **HEIC/HEIF decode** via libheif (`heic` feature) — iPhone HEIC and other HEIF captures decode directly, reading their nclx/ICC color information.
+- **Preset validation API** (`preset::validate`) — unknown-field detection plus type and range checks, usable without rendering.
+- Synthetic wide-gamut e2e fixtures (Display P3 HEIC, Adobe RGB JPEG, ProPhoto PNG) demonstrating gamut preservation.
+
+### Changed
+
+- Reduced dehaze peak memory by dropping guided-filter intermediates, and cut decode/encode IO buffer allocations.
+
+### Fixed
+
+- EXIF orientation is normalized at metadata extraction, preventing double-rotation of already-upright pixels.
+- Hardened a HEIC decode path flagged by CodeQL (potential null dereference).
 
 ## [0.1.0] - 2026-04-26
 
@@ -43,5 +65,6 @@ First public release of `agx-photo` to crates.io.
 - **Parallelization.** Per-pixel adjustments, separable Gaussian blur, denoise wavelet passes, grain generation, and dehaze use `rayon` for multi-core speedup.
 - **Profiling.** Feature-gated render performance instrumentation, zero overhead when disabled.
 
-[Unreleased]: https://github.com/zhjngli/AgX/compare/agx-photo-v0.1.0...HEAD
+[Unreleased]: https://github.com/zhjngli/AgX/compare/agx-photo-v0.2.0...HEAD
+[0.2.0]: https://github.com/zhjngli/AgX/releases/tag/agx-photo-v0.2.0
 [0.1.0]: https://github.com/zhjngli/AgX/releases/tag/agx-photo-v0.1.0
