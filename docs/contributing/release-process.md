@@ -183,10 +183,10 @@ When `agx-photo` ships changes that `agx-cli` consumes, both crates ship in **on
    ```bash
    git checkout main && git pull --ff-only
    REL=$(gh pr view <release-PR#> --json mergeCommit --jq .mergeCommit.oid)
-   git tag agx-photo-v0.2.0 "$REL" && git push origin agx-photo-v0.2.0
+   git tag agx-photo-vX.Y.Z "$REL" && git push origin agx-photo-vX.Y.Z
    cargo publish -p agx-photo
    # wait for the index (sparse: seconds; legacy git index: ~a minute), then:
-   git tag agx-cli-v0.3.0 "$REL" && git push origin agx-cli-v0.3.0
+   git tag agx-cli-vA.B.C "$REL" && git push origin agx-cli-vA.B.C   # independent version
    cargo publish -p agx-cli
    ```
 
