@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-07
+
 This release widens AgX's internal working space to Rec.2020 and adds end-to-end
 ICC color management — wide-gamut inputs survive the pipeline, outputs
 self-identify, and the delivery gamut is selectable. It also adds HEIC/HEIF
