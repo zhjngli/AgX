@@ -1,6 +1,6 @@
 [package]
 name = "agx-cli"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "CLI for the agx-photo photo editing library"
 license = "MIT OR Apache-2.0"

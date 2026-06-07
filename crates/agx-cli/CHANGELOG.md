@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-07
+
 ### Added
 
 - **`validate` subcommand** — check one or more preset files for unknown fields, type mismatches, and out-of-range values without rendering. Apply-time commands also warn on unknown preset fields instead of silently ignoring them.
