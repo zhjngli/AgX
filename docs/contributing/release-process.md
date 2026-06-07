@@ -6,7 +6,7 @@ The high-level summary lives in [`developer-workflow.md`](developer-workflow.md)
 
 ## Branch protection: releases go through a PR
 
-`main` is governed by a ruleset that requires a pull request for every change and has **no bypass actors** — not even repo admins can push to `main` directly. This is deliberate: the maintainer works alongside coding agents that act under the maintainer's identity, and a bypass would let an agent push unreviewed code to `main`. So the version-bump + changelog commits a release produces **cannot be pushed straight to `main`** the way a vanilla `cargo release --execute` expects.
+`main` is governed by a ruleset that requires a pull request for every change and has **no bypass actors** — not even repo admins can push to `main` directly. This is deliberate: the maintainer works alongside coding agents that act under the maintainer's identity, and a bypass would let an agent push unreviewed code to `main`. So the version-bump + changelog commits that a release produces **cannot be pushed straight to `main`** the way a vanilla `cargo release --execute` expects.
 
 Releases therefore split into two halves:
 
