@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/zhjngli/AgX"
 homepage = "https://github.com/zhjngli/AgX"
 documentation = "https://docs.rs/agx-cli"
-readme = "../../README.md"
+readme = "README.md"
 keywords = ["photo", "image", "editing", "preset", "cli"]
 categories = ["multimedia::images", "command-line-utilities"]
 
