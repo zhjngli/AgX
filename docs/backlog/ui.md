@@ -18,6 +18,6 @@ Desktop and web graphical interface for AgX.
 
 ## Related
 
-- [Platform and Distribution](platform-and-distribution.md) — WASM, REST API, and GPU enable UI backends
+- [Platform and Distribution](platform-and-distribution.md) — WASM and the REST API enable web and desktop UI backends
 - [Pluggable Pipeline](pluggable-pipeline.md) — stage caching for interactive editing performance
 - [Local Adjustments](local-adjustments.md) — brushes and masks need UI for painting/drawing

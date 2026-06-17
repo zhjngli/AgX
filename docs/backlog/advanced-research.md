@@ -20,4 +20,4 @@ Research-heavy features with significant implementation complexity: AI editing, 
 
 - [Local Adjustments](local-adjustments.md) — AI masking could auto-select subjects/sky
 - [Processing Parity](processing-parity.md) — HDR merge quality depends on tone mapping accuracy
-- [Platform and Distribution](platform-and-distribution.md) — these features benefit from GPU acceleration
+- [Performance](performance.md) — these features benefit from GPU acceleration

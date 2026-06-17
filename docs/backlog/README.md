@@ -2,7 +2,7 @@
 
 Future work for AgX — epics, sub-tasks, and bugs. Each file is an "epic" with sub-tasks that can be worked on independently. When all sub-tasks in an epic are complete, remove the file from this directory.
 
-Some epics have detailed sub-task docs (e.g., `grain-size-algorithm.md` is a sub-task of `processing-parity.md`). These live as their own files when the investigation is deep enough to warrant it, but are tracked under their parent epic in the roadmap.
+Some epics spin off detailed sub-task docs that live as their own files when the investigation is deep enough to warrant it (the "deep" tier below), while still being tracked under their parent epic in the roadmap.
 
 ## Modifying the backlog
 
@@ -20,7 +20,7 @@ When you spot something during other work (a new item, a completed sub-task, an 
 
 The section heading **is** the type — no per-item tag prefix needed. Where used below, `## Sub-tasks` means either the standard heading or the `## Sub-projects` variant.
 
-Epic-specific operational sections exist today as `## Status` (`color-management.md`), `## How to Re-Profile` (`performance.md`), and `## Problem` (`grain-size-algorithm.md`). These are not item containers and don't participate in the taxonomy; treat them as epic-level prose. New idiosyncratic sections should be the exception, not the norm — extend this list deliberately.
+Epic-specific operational sections exist today as `## Status` (`color-management.md`), `## How to Re-Profile` (`performance.md`), and `## The hard problem` (`ecosystem-interop.md`). These are not item containers and don't participate in the taxonomy; treat them as epic-level prose. New idiosyncratic sections should be the exception, not the norm — extend this list deliberately.
 
 Section-as-type also disambiguates check-off vs delete on completion:
 
@@ -159,42 +159,48 @@ All markdown links in backlog files are validated by `verify.sh`.
 
 ## Roadmap
 
-Prioritized by alignment with the project philosophy: preset-first batch editing via CLI and API. Features that make presets more expressive or batch workflows faster come first. Developer velocity improvements are also high priority.
+Prioritized by the project's core bet: **AgX's portable preset language is the product, not the rendering engine.** Lightroom and Capture One own decades of proprietary color science; AgX competes on a human-readable, portable preset format and the ecosystem around it — author a look once, port it anywhere, share it through a registry, serve it through an API. AgX's own engine is the reference renderer and API backend, not the differentiator. Work that grows the language and its platform comes first; own-engine improvements (render performance and broader format support) are deferred until they block a real user or use case.
 
-The [Documentation Initiative](documentation-initiative.md) is substantially complete — only optional theme/polish remains — so it no longer appears in the priority tables below.
+The [Documentation Initiative](documentation-initiative.md) and [Color Management](color-management.md) are substantially complete — only optional or deferred follow-ons remain — so neither appears in the priority tables below. Color Management now serves as the home for its future color work (gamut-tolerant HSL, gamut compression, HDR transfer curves, soft proofing).
 
-### Near-term
+### Near-term — grow the platform
 
-Practical improvements to existing functionality — small scope, clear value.
+The expansion of the project's vision: build the substrate, then serve, distribute, and port the preset language.
 
 | Priority | Idea | Why now |
 |----------|------|---------|
-| 1 | [Performance](performance.md) | P1-P5 parallelization + GPU shipped; remaining work is batch memory profiling, P6 SIMD, and a GPU CI runner |
-| 2 | [HEIC/HEIF Support](heic-support.md) | iPhone is the most popular camera and ships HEIC by default; supporting it unblocks the largest single user-reach gap |
-| 3 | [Processing Parity](processing-parity.md) | Per-feature algorithm verification against darktable/RawTherapee — long arc, ship one algo at a time |
+| 1 | [Pluggable Pipeline](pluggable-pipeline.md) | Extensible stages + color-space-aware insertion are the substrate the API, wider gamut, and future stages build on. Stage trait + extraction shipped; caching and auto-insert remain. |
+| 2 | [Platform and Distribution](platform-and-distribution.md) | REST API (apply preset → image as a service) + preset marketplace/registry (share and discover looks) — the headline expansion and the network-effects play around the language. Narrowed to these two; WASM/thumbnails parked, GPU tracked under Performance. |
+| 3 | [Ecosystem Interop](ecosystem-interop.md) | Preset-language portability — export/map AgX looks to Lightroom/Capture One so the language reaches engines AgX won't reimplement. A genuinely hard calibration problem (copying values across tools renders wildly differently), so a research track, not a mechanical export. |
 
-### Mid-term
+### Mid-term — as the platform matures
 
-Larger efforts that expand AgX's capabilities or improve code quality.
+Trust and expressiveness work the platform leans on once it exists.
 
 | Priority | Idea | Why next |
 |----------|------|----------|
-| 4 | [Color Management](color-management.md) | Wide gamut and ICC profiles close the consumer/professional gap and unlock log + wide-gamut working spaces other features depend on |
-| 5 | [Preset Tooling](preset-tooling.md) | `agx validate` and apply-time unknown-field warnings shipped; schema versioning + variables become urgent on first breaking schema change |
-| 6 | [Pluggable Pipeline](pluggable-pipeline.md) | Stage trait + per-pixel/neighborhood extraction shipped; remaining sub-tasks (stage caching, color-space auto-insert) gate on interactive UI work and wider gamut support |
-| 7 | [Ecosystem Interop](ecosystem-interop.md) | XMP/costyle/pp3 import — parameter mapping is inherently approximate; defer until concrete user demand appears |
+| 4 | [Preset Tooling](preset-tooling.md) | Schema versioning becomes a prerequisite once a marketplace distributes presets authors must trust not to break; variables/shortcuts make the language more expressive. |
+| 5 | [Processing Parity](processing-parity.md) | Reframed as cross-engine consistency: does an AgX preset mean the same look when AgX renders it vs. when it's exported to another engine? The trust contract of a portable language. |
 
-### Long-term
+### Deferred — revisit when it blocks something
+
+Real remaining work, held because the strategic leverage is elsewhere.
+
+| Idea | Why deferred |
+|------|--------------|
+| [Performance](performance.md) | High-leverage parallelization (P1–P5) + GPU compute path (P7) shipped. Remainder — SIMD, GPU-as-default, batch-memory profiling — waits until render time is a real bottleneck again. |
+| [HEIC/HEIF Support](heic-support.md) | Decode (the largest reach gap) shipped. Encode, auxiliary images, and XMP handling have marginal benefit before a user base exists. |
+
+### Long-term — major scope
 
 Major features that require significant design work or change the project's scope.
 
 | Priority | Idea | Notes |
 |----------|------|-------|
-| 9 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
-| 10 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
-| 11 | [Platform and Distribution](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
-| 12 | [UI](ui.md) | Desktop and web interfaces |
-| 13 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
+| 6 | [Geometric Corrections](geometric-corrections.md) | Lens corrections, perspective, crop/rotation |
+| 7 | [Local Adjustments](local-adjustments.md) | Major architectural change to the render model |
+| 8 | [UI](ui.md) | Desktop and web interfaces |
+| 9 | [Advanced Research](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |
 
 ## By Category
 
@@ -223,7 +229,7 @@ Major features that require significant design work or change the project's scop
 
 | File | Summary |
 |------|---------|
-| [documentation-initiative.md](documentation-initiative.md) | Umbrella epic: mdbook site, rustdoc retrofit, auto-gen CLI/preset ref, algorithm explanations, tutorials, how-tos |
+| [documentation-initiative.md](documentation-initiative.md) | Docs site shipped (mdbook, rustdoc, auto-gen CLI/preset ref, algorithm explanations, tutorials, how-tos); only optional theme + lint-tightening polish remains |
 
 ### Color and Formats
 
@@ -231,12 +237,12 @@ Major features that require significant design work or change the project's scop
 |------|---------|
 | [color-management.md](color-management.md) | Wide gamut, ICC profiles, per-camera color matrices |
 | [heic-support.md](heic-support.md) | HEIC/HEIF format decoding for Apple devices |
-| [ecosystem-interop.md](ecosystem-interop.md) | XMP/costyle/pp3 import/export and sidecar files |
+| [ecosystem-interop.md](ecosystem-interop.md) | Preset-language portability: calibrated export/mapping to Lightroom/Capture One, sidecar files, demand-gated imports |
 
 ### Platform and UI
 
 | File | Summary |
 |------|---------|
-| [platform-and-distribution.md](platform-and-distribution.md) | REST API, GPU, WASM, preset marketplace |
+| [platform-and-distribution.md](platform-and-distribution.md) | REST API and preset marketplace/registry (the platform expansion); WASM/thumbnails parked |
 | [ui.md](ui.md) | Desktop and web UI, histogram, before/after, undo/redo |
 | [advanced-research.md](advanced-research.md) | AI editing, HDR merge, panorama, focus stacking |

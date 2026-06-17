@@ -4,9 +4,9 @@ Widen AgX beyond the current "sRGB only" invariant so wide-gamut inputs (iPhone 
 
 ## Status
 
-AgX edits in linear Rec.2020 for physical operations and gamma-encoded Rec.2020 for perceptual operations (SP1 shipped). `ARCHITECTURE.md` core invariant #3 codifies the new working space. The remaining sub-projects below cover ICC profile handling, output gamut choice, and HDR — independently useful capabilities that build on SP1.
+AgX edits in linear Rec.2020 for physical operations and gamma-encoded Rec.2020 for perceptual operations (SP1 shipped). `ARCHITECTURE.md` core invariant #3 codifies the new working space. All four sub-projects below have shipped — wide working space (SP1), output ICC embed (SP2), input ICC read (SP3), and output gamut choice (SP4); they were sequenced so each landed an independently useful capability and unblocked the next.
 
-The work below is sequenced so each sub-project lands an independently useful capability and unblocks the next.
+What remains are the deferred follow-ons under `## Parked` (gamut-tolerant HSL, gamut compression, HDR transfer curves, soft proofing); this epic is the home for that future color work.
 
 ## Sub-projects
 

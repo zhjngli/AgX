@@ -1,23 +1,27 @@
 # Platform and Distribution
 
-Expanding AgX beyond a library + CLI to serve web apps, mobile backends, and interactive editing workflows.
+Expand AgX from a library + CLI into a platform for its preset language: serve looks as a service, and build a place to share and discover them. This is the headline expansion of the project's vision — the network-effects layer around the portable preset language.
 
 ## Sub-tasks
 
-- [ ] **REST API** — expose AgX as an HTTP service: accept image + preset (or inline params), return processed image. Considerations: multipart upload, streaming response, job queuing for heavy processing
-- [ ] **GPU acceleration (wgpu)** — use compute shaders for real-time rendering. Per-pixel adjustments map naturally to GPU; neighborhood operations need more thought. Most beneficial for interactive editing
-- [ ] **WASM compilation** — run the core engine in the browser. The `image` and `palette` crates support WASM, but LibRaw FFI does not — raw decoding would need a server-side component
-- [ ] **Thumbnail/preview pipeline** — fast low-res preview during editing, full-res on export. Downscale original, render on thumbnail, re-render at full res on export
-- [ ] **Preset marketplace/registry** — platform for sharing and discovering community presets. Needs curation, versioning, preview thumbnails, and a distribution format
+- [ ] **REST API** — expose AgX as an HTTP service: accept image + preset (or inline params), return the processed image. The hosted renderer behind any web UI, mobile backend, or marketplace preview. Considerations: multipart upload, streaming response, job queuing for heavy renders.
+- [ ] **Preset marketplace / registry** — a platform for sharing and discovering community presets, the network-effects play around the language. Needs curation, preview thumbnails, a distribution format, and — because authors must trust presets not to break — preset schema versioning (see [Preset Tooling](preset-tooling.md)).
 
 ## Considerations
 
-- REST API could serve as the backend for both a web UI and a mobile app.
-- GPU acceleration and WASM are independent efforts — GPU targets native performance, WASM targets browser reach.
-- The thumbnail/preview pipeline is a prerequisite for interactive editing regardless of platform.
+- The REST API re-exposes engine quality as a customer-facing concern: it is the hosted renderer, so it is where own-engine improvements (performance, parity) become visible again.
+- A marketplace distributes the portable preset language; its reach is widened by the export/portability work in [Ecosystem Interop](ecosystem-interop.md).
+- GPU acceleration is tracked under [Performance](performance.md) (the compute-shader path shipped as P7; GPU-as-default is P8) — not duplicated here.
+
+## Parked
+
+- **WASM compilation** — run the core engine in the browser for install-free editing. The `image` and `palette` crates support WASM, but LibRaw FFI does not, so raw decoding would need a server-side component. UI-adjacent; revisit if a browser editing surface is pursued.
+- **Thumbnail / preview pipeline** — fast low-res preview during editing, full-res on export. A prerequisite for interactive editing regardless of platform; revisit alongside UI work.
 
 ## Related
 
-- [Pluggable Pipeline](pluggable-pipeline.md) — stage caching enables interactive preview performance
-- [UI](ui.md) — REST API and WASM enable web and desktop UIs
-- [Performance](performance.md) — GPU and preview pipeline are performance-adjacent
+- [Preset Tooling](preset-tooling.md) — schema versioning is a marketplace prerequisite.
+- [Ecosystem Interop](ecosystem-interop.md) — portability widens where marketplace presets can be used.
+- [Pluggable Pipeline](pluggable-pipeline.md) — stage caching enables interactive/preview performance behind the API.
+- [Performance](performance.md) — GPU work lives there; the parked preview pipeline is performance-adjacent.
+- [UI](ui.md) — REST API and WASM enable web and desktop UIs.

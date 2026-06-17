@@ -2,11 +2,13 @@
 
 Understanding and reducing rendering differences between AgX and other photo editors, and verifying that each editing algorithm produces correct, artifact-free results.
 
+Two purposes sit under this epic. The first is **correctness** — each adjustment should produce artifact-free results that hold up against open-source references (darktable, RawTherapee). The second, sharpened by the preset-language direction, is **cross-engine consistency**: when an AgX preset is exported to another engine, that engine should reproduce the AgX look faithfully — a recognizable approximation, not the pixel-identical match the Considerations below rule out. Both reduce to the same prerequisite: knowing exactly how AgX renders each parameter.
+
 ## Sub-tasks
 
 ### Bug fixes
 
-- [x] **[Grain size algorithm rework](grain-size-algorithm.md)** — fixed: replaced frequency-based sizing with blur-based approach (fixed high-frequency noise + Gaussian blur for particle size)
+- [x] **Grain size algorithm rework** — fixed: replaced frequency-based sizing with blur-based approach (fixed high-frequency noise + Gaussian blur for particle size)
 
 ### Per-feature verification
 
@@ -37,6 +39,10 @@ Verify each editing algorithm against open-source references (darktable, RawTher
 - [ ] **Visual comparison tooling** — process the same image with identical parameters in AgX vs Lightroom, diff the output
 - [ ] **Reference audit** — read darktable/RawTherapee source for each adjustment type, document algorithms and compare to ours
 
+## Parked
+
+- **Grain color tint per type.** Real film stocks have characteristic color biases in grain (Portra skews warm/orange, Fuji skews green). A per-`GrainType` directional color tint applied to the noise, gated on pixel saturation so BW/desaturated pixels stay neutral, could map naturally (Fine = neutral, Silver = slight warm, Harsh = cooler/green). Distinct from existing chromatic grain (random per-channel divergence) — this is a systematic directional shift. Surfaced as a future enhancement when the grain-size frequency rework shipped.
+
 ## Considerations
 
 - Rendering differences are expected — there is no single "correct" rendering, only different interpretations.
@@ -47,5 +53,5 @@ Verify each editing algorithm against open-source references (darktable, RawTher
 ## Related
 
 - [Color Management](color-management.md) — per-camera profiles improve starting-point accuracy
-- [Documentation Initiative](documentation-initiative.md) — sub-project #4 covers algorithm explanations that aid comparison against references
-- [Ecosystem Interop](ecosystem-interop.md) — users importing presets from other tools expect similar results
+- [Documentation Initiative](documentation-initiative.md) — the shipped algorithm explanations aid comparison against reference editors
+- [Ecosystem Interop](ecosystem-interop.md) — cross-engine consistency is the same calibration problem; a faithful preset export depends on knowing exactly how AgX renders each parameter
