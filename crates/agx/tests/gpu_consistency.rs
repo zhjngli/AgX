@@ -210,3 +210,64 @@ fn combined_adjustments() {
     let (cpu, gpu) = render_both(&img, &params, None);
     assert_near_identical(&cpu, &gpu, 0.00001);
 }
+
+/// Looser tolerance for the LUT consistency tests. Unlike the arithmetic-only
+/// stages above (which run identical fp32 math on both paths and hold to 1e-5),
+/// the LUT path stores the table as an `Rgba16Float` (f16) GPU texture sampled
+/// by hardware trilinear interpolation, while the CPU does fp32 software
+/// trilinear. The residual CPU/GPU divergence at f16 precision is ~3e-3 max;
+/// 5e-3 gives modest headroom while staying far tighter than the ~0.2 error the
+/// missing half-texel correction produced — so it would still catch that bug.
+const LUT_TOLERANCE: f32 = 5e-3;
+
+/// Build a non-identity 3×3×3 LUT that swaps R and B channels and darkens by
+/// 10%.  Using a non-identity transform ensures encoding differences are
+/// observable and that the test is not trivially satisfied by an identity LUT.
+fn non_identity_lut(encoding: agx::LutEncoding) -> agx::lut::Lut3D {
+    let size = 2;
+    let mut table = Vec::with_capacity(size * size * size);
+    for b in 0..size {
+        for g in 0..size {
+            for r in 0..size {
+                let d = (size - 1) as f32;
+                table.push([
+                    (b as f32 / d) * 0.9,
+                    (g as f32 / d) * 0.9,
+                    (r as f32 / d) * 0.9,
+                ]);
+            }
+        }
+    }
+    agx::lut::Lut3D {
+        title: None,
+        size,
+        domain_min: [0.0; 3],
+        domain_max: [1.0; 3],
+        table,
+        encoding,
+    }
+}
+
+#[test]
+fn cpu_gpu_consistent_srgb_lut() {
+    if !gpu_available() {
+        return;
+    }
+    let img = make_gradient(16, 16);
+    let params = Parameters::default();
+    let lut = non_identity_lut(agx::LutEncoding::Srgb);
+    let (cpu, gpu) = render_both(&img, &params, Some(&lut));
+    assert_near_identical(&cpu, &gpu, LUT_TOLERANCE);
+}
+
+#[test]
+fn cpu_gpu_consistent_linear_lut() {
+    if !gpu_available() {
+        return;
+    }
+    let img = make_gradient(16, 16);
+    let params = Parameters::default();
+    let lut = non_identity_lut(agx::LutEncoding::Linear);
+    let (cpu, gpu) = render_both(&img, &params, Some(&lut));
+    assert_near_identical(&cpu, &gpu, LUT_TOLERANCE);
+}
