@@ -14,6 +14,7 @@ Refactor the hardcoded render sequence in `engine::render()` into discrete stage
 ## Parked
 
 - [ ] GPU path doesn't share the pluggable stage/executor architecture *(epic candidate)*. Each new CPU stage or color space must be hand-reimplemented and hand-ordered in WGSL, with no executor or auto-insert equivalent. As the CPU pipeline grows more pluggable, this manual mirroring is a growing source of CPU/GPU drift and consistency risk. No design yet for a GPU-side executor or a shared stage description both paths consume. Surfaced building color-space-aware insertion, where the CPU executor gained auto-insert but the GPU kept its fused, hand-ordered LUT bracket.
+- [ ] The WGSL `Params` uniform struct is hand-duplicated across ~18 shader files, so every parameter-layout change is an 18-file edit prone to silent drift. The shaders already share `common::*` modules via `naga_oil` `#import`, which can export struct definitions too — a single `common::params` module would collapse this. Surfaced twice now during struct-layout changes (StageInputs work and the GPU LUT-encoding field).
 
 ## Considerations
 
