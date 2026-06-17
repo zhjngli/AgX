@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn per_pixel_stage_with_identity_lut_round_trips() {
-        use crate::lut::Lut3D;
+        use crate::lut::{Lut3D, LutEncoding};
 
         let size = 17;
         let mut table = Vec::with_capacity(size * size * size);
@@ -144,6 +144,7 @@ mod tests {
             domain_min: [0.0, 0.0, 0.0],
             domain_max: [1.0, 1.0, 1.0],
             table,
+            encoding: LutEncoding::default(),
         };
 
         let params = Parameters::default();

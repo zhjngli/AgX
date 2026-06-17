@@ -3,6 +3,23 @@
 /// `.cube` file format parser.
 pub mod cube;
 
+/// Color space a LUT was authored in. Determines how the pipeline feeds it
+/// pixels. Both variants assume sRGB primaries; `Linear` is sRGB-primaries
+/// linear light (the unambiguous counterpart to sRGB-gamma authoring).
+#[cfg_attr(
+    any(feature = "docgen", feature = "validate"),
+    derive(schemars::JsonSchema)
+)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LutEncoding {
+    /// sRGB transfer curve, sRGB primaries (the historical default).
+    #[default]
+    Srgb,
+    /// Linear light, sRGB primaries.
+    Linear,
+}
+
 /// A 3D Look-Up Table for color transformation.
 ///
 /// Maps input RGB values to output RGB values via a pre-computed 3D lattice.
@@ -31,6 +48,8 @@ pub struct Lut3D {
     /// The lookup table data — `size^3` RGB output entries.
     /// Ordered with R changing fastest, then G, then B.
     pub table: Vec<[f32; 3]>,
+    /// Color space the LUT was authored in. Defaults to `Srgb`.
+    pub encoding: LutEncoding,
 }
 
 impl Lut3D {
@@ -222,6 +241,22 @@ LUT_3D_SIZE 2
         assert!(result.is_err());
     }
 
+    #[test]
+    fn lut_encoding_defaults_to_srgb() {
+        assert_eq!(LutEncoding::default(), LutEncoding::Srgb);
+    }
+
+    #[test]
+    fn lut_encoding_serde_roundtrip() {
+        let toml = "encoding = \"linear\"\n";
+        #[derive(serde::Deserialize)]
+        struct Holder {
+            encoding: LutEncoding,
+        }
+        let h: Holder = toml::from_str(toml).unwrap();
+        assert_eq!(h.encoding, LutEncoding::Linear);
+    }
+
     // --- Trilinear interpolation tests ---
 
     fn make_identity_lut(size: usize) -> Lut3D {
@@ -240,6 +275,7 @@ LUT_3D_SIZE 2
             domain_min: [0.0, 0.0, 0.0],
             domain_max: [1.0, 1.0, 1.0],
             table,
+            encoding: LutEncoding::default(),
         }
     }
 
@@ -307,6 +343,7 @@ LUT_3D_SIZE 2
             domain_min: [0.0, 0.0, 0.0],
             domain_max: [1.0, 1.0, 1.0],
             table,
+            encoding: LutEncoding::default(),
         };
 
         let (r, g, b) = lut.lookup(0.0, 0.0, 0.0);

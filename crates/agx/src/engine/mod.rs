@@ -1599,6 +1599,7 @@ mod tests {
             domain_min: [0.0, 0.0, 0.0],
             domain_max: [1.0, 1.0, 1.0],
             table,
+            encoding: Default::default(),
         };
         engine.set_lut(Some(Arc::new(lut)));
 
@@ -2511,6 +2512,7 @@ mod tests {
             domain_min: [0.0, 0.0, 0.0],
             domain_max: [1.0, 1.0, 1.0],
             table,
+            encoding: Default::default(),
         };
 
         let img = ImageBuffer::from_pixel(2, 2, Rgb([0.30_f32, 0.55, 0.80]));

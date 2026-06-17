@@ -33,6 +33,6 @@ pub use engine::{
 #[cfg(feature = "profiling")]
 pub use engine::RenderProfile;
 pub use error::{AgxError, Result};
-pub use lut::Lut3D;
+pub use lut::{Lut3D, LutEncoding};
 pub use metadata::ImageMetadata;
 pub use preset::Preset;
