@@ -76,4 +76,4 @@ The scripts output to `profile_results.json` (gitignored). Compare against the b
 ## Related
 
 - [Pluggable Pipeline](pluggable-pipeline.md) — stage caching is a future-work item there that affects render performance
-- [Platform and Distribution](platform-and-distribution.md) — back-links here re: GPU and interactive preview latency
+- [Platform and Distribution](platform-and-distribution.md) — the REST API (hosted renderer) and the parked preview pipeline are performance-adjacent

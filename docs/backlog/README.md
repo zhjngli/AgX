@@ -170,7 +170,7 @@ The expansion of the project's vision: build the substrate, then serve, distribu
 | Priority | Idea | Why now |
 |----------|------|---------|
 | 1 | [Pluggable Pipeline](pluggable-pipeline.md) | Extensible stages + color-space-aware insertion are the substrate the API, wider gamut, and future stages build on. Stage trait + extraction shipped; caching and auto-insert remain. |
-| 2 | [Platform and Distribution](platform-and-distribution.md) | REST API (apply preset → image as a service) + preset marketplace/registry (share and discover looks) — the headline expansion and the network-effects play around the language. Narrowed to these two; GPU/WASM/thumbnails parked. |
+| 2 | [Platform and Distribution](platform-and-distribution.md) | REST API (apply preset → image as a service) + preset marketplace/registry (share and discover looks) — the headline expansion and the network-effects play around the language. Narrowed to these two; WASM/thumbnails parked, GPU tracked under Performance. |
 | 3 | [Ecosystem Interop](ecosystem-interop.md) | Preset-language portability — export/map AgX looks to Lightroom/Capture One so the language reaches engines AgX won't reimplement. A genuinely hard calibration problem (copying values across tools renders wildly differently), so a research track, not a mechanical export. |
 
 ### Mid-term — as the platform matures

@@ -23,5 +23,5 @@ Expand AgX from a library + CLI into a platform for its preset language: serve l
 - [Preset Tooling](preset-tooling.md) — schema versioning is a marketplace prerequisite.
 - [Ecosystem Interop](ecosystem-interop.md) — portability widens where marketplace presets can be used.
 - [Pluggable Pipeline](pluggable-pipeline.md) — stage caching enables interactive/preview performance behind the API.
-- [Performance](performance.md) — GPU and the preview pipeline are performance-adjacent.
+- [Performance](performance.md) — GPU work lives there; the parked preview pipeline is performance-adjacent.
 - [UI](ui.md) — REST API and WASM enable web and desktop UIs.
