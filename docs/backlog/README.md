@@ -165,7 +165,7 @@ The [Documentation Initiative](documentation-initiative.md) and [Color Managemen
 
 ### Near-term — grow the platform
 
-The expansion of the project's vision: serve, distribute, and port the preset language.
+The expansion of the project's vision: build the substrate, then serve, distribute, and port the preset language.
 
 | Priority | Idea | Why now |
 |----------|------|---------|
