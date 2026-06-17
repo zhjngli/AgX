@@ -18,5 +18,5 @@ Schema versioning, validation, and authoring shortcuts for AgX presets.
 
 ## Related
 
-- [Ecosystem Interop](ecosystem-interop.md) — validation helps catch import errors
-- [Platform and Distribution](platform-and-distribution.md) — a preset marketplace makes schema versioning urgent from other formats
+- [Ecosystem Interop](ecosystem-interop.md) — validation helps catch import errors from other formats
+- [Platform and Distribution](platform-and-distribution.md) — a preset marketplace makes schema versioning urgent

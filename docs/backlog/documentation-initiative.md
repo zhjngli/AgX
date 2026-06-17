@@ -1,4 +1,4 @@
-# Documentation Site Polish
+# Documentation Initiative
 
 The documentation initiative — published mdbook site, rustdoc API reference, auto-generated CLI/preset reference, algorithm explanations co-located with source, tutorials, and how-to guides — has shipped. Sub-projects #1–#8, #10, and #11 are complete; their dated design docs in `docs/plans/` and the git history hold the full record of what was built and why.
 
