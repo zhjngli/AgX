@@ -74,23 +74,15 @@ pub(crate) fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
 
 // --- Color space helpers ---
 
-/// Convert a linear sRGB f32 pixel to sRGB-gamma. Pre-migration this was
-/// the engine's working-space transfer; post-migration the engine uses
-/// `crate::color_space::srgb_curve_signed`. This helper remains for the
-/// encode-side matrix-then-curve fused pass and as the inner sRGB step
-/// of the LUT-wrap bracket — both call sites are intentionally working
-/// in sRGB primaries, not Rec.2020.
+/// Convert a linear sRGB f32 pixel to sRGB-gamma via the `palette` crate.
+/// Works in sRGB primaries. Used in tests for roundtrip verification.
 pub fn linear_to_srgb(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let srgb: Srgb<f32> = LinSrgb::new(r, g, b).into_encoding();
     (srgb.red, srgb.green, srgb.blue)
 }
 
-/// Convert an sRGB-gamma f32 pixel to linear sRGB. Pre-migration this
-/// was the engine's working-space transfer; post-migration the engine
-/// uses `crate::color_space::srgb_curve_signed_inverse`. This helper
-/// remains for the encode-side fused pass and as the inner sRGB step
-/// of the LUT-wrap bracket — both call sites are intentionally working
-/// in sRGB primaries, not Rec.2020.
+/// Convert an sRGB-gamma f32 pixel to linear sRGB via the `palette` crate.
+/// Works in sRGB primaries. Used in tests for roundtrip verification.
 pub fn srgb_to_linear(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let lin: LinSrgb<f32> = Srgb::new(r, g, b).into_linear();
     (lin.red, lin.green, lin.blue)
@@ -145,7 +137,7 @@ pub struct PerPixelParams<'a> {
 /// Apply all per-pixel adjustments to a gamma Rec.2020 buffer in-place.
 ///
 /// Processes contrast, highlights, shadows, whites, blacks, tone curves,
-/// HSL, color grading, and LUT in that order. Operates in the gamma Rec.2020
+/// HSL, and color grading in that order. Operates in the gamma Rec.2020
 /// working space.
 pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
     buf.par_chunks_mut(1024).for_each(|chunk| {
@@ -194,7 +186,6 @@ pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
                 sg = cg;
                 sb = cb;
             }
-
             *pixel = [sr, sg, sb];
         }
     });

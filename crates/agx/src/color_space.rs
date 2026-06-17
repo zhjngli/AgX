@@ -139,6 +139,9 @@ pub fn convert_buffer(buf: &mut [[f32; 3]], from: ColorSpace, to: ColorSpace) {
     from_hub(buf, to);
 }
 
+/// Apply a scalar transfer-curve to every channel of every pixel. Takes a `fn` pointer
+/// rather than a closure so callers can pass named functions (e.g. `srgb_curve_signed`)
+/// directly, avoiding closure indirection and keeping call sites readable.
 fn apply_curve(buf: &mut [[f32; 3]], f: fn(f32) -> f32) {
     buf.par_iter_mut().for_each(|p| {
         p[0] = f(p[0]);
@@ -213,8 +216,8 @@ mod tests {
 
     #[test]
     fn convert_buffer_gamma_to_srgbgamma_matches_legacy_bracket_math() {
-        // The Gamma Rec.2020 -> sRGB-gamma hop must equal the pre-sample half of
-        // the old wrap_lut_lookup (inverse curve, matrix REC2020->SRGB, curve).
+        // The Gamma Rec.2020 -> sRGB-gamma hop must equal the pre-sample bracket math:
+        // inverse sRGB curve (decode gamma), Rec.2020 -> sRGB matrix, sRGB curve (re-encode).
         let px = [0.4_f32, 0.6, 0.2];
         let mut buf = vec![px];
         convert_buffer(&mut buf, ColorSpace::GammaRec2020, ColorSpace::SrgbGamma);

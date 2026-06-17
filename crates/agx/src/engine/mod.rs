@@ -2523,7 +2523,7 @@ mod tests {
         let out = engine.render().image;
         let p = out.get_pixel(0, 0).0;
 
-        // Characterization values — fill in from the first run (Step 2).
+        // Characterization values captured from the first run; any deviation means the pipeline changed.
         let expected = [0.8539122_f32, 0.69250095, 0.1506029];
         for c in 0..3 {
             assert!(

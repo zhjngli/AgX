@@ -25,7 +25,9 @@ impl LutStage {
 fn encoding_space(inp: &StageInputs) -> ColorSpace {
     match inp.lut.map(|l| l.encoding) {
         Some(LutEncoding::Linear) => ColorSpace::LinearSrgb,
-        _ => ColorSpace::SrgbGamma, // Srgb, or no LUT (stage is inactive then)
+        // Srgb encoding, or no LUT. The executor never calls this stage when inactive
+        // (is_active returns false), so the no-LUT arm is only a sane fallback default.
+        _ => ColorSpace::SrgbGamma,
     }
 }
 
