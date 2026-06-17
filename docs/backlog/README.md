@@ -20,7 +20,7 @@ When you spot something during other work (a new item, a completed sub-task, an 
 
 The section heading **is** the type — no per-item tag prefix needed. Where used below, `## Sub-tasks` means either the standard heading or the `## Sub-projects` variant.
 
-Epic-specific operational sections exist today as `## Status` (`color-management.md`) and `## How to Re-Profile` (`performance.md`). These are not item containers and don't participate in the taxonomy; treat them as epic-level prose. New idiosyncratic sections should be the exception, not the norm — extend this list deliberately.
+Epic-specific operational sections exist today as `## Status` (`color-management.md`), `## How to Re-Profile` (`performance.md`), and `## The hard problem` (`ecosystem-interop.md`). These are not item containers and don't participate in the taxonomy; treat them as epic-level prose. New idiosyncratic sections should be the exception, not the norm — extend this list deliberately.
 
 Section-as-type also disambiguates check-off vs delete on completion:
 
@@ -159,7 +159,7 @@ All markdown links in backlog files are validated by `verify.sh`.
 
 ## Roadmap
 
-Prioritized by the project's core bet: **AgX's portable preset language is the product, not the rendering engine.** Lightroom and Capture One own decades of proprietary color science; AgX competes on a human-readable, portable preset format and the ecosystem around it — author a look once, port it anywhere, share it through a registry, serve it through an API. AgX's own engine is the reference renderer and API backend, not the differentiator. Work that grows the language and its platform comes first; own-engine improvements (performance, format breadth, per-feature parity) are deferred until they block a real user or use case.
+Prioritized by the project's core bet: **AgX's portable preset language is the product, not the rendering engine.** Lightroom and Capture One own decades of proprietary color science; AgX competes on a human-readable, portable preset format and the ecosystem around it — author a look once, port it anywhere, share it through a registry, serve it through an API. AgX's own engine is the reference renderer and API backend, not the differentiator. Work that grows the language and its platform comes first; own-engine improvements (render performance and broader format support) are deferred until they block a real user or use case.
 
 The [Documentation Initiative](documentation-initiative.md) and [Color Management](color-management.md) are substantially complete — only optional or deferred follow-ons remain — so neither appears in the priority tables below. Color Management now serves as the home for its future color work (gamut-tolerant HSL, gamut compression, HDR transfer curves, soft proofing).
 
@@ -174,6 +174,8 @@ The expansion of the project's vision: serve, distribute, and port the preset la
 | 3 | [Ecosystem Interop](ecosystem-interop.md) | Preset-language portability — export/map AgX looks to Lightroom/Capture One so the language reaches engines AgX won't reimplement. A genuinely hard calibration problem (copying values across tools renders wildly differently), so a research track, not a mechanical export. |
 
 ### Mid-term — as the platform matures
+
+Trust and expressiveness work the platform leans on once it exists.
 
 | Priority | Idea | Why next |
 |----------|------|----------|

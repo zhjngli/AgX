@@ -2,6 +2,8 @@
 
 Understanding and reducing rendering differences between AgX and other photo editors, and verifying that each editing algorithm produces correct, artifact-free results.
 
+Two purposes sit under this epic. The first is **correctness** — each adjustment should produce artifact-free results that hold up against open-source references (darktable, RawTherapee). The second, sharpened by the preset-language direction, is **cross-engine consistency**: a portable preset is only trustworthy if an AgX-authored look means the same thing when AgX renders it as when it is exported to another engine. The per-feature work below serves both — knowing exactly how AgX renders each parameter is the prerequisite for matching it elsewhere.
+
 ## Sub-tasks
 
 ### Bug fixes
@@ -52,4 +54,4 @@ Verify each editing algorithm against open-source references (darktable, RawTher
 
 - [Color Management](color-management.md) — per-camera profiles improve starting-point accuracy
 - [Documentation Initiative](documentation-initiative.md) — the shipped algorithm explanations aid comparison against reference editors
-- [Ecosystem Interop](ecosystem-interop.md) — users importing presets from other tools expect similar results
+- [Ecosystem Interop](ecosystem-interop.md) — cross-engine consistency is the same calibration problem; a faithful preset export depends on knowing exactly how AgX renders each parameter
