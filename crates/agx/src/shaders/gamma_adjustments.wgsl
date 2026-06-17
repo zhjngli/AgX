@@ -250,7 +250,13 @@ fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
     }
 
     // Clamp to the LUT sampler's [0,1] domain; does not clip the engine buffer.
-    let coord = clamp(sample_coord, vec3f(0.0), vec3f(1.0));
+    let clamped = clamp(sample_coord, vec3f(0.0), vec3f(1.0));
+    let n = f32(textureDimensions(lut_texture).x);
+    // Half-texel correction: map [0,1] input to texel-center space so the
+    // hardware sampler reads LUT entry index c*(n-1), matching CPU Lut3D::lookup.
+    // (The raw sampler maps coord c to index c*n-0.5, which is wrong.)
+    // n=1 (fallback identity LUT): (1-1)/1=0, 0.5/1=0.5 -> coord=0.5, no div-by-zero.
+    let coord = clamped * ((n - 1.0) / n) + (0.5 / n);
     let sampled = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
 
     var out_lin_srgb = sampled.xyz;
