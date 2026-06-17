@@ -77,6 +77,16 @@ pub struct RenderContext<'a> {
     pub lut: Option<&'a crate::lut::Lut3D>,
 }
 
+/// Read-only inputs a stage may consult to decide activity and color space.
+/// Carries both `Parameters` and the optional LUT, because the LUT is threaded
+/// separately from `Parameters` (it is a large table shared via `Arc`).
+pub struct StageInputs<'a> {
+    /// Render parameters for the current render pass.
+    pub params: &'a Parameters,
+    /// Optional 3D LUT applied during the per-pixel stage.
+    pub lut: Option<&'a crate::lut::Lut3D>,
+}
+
 /// A single stage in the render pipeline.
 ///
 /// Stages are executed in a fixed order by the pipeline executor. Each stage
@@ -90,18 +100,18 @@ pub trait Stage: Send + Sync {
     fn name(&self) -> &'static str;
 
     /// Color space this stage expects its input buffer in.
-    fn input_color_space(&self) -> ColorSpace;
+    fn input_color_space(&self, inp: &StageInputs) -> ColorSpace;
 
     /// Color space this stage produces in the output buffer.
-    fn output_color_space(&self) -> ColorSpace;
+    fn output_color_space(&self, inp: &StageInputs) -> ColorSpace;
 
-    /// Whether this stage has any effect given current params.
+    /// Whether this stage has any effect given current inp.
     /// Returning false lets the executor skip the stage entirely.
-    fn is_active(&self, params: &Parameters) -> bool;
+    fn is_active(&self, inp: &StageInputs) -> bool;
 
-    /// Precompute loop-invariant data from params.
+    /// Precompute loop-invariant data from inp.
     /// Called once per render before `process()`.
-    fn prepare(&mut self, params: &Parameters);
+    fn prepare(&mut self, inp: &StageInputs);
 
     /// Process the pixel buffer in-place.
     fn process(&self, ctx: &mut RenderContext) -> Result<(), crate::error::AgxError>;

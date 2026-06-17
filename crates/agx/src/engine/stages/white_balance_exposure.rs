@@ -1,5 +1,5 @@
 use crate::adjust;
-use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
+use crate::engine::{ColorSpace, RenderContext, Stage, StageInputs};
 use crate::error::AgxError;
 
 /// Applies white balance and exposure in linear space.
@@ -23,19 +23,19 @@ impl Stage for WhiteBalanceExposureStage {
         "white_balance_exposure"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::LinearRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::LinearRec2020
     }
 
-    fn is_active(&self, params: &Parameters) -> bool {
-        params.temperature != 0.0 || params.tint != 0.0 || params.exposure != 0.0
+    fn is_active(&self, inp: &StageInputs) -> bool {
+        inp.params.temperature != 0.0 || inp.params.tint != 0.0 || inp.params.exposure != 0.0
     }
 
-    fn prepare(&mut self, _params: &Parameters) {}
+    fn prepare(&mut self, _inp: &StageInputs) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         adjust::apply_white_balance_exposure_buffer(
@@ -65,7 +65,8 @@ mod tests {
             lut: None,
         };
         let mut stage = WhiteBalanceExposureStage::new();
-        stage.prepare(&params);
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        stage.prepare(&inp);
         stage.process(&mut ctx).unwrap();
         for (c, &v) in ctx.buf[0].iter().enumerate() {
             assert!(
@@ -77,8 +78,10 @@ mod tests {
 
     #[test]
     fn stage_color_space_is_linear() {
+        let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = WhiteBalanceExposureStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::LinearRec2020);
-        assert_eq!(stage.output_color_space(), ColorSpace::LinearRec2020);
+        assert_eq!(stage.input_color_space(&inp), ColorSpace::LinearRec2020);
+        assert_eq!(stage.output_color_space(&inp), ColorSpace::LinearRec2020);
     }
 }

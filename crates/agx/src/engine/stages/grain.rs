@@ -1,5 +1,5 @@
 use crate::adjust;
-use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
+use crate::engine::{ColorSpace, RenderContext, Stage, StageInputs};
 use crate::error::AgxError;
 
 /// Film grain simulation via noise generation + Gaussian blur.
@@ -26,20 +26,20 @@ impl Stage for GrainStage {
         "grain"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn is_active(&self, params: &Parameters) -> bool {
-        !params.grain.is_neutral()
+    fn is_active(&self, inp: &StageInputs) -> bool {
+        !inp.params.grain.is_neutral()
     }
 
-    fn prepare(&mut self, params: &Parameters) {
-        self.seed = params.grain.seed.unwrap_or_else(rand::random::<u64>);
+    fn prepare(&mut self, inp: &StageInputs) {
+        self.seed = inp.params.grain.seed.unwrap_or_else(rand::random::<u64>);
     }
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
@@ -62,22 +62,26 @@ mod tests {
     #[test]
     fn grain_inactive_when_neutral() {
         let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = GrainStage::new();
-        assert!(!stage.is_active(&params));
+        assert!(!stage.is_active(&inp));
     }
 
     #[test]
     fn grain_active_when_nonzero() {
         let mut params = Parameters::default();
         params.grain.amount = 50.0;
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = GrainStage::new();
-        assert!(stage.is_active(&params));
+        assert!(stage.is_active(&inp));
     }
 
     #[test]
     fn grain_color_space_is_srgb() {
+        let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = GrainStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::GammaRec2020);
-        assert_eq!(stage.output_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(stage.input_color_space(&inp), ColorSpace::GammaRec2020);
+        assert_eq!(stage.output_color_space(&inp), ColorSpace::GammaRec2020);
     }
 }

@@ -1,5 +1,5 @@
 use crate::color_space::{srgb_curve_signed, srgb_curve_signed_inverse};
-use crate::engine::{ColorSpace, RenderContext, Stage};
+use crate::engine::{ColorSpace, RenderContext, Stage, StageInputs};
 use crate::error::AgxError;
 use rayon::prelude::*;
 
@@ -25,19 +25,19 @@ impl Stage for LinearToGammaStage {
         "linear_to_gamma"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::LinearRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn is_active(&self, _params: &crate::engine::Parameters) -> bool {
+    fn is_active(&self, _inp: &StageInputs) -> bool {
         true
     }
 
-    fn prepare(&mut self, _params: &crate::engine::Parameters) {}
+    fn prepare(&mut self, _inp: &StageInputs) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         ctx.buf.par_iter_mut().for_each(|pixel| {
@@ -71,19 +71,19 @@ impl Stage for GammaToLinearStage {
         "gamma_to_linear"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::LinearRec2020
     }
 
-    fn is_active(&self, _params: &crate::engine::Parameters) -> bool {
+    fn is_active(&self, _inp: &StageInputs) -> bool {
         true
     }
 
-    fn prepare(&mut self, _params: &crate::engine::Parameters) {}
+    fn prepare(&mut self, _inp: &StageInputs) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         ctx.buf.par_iter_mut().for_each(|pixel| {
@@ -112,8 +112,9 @@ mod tests {
             lut: None,
         };
 
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let mut to_gamma = LinearToGammaStage::new();
-        to_gamma.prepare(&params);
+        to_gamma.prepare(&inp);
         to_gamma.process(&mut ctx).unwrap();
 
         assert!(
@@ -122,7 +123,7 @@ mod tests {
         );
 
         let mut to_linear = GammaToLinearStage::new();
-        to_linear.prepare(&params);
+        to_linear.prepare(&inp);
         to_linear.process(&mut ctx).unwrap();
 
         for (i, pixel) in ctx.buf.iter().enumerate() {
@@ -139,25 +140,29 @@ mod tests {
     #[test]
     fn linear_to_gamma_always_active() {
         let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = LinearToGammaStage::new();
-        assert!(stage.is_active(&params));
+        assert!(stage.is_active(&inp));
     }
 
     #[test]
     fn gamma_to_linear_always_active() {
         let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = GammaToLinearStage::new();
-        assert!(stage.is_active(&params));
+        assert!(stage.is_active(&inp));
     }
 
     #[test]
     fn color_space_declarations_correct() {
+        let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let to_gamma = LinearToGammaStage::new();
-        assert_eq!(to_gamma.input_color_space(), ColorSpace::LinearRec2020);
-        assert_eq!(to_gamma.output_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(to_gamma.input_color_space(&inp), ColorSpace::LinearRec2020);
+        assert_eq!(to_gamma.output_color_space(&inp), ColorSpace::GammaRec2020);
 
         let to_linear = GammaToLinearStage::new();
-        assert_eq!(to_linear.input_color_space(), ColorSpace::GammaRec2020);
-        assert_eq!(to_linear.output_color_space(), ColorSpace::LinearRec2020);
+        assert_eq!(to_linear.input_color_space(&inp), ColorSpace::GammaRec2020);
+        assert_eq!(to_linear.output_color_space(&inp), ColorSpace::LinearRec2020);
     }
 }

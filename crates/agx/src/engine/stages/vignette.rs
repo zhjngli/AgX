@@ -1,5 +1,5 @@
 use crate::adjust;
-use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
+use crate::engine::{ColorSpace, RenderContext, Stage, StageInputs};
 use crate::error::AgxError;
 
 /// Position-dependent edge darkening/brightening.
@@ -24,19 +24,19 @@ impl Stage for VignetteStage {
         "vignette"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn is_active(&self, params: &Parameters) -> bool {
-        !params.vignette.is_default()
+    fn is_active(&self, inp: &StageInputs) -> bool {
+        !inp.params.vignette.is_default()
     }
 
-    fn prepare(&mut self, _params: &Parameters) {}
+    fn prepare(&mut self, _inp: &StageInputs) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         let pre = adjust::VignettePrecomputed::new(
@@ -58,22 +58,26 @@ mod tests {
     #[test]
     fn vignette_inactive_when_neutral() {
         let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = VignetteStage::new();
-        assert!(!stage.is_active(&params));
+        assert!(!stage.is_active(&inp));
     }
 
     #[test]
     fn vignette_active_when_nonzero() {
         let mut params = Parameters::default();
         params.vignette.amount = -50.0;
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = VignetteStage::new();
-        assert!(stage.is_active(&params));
+        assert!(stage.is_active(&inp));
     }
 
     #[test]
     fn vignette_color_space_is_srgb() {
+        let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = VignetteStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::GammaRec2020);
-        assert_eq!(stage.output_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(stage.input_color_space(&inp), ColorSpace::GammaRec2020);
+        assert_eq!(stage.output_color_space(&inp), ColorSpace::GammaRec2020);
     }
 }

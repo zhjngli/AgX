@@ -1,5 +1,5 @@
 use crate::adjust;
-use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
+use crate::engine::{ColorSpace, RenderContext, Stage, StageInputs};
 use crate::error::AgxError;
 
 /// Wavelet-based noise reduction. Operates in linear space.
@@ -23,19 +23,19 @@ impl Stage for DenoiseStage {
         "denoise"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::LinearRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::LinearRec2020
     }
 
-    fn is_active(&self, params: &Parameters) -> bool {
-        !params.noise_reduction.is_neutral()
+    fn is_active(&self, inp: &StageInputs) -> bool {
+        !inp.params.noise_reduction.is_neutral()
     }
 
-    fn prepare(&mut self, _params: &Parameters) {}
+    fn prepare(&mut self, _inp: &StageInputs) {}
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
         let result = adjust::denoise::apply_noise_reduction(
@@ -57,22 +57,26 @@ mod tests {
     #[test]
     fn denoise_inactive_when_neutral() {
         let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = DenoiseStage::new();
-        assert!(!stage.is_active(&params));
+        assert!(!stage.is_active(&inp));
     }
 
     #[test]
     fn denoise_active_when_nonzero() {
         let mut params = Parameters::default();
         params.noise_reduction.luminance = 50.0;
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = DenoiseStage::new();
-        assert!(stage.is_active(&params));
+        assert!(stage.is_active(&inp));
     }
 
     #[test]
     fn denoise_color_space_is_linear() {
+        let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = DenoiseStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::LinearRec2020);
-        assert_eq!(stage.output_color_space(), ColorSpace::LinearRec2020);
+        assert_eq!(stage.input_color_space(&inp), ColorSpace::LinearRec2020);
+        assert_eq!(stage.output_color_space(&inp), ColorSpace::LinearRec2020);
     }
 }

@@ -1,6 +1,6 @@
 use crate::adjust;
 use crate::color_space::wrap_lut_lookup;
-use crate::engine::{ColorSpace, Parameters, RenderContext, Stage};
+use crate::engine::{ColorSpace, RenderContext, Stage, StageInputs};
 use crate::error::AgxError;
 
 /// Applies all per-pixel gamma-encoded adjustments to the gamma Rec.2020
@@ -33,23 +33,23 @@ impl Stage for PerPixelAdjustmentsStage {
         "per_pixel_adjustments"
     }
 
-    fn input_color_space(&self) -> ColorSpace {
+    fn input_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn output_color_space(&self) -> ColorSpace {
+    fn output_color_space(&self, _inp: &StageInputs) -> ColorSpace {
         ColorSpace::GammaRec2020
     }
 
-    fn is_active(&self, _params: &Parameters) -> bool {
+    fn is_active(&self, _inp: &StageInputs) -> bool {
         true // always active — even neutral params need to be checked per-pixel
     }
 
-    fn prepare(&mut self, params: &Parameters) {
-        self.tone_curve_pre = (!params.tone_curve.is_default())
-            .then(|| adjust::ToneCurvePrecomputed::new(&params.tone_curve));
-        self.color_grading_pre = (!params.color_grading.is_default())
-            .then(|| adjust::ColorGradingPrecomputed::new(&params.color_grading));
+    fn prepare(&mut self, inp: &StageInputs) {
+        self.tone_curve_pre = (!inp.params.tone_curve.is_default())
+            .then(|| adjust::ToneCurvePrecomputed::new(&inp.params.tone_curve));
+        self.color_grading_pre = (!inp.params.color_grading.is_default())
+            .then(|| adjust::ColorGradingPrecomputed::new(&inp.params.color_grading));
     }
 
     fn process(&self, ctx: &mut RenderContext) -> Result<(), AgxError> {
@@ -96,7 +96,8 @@ mod tests {
             lut: None,
         };
         let mut stage = PerPixelAdjustmentsStage::new();
-        stage.prepare(&params);
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        stage.prepare(&inp);
         stage.process(&mut ctx).unwrap();
         for (c, &v) in ctx.buf[0].iter().enumerate() {
             assert!(
@@ -108,16 +109,19 @@ mod tests {
 
     #[test]
     fn per_pixel_stage_color_space_is_srgb() {
+        let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = PerPixelAdjustmentsStage::new();
-        assert_eq!(stage.input_color_space(), ColorSpace::GammaRec2020);
-        assert_eq!(stage.output_color_space(), ColorSpace::GammaRec2020);
+        assert_eq!(stage.input_color_space(&inp), ColorSpace::GammaRec2020);
+        assert_eq!(stage.output_color_space(&inp), ColorSpace::GammaRec2020);
     }
 
     #[test]
     fn per_pixel_stage_always_active() {
         let params = Parameters::default();
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
         let stage = PerPixelAdjustmentsStage::new();
-        assert!(stage.is_active(&params));
+        assert!(stage.is_active(&inp));
     }
 
     #[test]
@@ -154,7 +158,8 @@ mod tests {
             lut: Some(&lut),
         };
         let mut stage = PerPixelAdjustmentsStage::new();
-        stage.prepare(&params);
+        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        stage.prepare(&inp);
         stage.process(&mut ctx).unwrap();
 
         for (i, expected) in pixels.iter().enumerate() {

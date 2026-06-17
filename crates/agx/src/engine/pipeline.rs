@@ -3,7 +3,7 @@ use image::{Rgb, Rgb32FImage};
 use super::stages;
 #[cfg(debug_assertions)]
 use super::ColorSpace;
-use super::{Parameters, RenderContext, RenderResult, Stage};
+use super::{Parameters, RenderContext, RenderResult, Stage, StageInputs};
 
 #[cfg(feature = "profiling")]
 use super::RenderProfile;
@@ -65,10 +65,12 @@ impl CpuPipeline {
             lut,
         };
 
+        let inputs = StageInputs { params, lut };
+
         // Prepare all active stages
         for stage in &mut self.stages {
-            if stage.is_active(params) {
-                stage.prepare(params);
+            if stage.is_active(&inputs) {
+                stage.prepare(&inputs);
             }
         }
 
@@ -77,17 +79,17 @@ impl CpuPipeline {
         let mut current_color_space = ColorSpace::LinearRec2020;
 
         for stage in &self.stages {
-            if !stage.is_active(params) {
+            if !stage.is_active(&inputs) {
                 continue;
             }
 
             #[cfg(debug_assertions)]
             debug_assert_eq!(
-                stage.input_color_space(),
+                stage.input_color_space(&inputs),
                 current_color_space,
                 "stage '{}' expects {:?} but current space is {:?}",
                 stage.name(),
-                stage.input_color_space(),
+                stage.input_color_space(&inputs),
                 current_color_space,
             );
 
@@ -100,7 +102,7 @@ impl CpuPipeline {
 
             #[cfg(debug_assertions)]
             {
-                current_color_space = stage.output_color_space();
+                current_color_space = stage.output_color_space(&inputs);
             }
 
             #[cfg(feature = "profiling")]
