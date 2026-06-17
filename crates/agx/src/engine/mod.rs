@@ -2533,6 +2533,48 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn linear_lut_samples_in_linear_space() {
+        use crate::lut::{Lut3D, LutEncoding};
+        use std::sync::Arc;
+
+        // LUT that halves each channel (in whatever space it is sampled).
+        let size = 2;
+        let mut table = Vec::with_capacity(size * size * size);
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    let d = (size - 1) as f32;
+                    table.push([r as f32 / d * 0.5, g as f32 / d * 0.5, b as f32 / d * 0.5]);
+                }
+            }
+        }
+        let make = |encoding| Lut3D {
+            title: None,
+            size,
+            domain_min: [0.0; 3],
+            domain_max: [1.0; 3],
+            table: table.clone(),
+            encoding,
+        };
+
+        let img = ImageBuffer::from_pixel(1, 1, Rgb([0.5_f32, 0.5, 0.5]));
+
+        let mut e_srgb = Engine::new(img.clone());
+        e_srgb.set_lut(Some(Arc::new(make(LutEncoding::Srgb))));
+        let srgb_out = e_srgb.render().image.get_pixel(0, 0).0;
+
+        let mut e_lin = Engine::new(img);
+        e_lin.set_lut(Some(Arc::new(make(LutEncoding::Linear))));
+        let lin_out = e_lin.render().image.get_pixel(0, 0).0;
+
+        // Same table, different sampling space -> different result.
+        assert!(
+            (srgb_out[0] - lin_out[0]).abs() > 1e-3,
+            "linear vs sRGB encoding should diverge: srgb={srgb_out:?} lin={lin_out:?}"
+        );
+    }
 }
 
 #[cfg(all(test, feature = "docgen"))]
