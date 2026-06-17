@@ -63,7 +63,6 @@ impl Stage for PerPixelAdjustmentsStage {
             sat_shifts: ctx.params.hsl.saturation_shifts(),
             lum_shifts: ctx.params.hsl.luminance_shifts(),
             color_grading_pre: self.color_grading_pre,
-            lut_fn: None,
         };
         adjust::apply_per_pixel_adjustments(&mut ctx.buf, &pp);
         Ok(())

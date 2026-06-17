@@ -117,9 +117,6 @@ pub fn apply_white_balance_exposure_buffer(
 // --- Per-pixel adjustments (gamma Rec.2020 working space) ---
 
 /// All per-pixel parameters needed for the gamma Rec.2020 working-space adjustment pass.
-///
-/// The `lut_fn` closure abstracts over the LUT lookup so that `adjust`
-/// does not depend on the `lut` module (architecture rule).
 pub struct PerPixelParams<'a> {
     /// Contrast adjustment (range: -100 to +100, default: 0).
     pub contrast: f32,
@@ -143,9 +140,6 @@ pub struct PerPixelParams<'a> {
     pub lum_shifts: [f32; 8],
     /// Precomputed color grading data, if active.
     pub color_grading_pre: Option<ColorGradingPrecomputed>,
-    /// Optional LUT lookup closure (abstracts over the `lut` module).
-    #[allow(clippy::type_complexity)]
-    pub lut_fn: Option<&'a (dyn Fn(f32, f32, f32) -> (f32, f32, f32) + Sync + 'a)>,
 }
 
 /// Apply all per-pixel adjustments to a gamma Rec.2020 buffer in-place.
@@ -199,12 +193,6 @@ pub fn apply_per_pixel_adjustments(buf: &mut [[f32; 3]], pp: &PerPixelParams) {
                 sr = cr;
                 sg = cg;
                 sb = cb;
-            }
-            if let Some(lut_fn) = pp.lut_fn {
-                let (lr, lg, lb) = lut_fn(sr, sg, sb);
-                sr = lr;
-                sg = lg;
-                sb = lb;
             }
 
             *pixel = [sr, sg, sb];
@@ -280,7 +268,6 @@ mod tests {
             sat_shifts: [0.0; 8],
             lum_shifts: [0.0; 8],
             color_grading_pre: None,
-            lut_fn: None,
         };
         apply_per_pixel_adjustments(&mut buf, &pp);
         for c in 0..3 {
@@ -307,7 +294,6 @@ mod tests {
             sat_shifts: [0.0; 8],
             lum_shifts: [0.0; 8],
             color_grading_pre: None,
-            lut_fn: None,
         };
         apply_per_pixel_adjustments(&mut buf, &pp);
         // Positive contrast should push values above 0.5 higher
