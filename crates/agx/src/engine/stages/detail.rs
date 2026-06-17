@@ -58,7 +58,10 @@ mod tests {
     #[test]
     fn detail_inactive_when_neutral() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DetailStage::new();
         assert!(!stage.is_active(&inp));
     }
@@ -67,7 +70,10 @@ mod tests {
     fn detail_active_when_sharpening() {
         let mut params = Parameters::default();
         params.detail.sharpening.amount = 50.0;
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DetailStage::new();
         assert!(stage.is_active(&inp));
     }
@@ -75,7 +81,10 @@ mod tests {
     #[test]
     fn detail_color_space_is_srgb() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DetailStage::new();
         assert_eq!(stage.input_color_space(&inp), ColorSpace::GammaRec2020);
         assert_eq!(stage.output_color_space(&inp), ColorSpace::GammaRec2020);

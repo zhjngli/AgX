@@ -221,7 +221,10 @@ mod tests {
         let mut buf = vec![[0.2_f32, 0.5, 0.8], [-0.1, 1.2, 0.0]];
         let before = buf.clone();
         convert_buffer(&mut buf, ColorSpace::GammaRec2020, ColorSpace::GammaRec2020);
-        assert_eq!(buf, before, "same-space conversion must not touch the buffer");
+        assert_eq!(
+            buf, before,
+            "same-space conversion must not touch the buffer"
+        );
     }
 
     #[test]
@@ -271,7 +274,10 @@ mod tests {
             srgb_curve_signed(lin_srgb[2]),
         ];
         for c in 0..3 {
-            assert!((buf[0][c] - expected[c]).abs() < 1e-6, "channel {c} mismatch");
+            assert!(
+                (buf[0][c] - expected[c]).abs() < 1e-6,
+                "channel {c} mismatch"
+            );
         }
     }
 

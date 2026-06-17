@@ -65,7 +65,10 @@ mod tests {
             lut: None,
         };
         let mut stage = WhiteBalanceExposureStage::new();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         stage.prepare(&inp);
         stage.process(&mut ctx).unwrap();
         for (c, &v) in ctx.buf[0].iter().enumerate() {
@@ -79,7 +82,10 @@ mod tests {
     #[test]
     fn stage_color_space_is_linear() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = WhiteBalanceExposureStage::new();
         assert_eq!(stage.input_color_space(&inp), ColorSpace::LinearRec2020);
         assert_eq!(stage.output_color_space(&inp), ColorSpace::LinearRec2020);

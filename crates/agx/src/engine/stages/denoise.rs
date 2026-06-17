@@ -57,7 +57,10 @@ mod tests {
     #[test]
     fn denoise_inactive_when_neutral() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DenoiseStage::new();
         assert!(!stage.is_active(&inp));
     }
@@ -66,7 +69,10 @@ mod tests {
     fn denoise_active_when_nonzero() {
         let mut params = Parameters::default();
         params.noise_reduction.luminance = 50.0;
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DenoiseStage::new();
         assert!(stage.is_active(&inp));
     }
@@ -74,7 +80,10 @@ mod tests {
     #[test]
     fn denoise_color_space_is_linear() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DenoiseStage::new();
         assert_eq!(stage.input_color_space(&inp), ColorSpace::LinearRec2020);
         assert_eq!(stage.output_color_space(&inp), ColorSpace::LinearRec2020);

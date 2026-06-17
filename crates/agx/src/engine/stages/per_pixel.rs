@@ -96,7 +96,10 @@ mod tests {
             lut: None,
         };
         let mut stage = PerPixelAdjustmentsStage::new();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         stage.prepare(&inp);
         stage.process(&mut ctx).unwrap();
         for (c, &v) in ctx.buf[0].iter().enumerate() {
@@ -110,7 +113,10 @@ mod tests {
     #[test]
     fn per_pixel_stage_color_space_is_srgb() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = PerPixelAdjustmentsStage::new();
         assert_eq!(stage.input_color_space(&inp), ColorSpace::GammaRec2020);
         assert_eq!(stage.output_color_space(&inp), ColorSpace::GammaRec2020);
@@ -119,7 +125,10 @@ mod tests {
     #[test]
     fn per_pixel_stage_always_active() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = PerPixelAdjustmentsStage::new();
         assert!(stage.is_active(&inp));
     }
@@ -159,7 +168,10 @@ mod tests {
             lut: Some(&lut),
         };
         let mut stage = PerPixelAdjustmentsStage::new();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         stage.prepare(&inp);
         stage.process(&mut ctx).unwrap();
 

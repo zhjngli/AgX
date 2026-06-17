@@ -57,7 +57,10 @@ mod tests {
     #[test]
     fn dehaze_inactive_when_neutral() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DehazeStage::new();
         assert!(!stage.is_active(&inp));
     }
@@ -66,7 +69,10 @@ mod tests {
     fn dehaze_active_when_nonzero() {
         let mut params = Parameters::default();
         params.dehaze.amount = 50.0;
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DehazeStage::new();
         assert!(stage.is_active(&inp));
     }
@@ -74,7 +80,10 @@ mod tests {
     #[test]
     fn dehaze_color_space_is_linear() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = DehazeStage::new();
         assert_eq!(stage.input_color_space(&inp), ColorSpace::LinearRec2020);
         assert_eq!(stage.output_color_space(&inp), ColorSpace::LinearRec2020);

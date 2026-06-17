@@ -112,7 +112,10 @@ mod tests {
             lut: None,
         };
 
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let mut to_gamma = LinearToGammaStage::new();
         to_gamma.prepare(&inp);
         to_gamma.process(&mut ctx).unwrap();
@@ -140,7 +143,10 @@ mod tests {
     #[test]
     fn linear_to_gamma_always_active() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = LinearToGammaStage::new();
         assert!(stage.is_active(&inp));
     }
@@ -148,7 +154,10 @@ mod tests {
     #[test]
     fn gamma_to_linear_always_active() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let stage = GammaToLinearStage::new();
         assert!(stage.is_active(&inp));
     }
@@ -156,13 +165,19 @@ mod tests {
     #[test]
     fn color_space_declarations_correct() {
         let params = Parameters::default();
-        let inp = crate::engine::StageInputs { params: &params, lut: None };
+        let inp = crate::engine::StageInputs {
+            params: &params,
+            lut: None,
+        };
         let to_gamma = LinearToGammaStage::new();
         assert_eq!(to_gamma.input_color_space(&inp), ColorSpace::LinearRec2020);
         assert_eq!(to_gamma.output_color_space(&inp), ColorSpace::GammaRec2020);
 
         let to_linear = GammaToLinearStage::new();
         assert_eq!(to_linear.input_color_space(&inp), ColorSpace::GammaRec2020);
-        assert_eq!(to_linear.output_color_space(&inp), ColorSpace::LinearRec2020);
+        assert_eq!(
+            to_linear.output_color_space(&inp),
+            ColorSpace::LinearRec2020
+        );
     }
 }
