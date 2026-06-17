@@ -1,7 +1,7 @@
+use crate::color_space::convert_buffer;
 use image::{Rgb, Rgb32FImage};
 
 use super::stages;
-#[cfg(debug_assertions)]
 use super::ColorSpace;
 use super::{Parameters, RenderContext, RenderResult, Stage, StageInputs};
 
@@ -28,12 +28,10 @@ impl CpuPipeline {
                 Box::new(stages::WhiteBalanceExposureStage::new()),
                 Box::new(stages::DehazeStage::new()),
                 Box::new(stages::DenoiseStage::new()),
-                Box::new(stages::LinearToGammaStage::new()),
                 Box::new(stages::PerPixelAdjustmentsStage::new()),
                 Box::new(stages::DetailStage::new()),
                 Box::new(stages::GrainStage::new()),
                 Box::new(stages::VignetteStage::new()),
-                Box::new(stages::GammaToLinearStage::new()),
             ],
         }
     }
@@ -74,24 +72,29 @@ impl CpuPipeline {
             }
         }
 
-        // Execute stages in order, tracking color space in debug builds
-        #[cfg(debug_assertions)]
-        let mut current_color_space = ColorSpace::LinearRec2020;
+        // Execute stages in order, auto-inserting color-space conversions when
+        // the next active stage declares a different input space than the current
+        // buffer state. The buffer enters as LinearRec2020 (engine input contract).
+        let mut current = ColorSpace::LinearRec2020;
 
         for stage in &self.stages {
             if !stage.is_active(&inputs) {
                 continue;
             }
 
-            #[cfg(debug_assertions)]
-            debug_assert_eq!(
-                stage.input_color_space(&inputs),
-                current_color_space,
-                "stage '{}' expects {:?} but current space is {:?}",
-                stage.name(),
-                stage.input_color_space(&inputs),
-                current_color_space,
-            );
+            let needed = stage.input_color_space(&inputs);
+            if current != needed {
+                #[cfg(feature = "profiling")]
+                let conv_start = std::time::Instant::now();
+
+                convert_buffer(&mut ctx.buf, current, needed);
+
+                #[cfg(feature = "profiling")]
+                profile_stages.push((
+                    format!("convert: {needed:?}"),
+                    conv_start.elapsed().as_secs_f64() * 1000.0,
+                ));
+            }
 
             #[cfg(feature = "profiling")]
             let stage_start = std::time::Instant::now();
@@ -100,15 +103,26 @@ impl CpuPipeline {
                 .process(&mut ctx)
                 .expect("stage processing should not fail");
 
-            #[cfg(debug_assertions)]
-            {
-                current_color_space = stage.output_color_space(&inputs);
-            }
+            current = stage.output_color_space(&inputs);
 
             #[cfg(feature = "profiling")]
             profile_stages.push((
                 stage.name().to_string(),
                 stage_start.elapsed().as_secs_f64() * 1000.0,
+            ));
+        }
+
+        // Engine output contract: linear Rec.2020.
+        if current != ColorSpace::LinearRec2020 {
+            #[cfg(feature = "profiling")]
+            let conv_start = std::time::Instant::now();
+
+            convert_buffer(&mut ctx.buf, current, ColorSpace::LinearRec2020);
+
+            #[cfg(feature = "profiling")]
+            profile_stages.push((
+                "convert: LinearRec2020".to_string(),
+                conv_start.elapsed().as_secs_f64() * 1000.0,
             ));
         }
 
@@ -124,6 +138,30 @@ impl CpuPipeline {
                 stages: profile_stages,
                 total_ms: render_start.elapsed().as_secs_f64() * 1000.0,
             }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod auto_insert_tests {
+    use super::*;
+    use crate::engine::Parameters;
+    use image::{ImageBuffer, Rgb};
+
+    #[test]
+    fn neutral_render_is_identity_through_auto_insert() {
+        let img = ImageBuffer::from_pixel(2, 2, Rgb([0.4_f32, 0.6, 0.2]));
+        let original: Vec<[f32; 3]> = img.pixels().map(|p| p.0).collect();
+        let mut pipeline = CpuPipeline::new();
+        let params = Parameters::default();
+        let out = pipeline.execute(&img, &params, None).image;
+        for (i, p) in out.pixels().enumerate() {
+            for c in 0..3 {
+                assert!(
+                    (p.0[c] - original[i][c]).abs() < 1e-5,
+                    "neutral render changed pixel [{i}][{c}]"
+                );
+            }
         }
     }
 }
