@@ -63,7 +63,8 @@ pub struct GpuParameters {
     pub tc_green_active: f32,
     pub tc_blue_active: f32,
     pub lut_active: f32,
-    pub _pad_tc: [f32; 2],
+    pub lut_encoding: f32, // 0.0 = srgb, 1.0 = linear
+    pub _pad_tc: f32,
 
     // Image dimensions (needed by vignette, grain, etc.)
     pub width: f32,
@@ -177,8 +178,9 @@ impl From<&Parameters> for GpuParameters {
             } else {
                 1.0
             },
-            lut_active: 0.0, // set by GpuPipeline when LUT is present
-            _pad_tc: [0.0; 2],
+            lut_active: 0.0,   // set by GpuPipeline when LUT is present
+            lut_encoding: 0.0, // set by GpuPipeline when LUT is present
+            _pad_tc: 0.0,
             width: 0.0,
             height: 0.0,
             _pad5: [0.0; 2],

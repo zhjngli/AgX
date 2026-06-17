@@ -82,6 +82,12 @@ impl GpuPipeline {
         // Upload LUT if present
         if let Some(lut) = lut {
             self.runtime.upload_lut(lut);
+            gpu_params.lut_active = 1.0;
+            gpu_params.lut_encoding = match lut.encoding {
+                crate::lut::LutEncoding::Srgb => 0.0,
+                crate::lut::LutEncoding::Linear => 1.0,
+            };
+            self.runtime.upload_params(&gpu_params);
         }
 
         #[cfg(feature = "profiling")]

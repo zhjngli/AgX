@@ -55,7 +55,8 @@ struct Params {
     tc_green_active: f32,
     tc_blue_active: f32,
     lut_active: f32,
-    _pad_tc: vec2f,
+    lut_encoding: f32,
+    _pad_tc: f32,
 
     width: f32,
     height: f32,
