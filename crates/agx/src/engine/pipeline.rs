@@ -1,3 +1,14 @@
+//! CPU render executor.
+//!
+//! # Color-space invariant
+//!
+//! Color-space conversions are inserted **only by this executor** from the
+//! declared `input_color_space` / `output_color_space` of each stage, via
+//! `crate::color_space::convert_buffer` (the single conversion primitive).
+//! Stages must never hand-place a conversion inside `process`. Engine output
+//! is always linear Rec.2020, regardless of which space the last active stage
+//! left the buffer in.
+
 use crate::color_space::convert_buffer;
 use image::{Rgb, Rgb32FImage};
 

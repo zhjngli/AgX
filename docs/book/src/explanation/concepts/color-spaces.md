@@ -26,11 +26,13 @@ If you applied contrast in linear space, the result would look wrong: the midpoi
 
 The gamut for these operations is **gamma-encoded Rec.2020**. AgX reuses the sRGB transfer-curve shape — the same piecewise function that maps linear 0.18 to roughly 0.5 in gamma space — but applies it to Rec.2020 linear values rather than sRGB linear values. The result: the 0.5 perceptual midtone keeps the same meaning a colorist would expect, just over a wider gamut. A sign-preserving variant of the curve handles the small negative components that arise when wide-gamut inputs (or aggressive edits) push values just outside the Rec.2020 cube on intermediate matrix conversions.
 
-## Why LUTs still sample in sRGB gamma
+## Why LUT sampling requires a conversion bracket
 
-Existing `.cube` LUTs are universally authored in the sRGB-gamma domain. A colorist tweaking a film emulation LUT works with pixel values as they appear on an sRGB display; the input–output mapping baked into the LUT corresponds to sRGB values, not Rec.2020 values.
+Creative `.cube` LUTs are almost universally authored in the sRGB-gamma domain. A colorist building a film emulation or grade works with pixel values as they appear on an sRGB display; the input–output mapping baked into the LUT corresponds to sRGB-gamma values, not Rec.2020 values.
 
-To preserve portability — so third-party LUTs work out of the box — AgX wraps the LUT call with a conversion bracket: gamma Rec.2020 → linear Rec.2020 → linear sRGB → gamma sRGB → LUT sample → gamma sRGB → linear sRGB → linear Rec.2020 → gamma Rec.2020. The LUT itself stays gamut-agnostic; the engine handles the wide-working-space round trip on every pixel.
+To preserve portability — so third-party LUTs work out of the box — AgX converts the buffer to the LUT's declared encoding before sampling and back afterward. For the default `srgb` encoding this is: gamma Rec.2020 → linear Rec.2020 → linear sRGB → sRGB gamma → LUT sample → reverse. For `linear`-encoded LUTs (less common, used in physical-light pipelines), the bracket stops at linear sRGB instead of going through the transfer curve.
+
+The LUT module itself stays gamut-agnostic; the engine handles the wide-working-space round trip on every pixel. See [LUT encoding](lut-encoding.md) for the design rationale behind the two encoding choices.
 
 ## What this means for Display P3 photos
 
@@ -58,3 +60,4 @@ Color management is an evolving area; further work is tracked in the project bac
 
 - [Color spaces reference](../../reference/concepts/color-spaces.md) — definitions, conversions, per-stage table.
 - [Render pipeline](render-pipeline.md) — where in the pipeline the linear↔gamma conversions happen.
+- [LUT encoding](lut-encoding.md) — why the LUT sampling space differs from the pipeline working space.

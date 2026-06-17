@@ -47,12 +47,20 @@ const MANUAL_METADATA_FIELDS: &[(&str, &str, &str, &str)] = &[
         "Optional relative path to a base preset TOML file to merge before this preset.",
     ),
 ];
-const MANUAL_LUT_FIELDS: &[(&str, &str, &str, &str)] = &[(
-    "lut.path",
-    "string or null",
-    "null",
-    "Optional relative path to a `.cube` LUT file, resolved from the preset TOML file.",
-)];
+const MANUAL_LUT_FIELDS: &[(&str, &str, &str, &str)] = &[
+    (
+        "lut.path",
+        "string or null",
+        "null",
+        "Optional relative path to a `.cube` LUT file, resolved from the preset TOML file.",
+    ),
+    (
+        "lut.encoding",
+        "`srgb`, `linear`",
+        "`srgb`",
+        "Color space the LUT was authored in. `srgb` = sRGB transfer curve (standard for creative LUTs). `linear` = linear light, sRGB primaries. Both variants assume sRGB primaries.",
+    ),
+];
 const HSL_CHANNELS: &[&str] = &[
     "red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta",
 ];
@@ -1121,6 +1129,10 @@ mod tests {
             "null".to_owned(),
         );
         values.insert(vec!["lut".to_owned(), "path".to_owned()], "null".to_owned());
+        values.insert(
+            vec!["lut".to_owned(), "encoding".to_owned()],
+            "`srgb`".to_owned(),
+        );
 
         values
     }
@@ -1248,6 +1260,7 @@ mod tests {
         ));
         assert!(markdown.contains("metadata.name"));
         assert!(markdown.contains("lut.path"));
+        assert!(markdown.contains("lut.encoding"));
         assert!(markdown.contains("../explanation/algorithms/grain.md"));
     }
 

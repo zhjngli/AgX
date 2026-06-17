@@ -8,43 +8,47 @@ A render in AgX takes an input image (decoded from JPEG, PNG, TIFF, or raw) thro
 flowchart TD
     Decode["Decode<br/>(JPEG, PNG, TIFF, raw)"]
     LinearEntry["Linear Rec.2020"]
-    WB["White balance<br/>(linear)"]
-    Exposure["Exposure<br/>(linear)"]
-    Dehaze["Dehaze<br/>(linear)"]
-    Denoise["Noise reduction<br/>(linear)"]
-    LinearToGamma["Linear → Gamma"]
+    WB["White balance<br/>(linear Rec.2020)"]
+    Exposure["Exposure<br/>(linear Rec.2020)"]
+    Dehaze["Dehaze<br/>(linear Rec.2020)"]
+    Denoise["Noise reduction<br/>(linear Rec.2020)"]
+    ConvToGamma["Auto-conversion:<br/>Linear → Gamma Rec.2020"]
     Tonal["Contrast, highlights,<br/>shadows, whites, blacks<br/>(Gamma Rec.2020)"]
     ToneCurves["Tone curves<br/>(Gamma Rec.2020)"]
     HSL["HSL adjustments<br/>(Gamma Rec.2020)"]
     ColorGrading["Color grading<br/>(Gamma Rec.2020)"]
-    LUT["LUT<br/>(Gamma Rec.2020;<br/>LUT sampled in sRGB gamma<br/>via conversion bracket)"]
+    ConvToLut["Auto-conversion:<br/>to LUT encoding space"]
+    LUT["LUT<br/>(sRGB gamma or linear sRGB,<br/>per lut.encoding)"]
+    ConvFromLut["Auto-conversion:<br/>back to Gamma Rec.2020"]
     Detail["Detail pass<br/>(sharpen, clarity, texture)<br/>(Gamma Rec.2020)"]
     Grain["Grain<br/>(Gamma Rec.2020)"]
     Vignette["Vignette<br/>(Gamma Rec.2020)"]
-    GammaToLinear["Gamma → Linear"]
-    Encode["Encode<br/>(Linear Rec.2020 → 8-bit sRGB:<br/>matrix + transfer + quantize)"]
+    ConvToLinear["Auto-conversion:<br/>Gamma → Linear Rec.2020"]
+    Encode["Encode<br/>(Linear Rec.2020 → output gamut:<br/>matrix + transfer + quantize)"]
 
     Decode --> LinearEntry
     LinearEntry --> WB
     WB --> Exposure
     Exposure --> Dehaze
     Dehaze --> Denoise
-    Denoise --> LinearToGamma
-    LinearToGamma --> Tonal
+    Denoise --> ConvToGamma
+    ConvToGamma --> Tonal
     Tonal --> ToneCurves
     ToneCurves --> HSL
     HSL --> ColorGrading
-    ColorGrading --> LUT
-    LUT --> Detail
+    ColorGrading --> ConvToLut
+    ConvToLut --> LUT
+    LUT --> ConvFromLut
+    ConvFromLut --> Detail
     Detail --> Grain
     Grain --> Vignette
-    Vignette --> GammaToLinear
-    GammaToLinear --> Encode
+    Vignette --> ConvToLinear
+    ConvToLinear --> Encode
 ```
 
 ## Color space discipline
 
-Each stage runs in the color space where its math is physically or perceptually correct. The pipeline does the linear-to-gamma conversion in the middle to switch from physical to perceptual operations. See [Color spaces](color-spaces.md) for the linear-vs-gamma distinction and the per-stage table.
+Each stage runs in the color space where its math is physically or perceptually correct. The pipeline does the linear-to-gamma conversion in the middle to switch from physical to perceptual operations. Conversions between stages are inserted automatically by the pipeline executor based on each stage's declared input and output color space. The LUT stage samples in the space declared by `lut.encoding` (`srgb` by default; `linear` for linear-light LUTs). See [Color spaces](color-spaces.md) for the linear-vs-gamma distinction and the per-stage table.
 
 ## See also
 

@@ -42,21 +42,22 @@ pub struct RenderResult {
 
 /// Color space declaration for pipeline stages.
 ///
-/// After the wide working space migration, the engine's working space is
-/// `LinearRec2020` (for stages 1–3) and `GammaRec2020` (for stages 5–8,
-/// using the sRGB transfer curve applied to Rec.2020 linear values).
-/// `LinearSrgb` and `SrgbGamma` are retained for encode-side intermediates
-/// and the LUT-wrap conversion bracket.
+/// The executor auto-inserts conversions between adjacent stages that declare
+/// different color spaces. `convert_buffer` is the single conversion primitive;
+/// all stage-to-stage conversions route through it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorSpace {
-    /// Linear Rec.2020 (working space for stages 1–3 and the engine boundary).
+    /// Linear Rec.2020 — the engine's primary working space and the input/output
+    /// boundary. Decode delivers buffers in this space; encode expects it.
     LinearRec2020,
-    /// Gamma-encoded Rec.2020 — sRGB transfer curve applied to Rec.2020 linear values
-    /// (working space for stages 5–8).
+    /// Gamma-encoded Rec.2020 — sRGB transfer curve applied to linear Rec.2020
+    /// values. The working space for gamma-domain stages.
     GammaRec2020,
-    /// Linear sRGB (encode-side intermediate; LUT-wrap intermediate).
+    /// Linear-light sRGB primaries. The sampling space for `Linear`-encoded LUTs
+    /// and an encode-side intermediate.
     LinearSrgb,
-    /// sRGB with gamma encoding (encode-side final; LUT-wrap intermediate).
+    /// Gamma-encoded sRGB. The sampling space for `Srgb`-encoded LUTs and the
+    /// sRGB final-output step.
     SrgbGamma,
 }
 
@@ -73,7 +74,7 @@ pub struct RenderContext<'a> {
     pub height: u32,
     /// Render parameters (read-only for stages).
     pub params: &'a Parameters,
-    /// Optional LUT applied during the per-pixel adjustment stage.
+    /// Optional 3D LUT applied by `LutStage` (after per-pixel adjustments, before detail).
     pub lut: Option<&'a crate::lut::Lut3D>,
 }
 
@@ -83,7 +84,7 @@ pub struct RenderContext<'a> {
 pub struct StageInputs<'a> {
     /// Render parameters for the current render pass.
     pub params: &'a Parameters,
-    /// Optional 3D LUT applied during the per-pixel stage.
+    /// Optional 3D LUT applied by [`LutStage`](crate::engine::stages::LutStage).
     pub lut: Option<&'a crate::lut::Lut3D>,
 }
 

@@ -1,8 +1,11 @@
 //! Color-space conversion matrices and transfer curves.
 //!
-//! Working space contract: linear Rec.2020 between decode and the engine,
-//! gamma-encoded Rec.2020 between stages 5 and 8. See
-//! `docs/plans/2026-05-16-wide-working-space-design.md`.
+//! # Working space contract
+//!
+//! The engine's working space is linear Rec.2020. Conversions between stages
+//! are inserted exclusively by the CPU executor in `engine::pipeline`, via
+//! [`convert_buffer`] (the single conversion primitive — hub-and-spoke through
+//! linear Rec.2020). Engine output is always linear Rec.2020.
 
 use crate::engine::ColorSpace;
 use rayon::prelude::*;
