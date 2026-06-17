@@ -2478,6 +2478,49 @@ mod tests {
         }
         assert!(changed, "grain should change render output");
     }
+
+    #[test]
+    fn srgb_lut_render_is_stable() {
+        use crate::lut::Lut3D;
+        use std::sync::Arc;
+
+        // A small non-identity LUT: swap R and B output channels.
+        let size = 2;
+        let mut table = Vec::with_capacity(size * size * size);
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    let d = (size - 1) as f32;
+                    table.push([b as f32 / d, g as f32 / d, r as f32 / d]);
+                }
+            }
+        }
+        let lut = Lut3D {
+            title: None,
+            size,
+            domain_min: [0.0, 0.0, 0.0],
+            domain_max: [1.0, 1.0, 1.0],
+            table,
+        };
+
+        let img = ImageBuffer::from_pixel(2, 2, Rgb([0.30_f32, 0.55, 0.80]));
+        let mut engine = Engine::new(img);
+        engine.params_mut().contrast = 20.0;
+        engine.set_lut(Some(Arc::new(lut)));
+        let out = engine.render().image;
+        let p = out.get_pixel(0, 0).0;
+
+        // Characterization values — fill in from the first run (Step 2).
+        let expected = [0.8539122_f32, 0.69250095, 0.1506029];
+        for c in 0..3 {
+            assert!(
+                (p[c] - expected[c]).abs() < 1e-6,
+                "channel {c}: got {} expected {}",
+                p[c],
+                expected[c]
+            );
+        }
+    }
 }
 
 #[cfg(all(test, feature = "docgen"))]
