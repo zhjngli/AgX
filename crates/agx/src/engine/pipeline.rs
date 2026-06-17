@@ -157,9 +157,9 @@ mod auto_insert_tests {
         let params = Parameters::default();
         let out = pipeline.execute(&img, &params, None).image;
         for (i, p) in out.pixels().enumerate() {
-            for c in 0..3 {
+            for (c, (&actual, &orig)) in p.0.iter().zip(original[i].iter()).enumerate() {
                 assert!(
-                    (p.0[c] - original[i][c]).abs() < 1e-5,
+                    (actual - orig).abs() < 1e-5,
                     "neutral render changed pixel [{i}][{c}]"
                 );
             }
