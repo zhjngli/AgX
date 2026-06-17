@@ -32,9 +32,11 @@ pub enum LutEncoding {
 ///
 /// # Color Space
 ///
-/// LUTs are color-space-dependent. Most creative `.cube` LUTs expect sRGB
-/// gamma input in the 0.0–1.0 range. The AgX engine applies the LUT in
-/// sRGB gamma space after tone adjustments.
+/// LUTs are color-space-dependent. The AgX engine applies the LUT as its own
+/// pipeline stage after the per-pixel tone adjustments, sampling in the space
+/// given by the LUT's `encoding`: sRGB gamma for [`LutEncoding::Srgb`],
+/// linear sRGB for [`LutEncoding::Linear`]. The executor inserts the
+/// conversion bracket automatically.
 #[derive(Debug, Clone)]
 pub struct Lut3D {
     /// Optional title from the .cube file header.

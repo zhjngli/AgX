@@ -10,7 +10,7 @@ This page collects the load-bearing invariants of AgX and the choices that produ
 - [Fixed render order](#fixed-render-order) — the engine applies adjustments in a fixed, hardcoded order.
 - [Dual pipeline, CPU canonical](#dual-pipeline-cpu-canonical) — CPU and GPU pipelines produce near-identical output; CPU is the deterministic source of truth.
 - [Partial-parameter merge semantics](#partial-parameter-merge-semantics) — recursive through composite sections, last-write-wins at the leaf.
-- [LUT in sRGB gamma](#lut-in-srgb-gamma) — LUTs apply in the perceptually-encoded space, matching how colorists author them.
+- [LUT encoding and the auto-conversion bracket](#lut-encoding-and-the-auto-conversion-bracket) — LUTs declare their authoring encoding; the pipeline auto-converts to that space before sampling.
 - [Preset-first scope](#preset-first-scope) — no UI on the critical path; CLI and library are the surface.
 
 ## Always re-render from original
@@ -71,7 +71,7 @@ Wide-gamut inputs flow unclamped through the entire pipeline, which means heavy 
 
 ### What we chose
 
-The engine applies adjustments in a fixed, hardcoded order. Exposure and white balance run first in linear Rec.2020; dehaze and denoise follow, also in linear Rec.2020; the buffer is converted to gamma Rec.2020; the gamma-space adjustments (contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading, LUT) run in one per-pixel pass; detail, grain, and vignette run last. The order in which fields appear in a preset, in the `Parameters` struct, or in API calls has no effect on output.
+The engine applies adjustments in a fixed, hardcoded order. Exposure and white balance run first in linear Rec.2020; dehaze and denoise follow, also in linear Rec.2020; the buffer is converted to gamma Rec.2020; the gamma-space per-pixel adjustments (contrast, highlights, shadows, whites, blacks, tone curves, HSL, color grading) run in one pass; the LUT runs as its own stage after that pass, in the space declared by its encoding; detail, grain, and vignette run last. The order in which fields appear in a preset, in the `Parameters` struct, or in API calls has no effect on output.
 
 ### What we considered
 
@@ -79,7 +79,7 @@ The alternative is user-reorderable stages: a preset can declare "run dehaze aft
 
 ### Why we chose this
 
-Each stage is designed to run in the color space and pipeline position where its math is correct: exposure is a linear scaling and must precede the gamma conversion; dehaze and denoise both operate on physical light and stay in linear Rec.2020; contrast and tonal sliders reshape perceptual brightness and require the gamma-Rec.2020 encoding; LUTs apply in the sRGB-gamma space colorists author them in (the engine brackets the lookup with conversions so existing `.cube` LUTs work unchanged); grain and vignette are surface effects that should not be re-modified by upstream stages. Reordering any of these breaks an assumption a downstream stage depends on. The render pipeline explanation page walks through the worked examples. Hiding the order from users is also what makes the declarative-preset model work: a preset produces the same output regardless of how it was authored.
+Each stage is designed to run in the color space and pipeline position where its math is correct: exposure is a linear scaling and must precede the gamma conversion; dehaze and denoise both operate on physical light and stay in linear Rec.2020; contrast and tonal sliders reshape perceptual brightness and require the gamma-Rec.2020 encoding; LUTs run as their own stage after the per-pixel pass, in the space declared by their encoding so existing `.cube` LUTs work unchanged; grain and vignette are surface effects that should not be re-modified by upstream stages. Reordering any of these breaks an assumption a downstream stage depends on. The render pipeline explanation page walks through the worked examples. Hiding the order from users is also what makes the declarative-preset model work: a preset produces the same output regardless of how it was authored.
 
 ### What this costs
 
@@ -121,23 +121,23 @@ The merge is built around how users actually layer presets: a base look preset, 
 
 Two parameter representations have to be maintained: `Parameters` (concrete, the engine's working type) and `PartialParameters` (every field optional, the preset deserialization target). Adding a new parameter means updating both, plus the materialize and merge implementations. Last-write-wins also means the merge is silent about conflicts — two presets setting the same field to different values produces a result without warning. The chosen semantic means a user who layers two presets with overlapping intent has no automatic feedback about which one won.
 
-## LUT in sRGB gamma
+## LUT encoding and the auto-conversion bracket
 
 ### What we chose
 
-LUTs are applied in sRGB gamma space, inside the per-pixel pass that runs after the linear stages and before detail, grain, and vignette. Pixel values are encoded to sRGB gamma before the LUT lookup, the LUT does its trilinear interpolation on those values, and the result continues through the per-pixel pass. The pipeline does not auto-convert the LUT input to a different space.
+LUTs are applied as their own pipeline stage after the per-pixel pass, sampling in the space declared by the LUT's `encoding` field. A preset declares `encoding = "srgb"` (the default) or `encoding = "linear"`; the executor auto-inserts the conversion bracket — converting the working buffer into the LUT's declared space before the lookup and back afterward. Both encodings use sRGB primaries; the distinction is the transfer curve: sRGB gamma for `srgb`, linear light for `linear`.
 
 ### What we considered
 
-The alternative is to apply LUTs in linear sRGB. A pipeline that already runs dehaze, denoise, and exposure in linear could plausibly run LUTs there too. A second alternative is a per-LUT declared input space — each `.cube` file would declare whether it expects linear, sRGB gamma, or log input, and the pipeline would auto-insert conversions. A third is a global setting that picks one space for all LUTs.
+The alternative is to apply LUTs unconditionally in linear sRGB. A pipeline that already runs dehaze, denoise, and exposure in linear could plausibly run LUTs there too. A second alternative is a global setting that picks one space for all LUTs. A third is a per-LUT declared input space with named log curves (S-Log3, LogC, ACEScct), which would support video-grading LUTs that expect a log-encoded signal.
 
 ### Why we chose this
 
-AgX treats LUTs as opaque numeric mappings whose correct input space is determined by how they were authored, not by what the engine prefers. The vast majority of creative `.cube` LUTs — film emulations, color grades, Instagram-style looks — are authored by colorists working on screens that display sRGB. The lattice values in those LUTs correspond to sRGB pixel values, not linear ones. Applying such a LUT to linear values produces incorrect colors. AgX picks the space that works for the largest body of existing LUTs, and applies the LUT after parametric tone adjustments — matching the standard Lightroom and Resolve workflow where the LUT is a creative grade on top of corrected exposure and contrast.
+AgX treats LUTs as opaque numeric mappings whose correct input space is determined by how they were authored, not by what the engine prefers. The vast majority of creative `.cube` LUTs — film emulations, color grades, Instagram-style looks — are authored by colorists working on screens that display sRGB. The lattice values in those LUTs correspond to sRGB pixel values, not linear ones. Applying such a LUT to linear values produces incorrect colors. Providing the `srgb` default covers that common case, while `linear` handles the less common case of LUTs produced by tools that operate in a physical-light pipeline. A per-LUT declared encoding with auto-inserted conversions is what makes both cases portable without manual bracket code in each preset.
 
 ### What this costs
 
-Log-input LUTs (S-Log3, LogC, ACEScct) used in video grading workflows are not directly supported. A colorist who wants to apply a log-to-Rec709 conversion LUT cannot use AgX's LUT pipeline as is — the input the LUT expects is not the input it receives. The fix is the per-LUT declared input space, which is on the long-term map but blocked on the log-color and HDR-transfer-curve work AgX currently defers.
+Log-input LUTs (S-Log3, LogC, ACEScct) used in video grading workflows are not supported. A colorist who wants to apply a log-to-Rec709 conversion LUT cannot use AgX's LUT pipeline as is — the input the LUT expects (a log-encoded signal) is not what it receives. Adding named log transfer curves is deferred; it requires HDR-transfer-curve infrastructure that AgX does not yet have.
 
 ## Preset-first scope
 

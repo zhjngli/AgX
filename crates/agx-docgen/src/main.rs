@@ -58,7 +58,7 @@ const MANUAL_LUT_FIELDS: &[(&str, &str, &str, &str)] = &[
         "lut.encoding",
         "`srgb`, `linear`",
         "`srgb`",
-        "Color space the LUT was authored in. `srgb` = sRGB transfer curve (standard for creative LUTs). `linear` = linear light, sRGB primaries. Both variants assume sRGB primaries.",
+        "Color space the LUT was authored in. `srgb` = sRGB transfer curve (standard for creative LUTs). `linear` = linear light, sRGB primaries. Both variants assume sRGB primaries. Applies to the LUT loaded via this preset's `path`; inheriting a base preset's LUT without also specifying `path` leaves the encoding unchanged.",
     ),
 ];
 const HSL_CHANNELS: &[&str] = &[
