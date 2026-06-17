@@ -6,7 +6,7 @@ An open-source photo editing library and CLI written in Rust, with a portable, h
 
 ## Philosophy
 
-AgX is a **preset-first** photo editing tool. It doesn't try to out-render Lightroom or Capture One — they have decades of engine refinement behind them. AgX's bet is different: the **portable, human-readable preset language is the product**, and its value grows with the ecosystem around looks you can read, diff, share, and fork as easily as code.
+AgX is a **preset-first** photo editing tool. It doesn't try to out-render Lightroom or Capture One — they have decades of engine refinement behind them. AgX's bet is different: the **portable, human-readable preset language is the product**, and its value grows with the ecosystem around it — looks you can read, diff, share, and fork as easily as code.
 
 - **Presets as recipes**: a preset is a complete editing recipe in a single TOML file. Presets can extend other presets, override selectively, and compose into layered looks.
 - **Batch-oriented**: apply a look to an entire shoot in one command. The CLI and library API are designed for processing many images quickly, not pixel-level retouching.
