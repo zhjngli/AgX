@@ -2,7 +2,7 @@
 
 AgX is a preset-first photo editing tool. This page explains what "preset-first" means, what it implies for the shape of the project, and what AgX deliberately is and is not.
 
-The short version: AgX's bet is that the *portable preset language* — not the rendering engine — is the durable, valuable thing. Lightroom and Capture One already own engine quality; AgX competes on making a look legible, shareable, and composable as plain text.
+The short version: AgX's bet is that the *portable preset language* — not the rendering engine — is the durable, valuable thing. Lightroom and Capture One have decades of engine refinement behind them; AgX competes on a different axis — making a look legible, shareable, and composable as plain text.
 
 ## Presets as recipes
 
