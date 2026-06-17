@@ -170,47 +170,6 @@ fn from_hub(buf: &mut [[f32; 3]], space: ColorSpace) {
     }
 }
 
-/// Sample a 3D LUT (sRGB-gamma authored) from a gamma-encoded Rec.2020 pixel.
-///
-/// Existing `.cube` LUTs are authored in sRGB-gamma space. The engine working
-/// space for stages 5–8 is gamma-encoded Rec.2020, so the LUT call is bracketed:
-/// gamma Rec.2020 → linear Rec.2020 → linear sRGB → gamma sRGB → LUT →
-/// gamma sRGB → linear sRGB → linear Rec.2020 → gamma Rec.2020.
-pub fn wrap_lut_lookup<F>(r: f32, g: f32, b: f32, sample: F) -> (f32, f32, f32)
-where
-    F: FnOnce(f32, f32, f32) -> (f32, f32, f32),
-{
-    let r_lin_r = srgb_curve_signed_inverse(r);
-    let g_lin_r = srgb_curve_signed_inverse(g);
-    let b_lin_r = srgb_curve_signed_inverse(b);
-
-    let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
-    let r_lin_s = m[0][0] * r_lin_r + m[0][1] * g_lin_r + m[0][2] * b_lin_r;
-    let g_lin_s = m[1][0] * r_lin_r + m[1][1] * g_lin_r + m[1][2] * b_lin_r;
-    let b_lin_s = m[2][0] * r_lin_r + m[2][1] * g_lin_r + m[2][2] * b_lin_r;
-
-    let r_g_s = srgb_curve_signed(r_lin_s);
-    let g_g_s = srgb_curve_signed(g_lin_s);
-    let b_g_s = srgb_curve_signed(b_lin_s);
-
-    let (r_out, g_out, b_out) = sample(r_g_s, g_g_s, b_g_s);
-
-    let r_lin_s2 = srgb_curve_signed_inverse(r_out);
-    let g_lin_s2 = srgb_curve_signed_inverse(g_out);
-    let b_lin_s2 = srgb_curve_signed_inverse(b_out);
-
-    let m_inv = &LINEAR_SRGB_TO_LINEAR_REC2020;
-    let r_lin_r2 = m_inv[0][0] * r_lin_s2 + m_inv[0][1] * g_lin_s2 + m_inv[0][2] * b_lin_s2;
-    let g_lin_r2 = m_inv[1][0] * r_lin_s2 + m_inv[1][1] * g_lin_s2 + m_inv[1][2] * b_lin_s2;
-    let b_lin_r2 = m_inv[2][0] * r_lin_s2 + m_inv[2][1] * g_lin_s2 + m_inv[2][2] * b_lin_s2;
-
-    (
-        srgb_curve_signed(r_lin_r2),
-        srgb_curve_signed(g_lin_r2),
-        srgb_curve_signed(b_lin_r2),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -375,22 +334,6 @@ mod tests {
     }
 
     #[test]
-    fn wrap_lut_lookup_identity_lut_round_trips() {
-        let identity = |r: f32, g: f32, b: f32| (r, g, b);
-        for (r, g, b) in &[
-            (0.2_f32, 0.5, 0.8),
-            (0.0, 0.0, 0.0),
-            (1.0, 1.0, 1.0),
-            (0.7, 0.2, 0.4),
-        ] {
-            let (or, og, ob) = wrap_lut_lookup(*r, *g, *b, identity);
-            assert!((or - r).abs() < 1e-3, "r drift: in={r} out={or}");
-            assert!((og - g).abs() < 1e-3, "g drift: in={g} out={og}");
-            assert!((ob - b).abs() < 1e-3, "b drift: in={b} out={ob}");
-        }
-    }
-
-    #[test]
     fn bt2020_to_rec2020_is_identity() {
         let m = LINEAR_BT2020_TO_LINEAR_REC2020;
         for v in &[
@@ -501,48 +444,6 @@ mod tests {
         assert!((pos + neg).abs() < 1e-6, "curve must be odd");
         let decoded = pos.powf(563.0 / 256.0); // inverse gamma (563/256)
         assert!((decoded - 0.5).abs() < 1e-4, "round-trip drift: {decoded}");
-    }
-
-    #[test]
-    fn wrap_lut_lookup_constant_non_white_lut_matches_hand_computed_round_trip() {
-        // A LUT that always returns a gamut-asymmetric gamma-sRGB triple. The
-        // post-LUT bracket converts that to gamma Rec.2020: a swapped matrix
-        // would break this assertion (unlike a constant-white case, which is
-        // invariant under both matrices because their rows sum to ~1.0).
-        let constant = |_: f32, _: f32, _: f32| (0.7_f32, 0.3, 0.5);
-
-        let (or, og, ob) = wrap_lut_lookup(0.1, 0.2, 0.3, constant);
-
-        let r_lin_s = srgb_curve_signed_inverse(0.7);
-        let g_lin_s = srgb_curve_signed_inverse(0.3);
-        let b_lin_s = srgb_curve_signed_inverse(0.5);
-
-        let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
-        let r_lin_r = m[0][0] * r_lin_s + m[0][1] * g_lin_s + m[0][2] * b_lin_s;
-        let g_lin_r = m[1][0] * r_lin_s + m[1][1] * g_lin_s + m[1][2] * b_lin_s;
-        let b_lin_r = m[2][0] * r_lin_s + m[2][1] * g_lin_s + m[2][2] * b_lin_s;
-
-        let expected = [
-            srgb_curve_signed(r_lin_r),
-            srgb_curve_signed(g_lin_r),
-            srgb_curve_signed(b_lin_r),
-        ];
-
-        assert!(
-            (or - expected[0]).abs() < 1e-6,
-            "r: got {or}, expected {}",
-            expected[0]
-        );
-        assert!(
-            (og - expected[1]).abs() < 1e-6,
-            "g: got {og}, expected {}",
-            expected[1]
-        );
-        assert!(
-            (ob - expected[2]).abs() < 1e-6,
-            "b: got {ob}, expected {}",
-            expected[2]
-        );
     }
 }
 

@@ -29,6 +29,7 @@ impl CpuPipeline {
                 Box::new(stages::DehazeStage::new()),
                 Box::new(stages::DenoiseStage::new()),
                 Box::new(stages::PerPixelAdjustmentsStage::new()),
+                Box::new(stages::LutStage::new()),
                 Box::new(stages::DetailStage::new()),
                 Box::new(stages::GrainStage::new()),
                 Box::new(stages::VignetteStage::new()),

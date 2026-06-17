@@ -10,7 +10,9 @@ pub mod denoise;
 pub mod detail;
 /// Film grain simulation stage.
 pub mod grain;
-/// Per-pixel adjustments: contrast, tone curves, HSL, color grading, LUT.
+/// 3D LUT sampling stage.
+pub mod lut;
+/// Per-pixel adjustments: contrast, tone curves, HSL, color grading.
 pub mod per_pixel;
 /// Edge vignette darkening/brightening stage.
 pub mod vignette;
@@ -22,6 +24,7 @@ pub use dehaze::DehazeStage;
 pub use denoise::DenoiseStage;
 pub use detail::DetailStage;
 pub use grain::GrainStage;
+pub use lut::LutStage;
 pub use per_pixel::PerPixelAdjustmentsStage;
 pub use vignette::VignetteStage;
 pub use white_balance_exposure::WhiteBalanceExposureStage;
