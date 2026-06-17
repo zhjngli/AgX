@@ -108,8 +108,11 @@ pub(crate) struct WhiteBalanceSection {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct LutSection {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) path: Option<String>,
+    /// Color space the LUT was authored in. Defaults to `srgb` when omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) encoding: Option<crate::lut::LutEncoding>,
 }
 
 /// Internal TOML layout for a preset file.
@@ -439,10 +442,14 @@ impl Preset {
             (this_partial.clone(), None)
         };
 
-        // Load this preset's LUT (overrides base LUT if present)
+        // Load this preset's LUT (overrides base LUT if present).
+        // The encoding field only applies to a LUT directly loaded by this preset;
+        // if the LUT comes from the base via inheritance, its encoding is left as-is.
         let lut = if let Some(lut_path_str) = &raw.lut.path {
             let lut_path = base_dir.join(lut_path_str);
-            Some(Arc::new(crate::lut::Lut3D::from_cube_file(&lut_path)?))
+            let mut loaded = crate::lut::Lut3D::from_cube_file(&lut_path)?;
+            loaded.encoding = raw.lut.encoding.unwrap_or_default();
+            Some(Arc::new(loaded))
         } else {
             base_lut
         };
@@ -1306,5 +1313,56 @@ amount = 150.0
 "#;
         let result = Preset::from_toml(toml_str);
         assert!(result.is_err());
+    }
+
+    // --- LUT encoding preset tests ---
+
+    #[test]
+    fn preset_lut_encoding_linear_is_parsed() {
+        let temp_dir = std::env::temp_dir();
+        let cube_path = temp_dir.join("agx_enc_linear_test.cube");
+        std::fs::write(
+            &cube_path,
+            "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n",
+        )
+        .unwrap();
+        let toml = format!(
+            "[metadata]\nname = \"Enc\"\n\n[lut]\npath = \"{}\"\nencoding = \"linear\"\n",
+            cube_path.file_name().unwrap().to_str().unwrap()
+        );
+        let preset_path = temp_dir.join("agx_enc_linear_test.toml");
+        std::fs::write(&preset_path, toml).unwrap();
+
+        let preset = Preset::load_from_file(&preset_path).unwrap();
+        assert_eq!(
+            preset.lut.unwrap().encoding,
+            crate::lut::LutEncoding::Linear
+        );
+
+        let _ = std::fs::remove_file(&cube_path);
+        let _ = std::fs::remove_file(&preset_path);
+    }
+
+    #[test]
+    fn preset_lut_encoding_defaults_to_srgb_when_omitted() {
+        let temp_dir = std::env::temp_dir();
+        let cube_path = temp_dir.join("agx_enc_default_test.cube");
+        std::fs::write(
+            &cube_path,
+            "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n",
+        )
+        .unwrap();
+        let toml = format!(
+            "[metadata]\nname = \"Enc\"\n\n[lut]\npath = \"{}\"\n",
+            cube_path.file_name().unwrap().to_str().unwrap()
+        );
+        let preset_path = temp_dir.join("agx_enc_default_test.toml");
+        std::fs::write(&preset_path, toml).unwrap();
+
+        let preset = Preset::load_from_file(&preset_path).unwrap();
+        assert_eq!(preset.lut.unwrap().encoding, crate::lut::LutEncoding::Srgb);
+
+        let _ = std::fs::remove_file(&cube_path);
+        let _ = std::fs::remove_file(&preset_path);
     }
 }
