@@ -4,6 +4,9 @@
 //! gamma-encoded Rec.2020 between stages 5 and 8. See
 //! `docs/plans/2026-05-16-wide-working-space-design.md`.
 
+use crate::engine::ColorSpace;
+use rayon::prelude::*;
+
 /// Linear Rec.2020 → linear sRGB.
 ///
 /// Derived from BT.2020 and sRGB primaries plus the D65 white point.
@@ -119,6 +122,54 @@ pub fn apply_matrix_3x3(buf: &mut [[f32; 3]], m: &[[f32; 3]; 3]) {
     }
 }
 
+/// Convert a pixel buffer in place from one color space to another, routed
+/// through the linear Rec.2020 hub. `from == to` is a true no-op.
+///
+/// This is the single source of truth for pipeline color-space conversions:
+/// each space defines only its to-hub / from-hub hops, so adding a new space
+/// later (OKLab, a named log curve) means adding two hops here and nothing else.
+pub fn convert_buffer(buf: &mut [[f32; 3]], from: ColorSpace, to: ColorSpace) {
+    if from == to {
+        return;
+    }
+    to_hub(buf, from);
+    from_hub(buf, to);
+}
+
+fn apply_curve(buf: &mut [[f32; 3]], f: fn(f32) -> f32) {
+    buf.par_iter_mut().for_each(|p| {
+        p[0] = f(p[0]);
+        p[1] = f(p[1]);
+        p[2] = f(p[2]);
+    });
+}
+
+/// Bring a buffer from `space` into the linear Rec.2020 hub.
+fn to_hub(buf: &mut [[f32; 3]], space: ColorSpace) {
+    match space {
+        ColorSpace::LinearRec2020 => {}
+        ColorSpace::GammaRec2020 => apply_curve(buf, srgb_curve_signed_inverse),
+        ColorSpace::LinearSrgb => apply_matrix_3x3(buf, &LINEAR_SRGB_TO_LINEAR_REC2020),
+        ColorSpace::SrgbGamma => {
+            apply_curve(buf, srgb_curve_signed_inverse);
+            apply_matrix_3x3(buf, &LINEAR_SRGB_TO_LINEAR_REC2020);
+        }
+    }
+}
+
+/// Take a buffer from the linear Rec.2020 hub into `space`.
+fn from_hub(buf: &mut [[f32; 3]], space: ColorSpace) {
+    match space {
+        ColorSpace::LinearRec2020 => {}
+        ColorSpace::GammaRec2020 => apply_curve(buf, srgb_curve_signed),
+        ColorSpace::LinearSrgb => apply_matrix_3x3(buf, &LINEAR_REC2020_TO_LINEAR_SRGB),
+        ColorSpace::SrgbGamma => {
+            apply_matrix_3x3(buf, &LINEAR_REC2020_TO_LINEAR_SRGB);
+            apply_curve(buf, srgb_curve_signed);
+        }
+    }
+}
+
 /// Sample a 3D LUT (sRGB-gamma authored) from a gamma-encoded Rec.2020 pixel.
 ///
 /// Existing `.cube` LUTs are authored in sRGB-gamma space. The engine working
@@ -163,6 +214,66 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::ColorSpace;
+
+    #[test]
+    fn convert_buffer_identity_is_noop() {
+        let mut buf = vec![[0.2_f32, 0.5, 0.8], [-0.1, 1.2, 0.0]];
+        let before = buf.clone();
+        convert_buffer(&mut buf, ColorSpace::GammaRec2020, ColorSpace::GammaRec2020);
+        assert_eq!(buf, before, "same-space conversion must not touch the buffer");
+    }
+
+    #[test]
+    fn convert_buffer_round_trips() {
+        let original = vec![[0.2_f32, 0.5, 0.8], [0.05, 0.9, 0.3]];
+        for space in [
+            ColorSpace::GammaRec2020,
+            ColorSpace::LinearSrgb,
+            ColorSpace::SrgbGamma,
+        ] {
+            let mut buf = original.clone();
+            convert_buffer(&mut buf, ColorSpace::LinearRec2020, space);
+            convert_buffer(&mut buf, space, ColorSpace::LinearRec2020);
+            for (i, px) in buf.iter().enumerate() {
+                for c in 0..3 {
+                    assert!(
+                        (px[c] - original[i][c]).abs() < 1e-5,
+                        "round trip via {space:?} drifted at [{i}][{c}]"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn convert_buffer_gamma_to_srgbgamma_matches_legacy_bracket_math() {
+        // The Gamma Rec.2020 -> sRGB-gamma hop must equal the pre-sample half of
+        // the old wrap_lut_lookup (inverse curve, matrix REC2020->SRGB, curve).
+        let px = [0.4_f32, 0.6, 0.2];
+        let mut buf = vec![px];
+        convert_buffer(&mut buf, ColorSpace::GammaRec2020, ColorSpace::SrgbGamma);
+
+        let lin_rec = [
+            srgb_curve_signed_inverse(px[0]),
+            srgb_curve_signed_inverse(px[1]),
+            srgb_curve_signed_inverse(px[2]),
+        ];
+        let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
+        let lin_srgb = [
+            m[0][0] * lin_rec[0] + m[0][1] * lin_rec[1] + m[0][2] * lin_rec[2],
+            m[1][0] * lin_rec[0] + m[1][1] * lin_rec[1] + m[1][2] * lin_rec[2],
+            m[2][0] * lin_rec[0] + m[2][1] * lin_rec[1] + m[2][2] * lin_rec[2],
+        ];
+        let expected = [
+            srgb_curve_signed(lin_srgb[0]),
+            srgb_curve_signed(lin_srgb[1]),
+            srgb_curve_signed(lin_srgb[2]),
+        ];
+        for c in 0..3 {
+            assert!((buf[0][c] - expected[c]).abs() < 1e-6, "channel {c} mismatch");
+        }
+    }
 
     /// Multiplying a matrix by its inverse should produce identity within
     /// float epsilon.
