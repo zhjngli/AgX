@@ -2,6 +2,8 @@
 
 AgX is a preset-first photo editing tool. This page explains what "preset-first" means, what it implies for the shape of the project, and what AgX deliberately is and is not.
 
+The short version: AgX's bet is that the *portable preset language* — not the rendering engine — is the durable, valuable thing. Lightroom and Capture One already own engine quality; AgX competes on making a look legible, shareable, and composable as plain text.
+
 ## Presets as recipes
 
 A preset in AgX is a recipe for an edit: a complete, declarative statement of which knobs to turn and how far. It is not a log of operations the user performed. The TOML document says `exposure = +0.5` and `contrast = 15`; it does not say "the user dragged the exposure slider, then opened the curves panel, then undid the curve change." The engine reads the recipe, applies every value in a fixed pipeline order, and produces an image. The same recipe applied to the same input always produces the same output.
@@ -26,7 +28,7 @@ Presets are plain text. They live in TOML files; they sit in a Git repository as
 
 This makes presets forkable. A preset author can publish a "neutral starting point" preset that fixes white balance and gives the input a sensible tonal baseline; another author can fork it, add a tone curve and a LUT, and publish the result without the original author's involvement. The `extends` mechanism makes the fork structural rather than copy-paste — the child preset declares what it overrides on top of its parent — so a fix to the parent propagates to every preset that extends it.
 
-The longer-term bet is that a preset format which is shareable enough accumulates an ecosystem. If presets travel as easily as code does — readable, diffable, version-controllable, composable — then preset libraries, preset marketplaces, and preset remixing become possible in a way they are not for editor-locked sidecar formats. AgX's design wagers that a portable recipe format is a precondition for that ecosystem, and that the ecosystem itself is worth building toward.
+The longer-term bet is that a preset format which is shareable enough accumulates an ecosystem. If presets travel as easily as code does — readable, diffable, version-controllable, composable — then preset libraries, preset marketplaces, and preset remixing become possible in a way they are not for editor-locked sidecar formats. AgX's design wagers that a portable recipe format is a precondition for that ecosystem, and that the ecosystem itself is worth building toward. Part of that wager is portability across tools: a recipe legible enough to share is one that could, in principle, be translated into the formats other editors read — though faithful translation is a hard, unsolved problem, since every engine renders the same nominal adjustment differently.
 
 ## CLI and API first
 
