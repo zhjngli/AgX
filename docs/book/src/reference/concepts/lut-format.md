@@ -126,3 +126,4 @@ When using third-party LUTs, verify they expect sRGB gamma input (most creative 
 ## See also
 
 - [How AgX generates its bundled LUTs](../../explanation/concepts/lut-generation.md) — the design choices behind the `agx-lut-gen` crate.
+- [LUT encoding](../../explanation/concepts/lut-encoding.md) — why LUT encoding matters and when to use `srgb` vs `linear`.

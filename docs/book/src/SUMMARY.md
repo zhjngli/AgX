@@ -45,6 +45,7 @@
   - [Color spaces](explanation/concepts/color-spaces.md)
   - [Color profiles](explanation/concepts/color-profiles.md)
   - [How AgX generates its bundled LUTs](explanation/concepts/lut-generation.md)
+  - [LUT encoding](explanation/concepts/lut-encoding.md)
 - [Algorithms](explanation/algorithms/index.md)
   - [Basic adjustments](explanation/algorithms/basic.md)
   - [HSL](explanation/algorithms/hsl.md)

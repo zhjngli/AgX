@@ -42,21 +42,22 @@ pub struct RenderResult {
 
 /// Color space declaration for pipeline stages.
 ///
-/// After the wide working space migration, the engine's working space is
-/// `LinearRec2020` (for stages 1–3) and `GammaRec2020` (for stages 5–8,
-/// using the sRGB transfer curve applied to Rec.2020 linear values).
-/// `LinearSrgb` and `SrgbGamma` are retained for encode-side intermediates
-/// and the LUT-wrap conversion bracket.
+/// The executor auto-inserts conversions between adjacent stages that declare
+/// different color spaces. `convert_buffer` is the single conversion primitive;
+/// all stage-to-stage conversions route through it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorSpace {
-    /// Linear Rec.2020 (working space for stages 1–3 and the engine boundary).
+    /// Linear Rec.2020 — the engine's primary working space and the input/output
+    /// boundary. Decode delivers buffers in this space; encode expects it.
     LinearRec2020,
-    /// Gamma-encoded Rec.2020 — sRGB transfer curve applied to Rec.2020 linear values
-    /// (working space for stages 5–8).
+    /// Gamma-encoded Rec.2020 — sRGB transfer curve applied to linear Rec.2020
+    /// values. The working space for gamma-domain stages.
     GammaRec2020,
-    /// Linear sRGB (encode-side intermediate; LUT-wrap intermediate).
+    /// Linear-light sRGB primaries. The sampling space for `Linear`-encoded LUTs
+    /// and an encode-side intermediate.
     LinearSrgb,
-    /// sRGB with gamma encoding (encode-side final; LUT-wrap intermediate).
+    /// Gamma-encoded sRGB. The sampling space for `Srgb`-encoded LUTs and the
+    /// sRGB final-output step.
     SrgbGamma,
 }
 
@@ -73,7 +74,17 @@ pub struct RenderContext<'a> {
     pub height: u32,
     /// Render parameters (read-only for stages).
     pub params: &'a Parameters,
-    /// Optional LUT applied during the per-pixel adjustment stage.
+    /// Optional 3D LUT applied by `LutStage` (after per-pixel adjustments, before detail).
+    pub lut: Option<&'a crate::lut::Lut3D>,
+}
+
+/// Read-only inputs a stage may consult to decide activity and color space.
+/// Carries both `Parameters` and the optional LUT, because the LUT is threaded
+/// separately from `Parameters` (it is a large table shared via `Arc`).
+pub struct StageInputs<'a> {
+    /// Render parameters for the current render pass.
+    pub params: &'a Parameters,
+    /// Optional 3D LUT applied by [`LutStage`](crate::engine::stages::LutStage).
     pub lut: Option<&'a crate::lut::Lut3D>,
 }
 
@@ -90,18 +101,18 @@ pub trait Stage: Send + Sync {
     fn name(&self) -> &'static str;
 
     /// Color space this stage expects its input buffer in.
-    fn input_color_space(&self) -> ColorSpace;
+    fn input_color_space(&self, inp: &StageInputs) -> ColorSpace;
 
     /// Color space this stage produces in the output buffer.
-    fn output_color_space(&self) -> ColorSpace;
+    fn output_color_space(&self, inp: &StageInputs) -> ColorSpace;
 
-    /// Whether this stage has any effect given current params.
+    /// Whether this stage has any effect given current inp.
     /// Returning false lets the executor skip the stage entirely.
-    fn is_active(&self, params: &Parameters) -> bool;
+    fn is_active(&self, inp: &StageInputs) -> bool;
 
-    /// Precompute loop-invariant data from params.
+    /// Precompute loop-invariant data from inp.
     /// Called once per render before `process()`.
-    fn prepare(&mut self, params: &Parameters);
+    fn prepare(&mut self, inp: &StageInputs);
 
     /// Process the pixel buffer in-place.
     fn process(&self, ctx: &mut RenderContext) -> Result<(), crate::error::AgxError>;
@@ -1589,6 +1600,7 @@ mod tests {
             domain_min: [0.0, 0.0, 0.0],
             domain_max: [1.0, 1.0, 1.0],
             table,
+            encoding: Default::default(),
         };
         engine.set_lut(Some(Arc::new(lut)));
 
@@ -2477,6 +2489,92 @@ mod tests {
             }
         }
         assert!(changed, "grain should change render output");
+    }
+
+    #[test]
+    fn srgb_lut_render_is_stable() {
+        use crate::lut::Lut3D;
+        use std::sync::Arc;
+
+        // A small non-identity LUT: swap R and B output channels.
+        let size = 2;
+        let mut table = Vec::with_capacity(size * size * size);
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    let d = (size - 1) as f32;
+                    table.push([b as f32 / d, g as f32 / d, r as f32 / d]);
+                }
+            }
+        }
+        let lut = Lut3D {
+            title: None,
+            size,
+            domain_min: [0.0, 0.0, 0.0],
+            domain_max: [1.0, 1.0, 1.0],
+            table,
+            encoding: Default::default(),
+        };
+
+        let img = ImageBuffer::from_pixel(2, 2, Rgb([0.30_f32, 0.55, 0.80]));
+        let mut engine = Engine::new(img);
+        engine.params_mut().contrast = 20.0;
+        engine.set_lut(Some(Arc::new(lut)));
+        let out = engine.render().image;
+        let p = out.get_pixel(0, 0).0;
+
+        // Characterization values captured from the first run; any deviation means the pipeline changed.
+        let expected = [0.8539122_f32, 0.69250095, 0.1506029];
+        for c in 0..3 {
+            assert!(
+                (p[c] - expected[c]).abs() < 1e-6,
+                "channel {c}: got {} expected {}",
+                p[c],
+                expected[c]
+            );
+        }
+    }
+
+    #[test]
+    fn linear_lut_samples_in_linear_space() {
+        use crate::lut::{Lut3D, LutEncoding};
+        use std::sync::Arc;
+
+        // LUT that halves each channel (in whatever space it is sampled).
+        let size = 2;
+        let mut table = Vec::with_capacity(size * size * size);
+        for b in 0..size {
+            for g in 0..size {
+                for r in 0..size {
+                    let d = (size - 1) as f32;
+                    table.push([r as f32 / d * 0.5, g as f32 / d * 0.5, b as f32 / d * 0.5]);
+                }
+            }
+        }
+        let make = |encoding| Lut3D {
+            title: None,
+            size,
+            domain_min: [0.0; 3],
+            domain_max: [1.0; 3],
+            table: table.clone(),
+            encoding,
+        };
+
+        let img = ImageBuffer::from_pixel(1, 1, Rgb([0.5_f32, 0.5, 0.5]));
+
+        let mut e_srgb = Engine::new(img.clone());
+        e_srgb.set_lut(Some(Arc::new(make(LutEncoding::Srgb))));
+        let srgb_out = e_srgb.render().image.get_pixel(0, 0).0;
+
+        let mut e_lin = Engine::new(img);
+        e_lin.set_lut(Some(Arc::new(make(LutEncoding::Linear))));
+        let lin_out = e_lin.render().image.get_pixel(0, 0).0;
+
+        // Same table, different sampling space -> different result.
+        assert!(
+            (srgb_out[0] - lin_out[0]).abs() > 1e-3,
+            "linear vs sRGB encoding should diverge: srgb={srgb_out:?} lin={lin_out:?}"
+        );
     }
 }
 

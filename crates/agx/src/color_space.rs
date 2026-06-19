@@ -1,8 +1,14 @@
 //! Color-space conversion matrices and transfer curves.
 //!
-//! Working space contract: linear Rec.2020 between decode and the engine,
-//! gamma-encoded Rec.2020 between stages 5 and 8. See
-//! `docs/plans/2026-05-16-wide-working-space-design.md`.
+//! # Working space contract
+//!
+//! The engine's working space is linear Rec.2020. Conversions between stages
+//! are inserted exclusively by the CPU executor in `engine::pipeline`, via
+//! [`convert_buffer`] (the single conversion primitive — hub-and-spoke through
+//! linear Rec.2020). Engine output is always linear Rec.2020.
+
+use crate::engine::ColorSpace;
+use rayon::prelude::*;
 
 /// Linear Rec.2020 → linear sRGB.
 ///
@@ -119,50 +125,126 @@ pub fn apply_matrix_3x3(buf: &mut [[f32; 3]], m: &[[f32; 3]; 3]) {
     }
 }
 
-/// Sample a 3D LUT (sRGB-gamma authored) from a gamma-encoded Rec.2020 pixel.
+/// Convert a pixel buffer in place from one color space to another, routed
+/// through the linear Rec.2020 hub. `from == to` is a true no-op.
 ///
-/// Existing `.cube` LUTs are authored in sRGB-gamma space. The engine working
-/// space for stages 5–8 is gamma-encoded Rec.2020, so the LUT call is bracketed:
-/// gamma Rec.2020 → linear Rec.2020 → linear sRGB → gamma sRGB → LUT →
-/// gamma sRGB → linear sRGB → linear Rec.2020 → gamma Rec.2020.
-pub fn wrap_lut_lookup<F>(r: f32, g: f32, b: f32, sample: F) -> (f32, f32, f32)
-where
-    F: FnOnce(f32, f32, f32) -> (f32, f32, f32),
-{
-    let r_lin_r = srgb_curve_signed_inverse(r);
-    let g_lin_r = srgb_curve_signed_inverse(g);
-    let b_lin_r = srgb_curve_signed_inverse(b);
+/// This is the single source of truth for pipeline color-space conversions:
+/// each space defines only its to-hub / from-hub hops, so adding a new space
+/// later (OKLab, a named log curve) means adding two hops here and nothing else.
+pub fn convert_buffer(buf: &mut [[f32; 3]], from: ColorSpace, to: ColorSpace) {
+    if from == to {
+        return;
+    }
+    to_hub(buf, from);
+    from_hub(buf, to);
+}
 
-    let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
-    let r_lin_s = m[0][0] * r_lin_r + m[0][1] * g_lin_r + m[0][2] * b_lin_r;
-    let g_lin_s = m[1][0] * r_lin_r + m[1][1] * g_lin_r + m[1][2] * b_lin_r;
-    let b_lin_s = m[2][0] * r_lin_r + m[2][1] * g_lin_r + m[2][2] * b_lin_r;
+/// Apply a scalar transfer-curve to every channel of every pixel. Takes a `fn` pointer
+/// rather than a closure so callers can pass named functions (e.g. `srgb_curve_signed`)
+/// directly, avoiding closure indirection and keeping call sites readable.
+fn apply_curve(buf: &mut [[f32; 3]], f: fn(f32) -> f32) {
+    buf.par_iter_mut().for_each(|p| {
+        p[0] = f(p[0]);
+        p[1] = f(p[1]);
+        p[2] = f(p[2]);
+    });
+}
 
-    let r_g_s = srgb_curve_signed(r_lin_s);
-    let g_g_s = srgb_curve_signed(g_lin_s);
-    let b_g_s = srgb_curve_signed(b_lin_s);
+/// Bring a buffer from `space` into the linear Rec.2020 hub.
+fn to_hub(buf: &mut [[f32; 3]], space: ColorSpace) {
+    match space {
+        ColorSpace::LinearRec2020 => {}
+        ColorSpace::GammaRec2020 => apply_curve(buf, srgb_curve_signed_inverse),
+        ColorSpace::LinearSrgb => apply_matrix_3x3(buf, &LINEAR_SRGB_TO_LINEAR_REC2020),
+        ColorSpace::SrgbGamma => {
+            apply_curve(buf, srgb_curve_signed_inverse);
+            apply_matrix_3x3(buf, &LINEAR_SRGB_TO_LINEAR_REC2020);
+        }
+    }
+}
 
-    let (r_out, g_out, b_out) = sample(r_g_s, g_g_s, b_g_s);
-
-    let r_lin_s2 = srgb_curve_signed_inverse(r_out);
-    let g_lin_s2 = srgb_curve_signed_inverse(g_out);
-    let b_lin_s2 = srgb_curve_signed_inverse(b_out);
-
-    let m_inv = &LINEAR_SRGB_TO_LINEAR_REC2020;
-    let r_lin_r2 = m_inv[0][0] * r_lin_s2 + m_inv[0][1] * g_lin_s2 + m_inv[0][2] * b_lin_s2;
-    let g_lin_r2 = m_inv[1][0] * r_lin_s2 + m_inv[1][1] * g_lin_s2 + m_inv[1][2] * b_lin_s2;
-    let b_lin_r2 = m_inv[2][0] * r_lin_s2 + m_inv[2][1] * g_lin_s2 + m_inv[2][2] * b_lin_s2;
-
-    (
-        srgb_curve_signed(r_lin_r2),
-        srgb_curve_signed(g_lin_r2),
-        srgb_curve_signed(b_lin_r2),
-    )
+/// Take a buffer from the linear Rec.2020 hub into `space`.
+fn from_hub(buf: &mut [[f32; 3]], space: ColorSpace) {
+    match space {
+        ColorSpace::LinearRec2020 => {}
+        ColorSpace::GammaRec2020 => apply_curve(buf, srgb_curve_signed),
+        ColorSpace::LinearSrgb => apply_matrix_3x3(buf, &LINEAR_REC2020_TO_LINEAR_SRGB),
+        ColorSpace::SrgbGamma => {
+            apply_matrix_3x3(buf, &LINEAR_REC2020_TO_LINEAR_SRGB);
+            apply_curve(buf, srgb_curve_signed);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::ColorSpace;
+
+    #[test]
+    fn convert_buffer_identity_is_noop() {
+        let mut buf = vec![[0.2_f32, 0.5, 0.8], [-0.1, 1.2, 0.0]];
+        let before = buf.clone();
+        convert_buffer(&mut buf, ColorSpace::GammaRec2020, ColorSpace::GammaRec2020);
+        assert_eq!(
+            buf, before,
+            "same-space conversion must not touch the buffer"
+        );
+    }
+
+    #[test]
+    fn convert_buffer_round_trips() {
+        let original = vec![[0.2_f32, 0.5, 0.8], [0.05, 0.9, 0.3]];
+        for space in [
+            ColorSpace::GammaRec2020,
+            ColorSpace::LinearSrgb,
+            ColorSpace::SrgbGamma,
+        ] {
+            let mut buf = original.clone();
+            convert_buffer(&mut buf, ColorSpace::LinearRec2020, space);
+            convert_buffer(&mut buf, space, ColorSpace::LinearRec2020);
+            for (i, px) in buf.iter().enumerate() {
+                for c in 0..3 {
+                    assert!(
+                        (px[c] - original[i][c]).abs() < 1e-5,
+                        "round trip via {space:?} drifted at [{i}][{c}]"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn convert_buffer_gamma_to_srgbgamma_matches_legacy_bracket_math() {
+        // The Gamma Rec.2020 -> sRGB-gamma hop must equal the pre-sample bracket math:
+        // inverse sRGB curve (decode gamma), Rec.2020 -> sRGB matrix, sRGB curve (re-encode).
+        let px = [0.4_f32, 0.6, 0.2];
+        let mut buf = vec![px];
+        convert_buffer(&mut buf, ColorSpace::GammaRec2020, ColorSpace::SrgbGamma);
+
+        let lin_rec = [
+            srgb_curve_signed_inverse(px[0]),
+            srgb_curve_signed_inverse(px[1]),
+            srgb_curve_signed_inverse(px[2]),
+        ];
+        let m = &LINEAR_REC2020_TO_LINEAR_SRGB;
+        let lin_srgb = [
+            m[0][0] * lin_rec[0] + m[0][1] * lin_rec[1] + m[0][2] * lin_rec[2],
+            m[1][0] * lin_rec[0] + m[1][1] * lin_rec[1] + m[1][2] * lin_rec[2],
+            m[2][0] * lin_rec[0] + m[2][1] * lin_rec[1] + m[2][2] * lin_rec[2],
+        ];
+        let expected = [
+            srgb_curve_signed(lin_srgb[0]),
+            srgb_curve_signed(lin_srgb[1]),
+            srgb_curve_signed(lin_srgb[2]),
+        ];
+        for c in 0..3 {
+            assert!(
+                (buf[0][c] - expected[c]).abs() < 1e-6,
+                "channel {c} mismatch"
+            );
+        }
+    }
 
     /// Multiplying a matrix by its inverse should produce identity within
     /// float epsilon.
@@ -255,22 +337,6 @@ mod tests {
         let at_threshold = srgb_curve_signed(0.0031308);
         let back = srgb_curve_signed_inverse(at_threshold);
         assert!((back - 0.0031308).abs() < 1e-6);
-    }
-
-    #[test]
-    fn wrap_lut_lookup_identity_lut_round_trips() {
-        let identity = |r: f32, g: f32, b: f32| (r, g, b);
-        for (r, g, b) in &[
-            (0.2_f32, 0.5, 0.8),
-            (0.0, 0.0, 0.0),
-            (1.0, 1.0, 1.0),
-            (0.7, 0.2, 0.4),
-        ] {
-            let (or, og, ob) = wrap_lut_lookup(*r, *g, *b, identity);
-            assert!((or - r).abs() < 1e-3, "r drift: in={r} out={or}");
-            assert!((og - g).abs() < 1e-3, "g drift: in={g} out={og}");
-            assert!((ob - b).abs() < 1e-3, "b drift: in={b} out={ob}");
-        }
     }
 
     #[test]
@@ -384,48 +450,6 @@ mod tests {
         assert!((pos + neg).abs() < 1e-6, "curve must be odd");
         let decoded = pos.powf(563.0 / 256.0); // inverse gamma (563/256)
         assert!((decoded - 0.5).abs() < 1e-4, "round-trip drift: {decoded}");
-    }
-
-    #[test]
-    fn wrap_lut_lookup_constant_non_white_lut_matches_hand_computed_round_trip() {
-        // A LUT that always returns a gamut-asymmetric gamma-sRGB triple. The
-        // post-LUT bracket converts that to gamma Rec.2020: a swapped matrix
-        // would break this assertion (unlike a constant-white case, which is
-        // invariant under both matrices because their rows sum to ~1.0).
-        let constant = |_: f32, _: f32, _: f32| (0.7_f32, 0.3, 0.5);
-
-        let (or, og, ob) = wrap_lut_lookup(0.1, 0.2, 0.3, constant);
-
-        let r_lin_s = srgb_curve_signed_inverse(0.7);
-        let g_lin_s = srgb_curve_signed_inverse(0.3);
-        let b_lin_s = srgb_curve_signed_inverse(0.5);
-
-        let m = &LINEAR_SRGB_TO_LINEAR_REC2020;
-        let r_lin_r = m[0][0] * r_lin_s + m[0][1] * g_lin_s + m[0][2] * b_lin_s;
-        let g_lin_r = m[1][0] * r_lin_s + m[1][1] * g_lin_s + m[1][2] * b_lin_s;
-        let b_lin_r = m[2][0] * r_lin_s + m[2][1] * g_lin_s + m[2][2] * b_lin_s;
-
-        let expected = [
-            srgb_curve_signed(r_lin_r),
-            srgb_curve_signed(g_lin_r),
-            srgb_curve_signed(b_lin_r),
-        ];
-
-        assert!(
-            (or - expected[0]).abs() < 1e-6,
-            "r: got {or}, expected {}",
-            expected[0]
-        );
-        assert!(
-            (og - expected[1]).abs() < 1e-6,
-            "g: got {og}, expected {}",
-            expected[1]
-        );
-        assert!(
-            (ob - expected[2]).abs() < 1e-6,
-            "b: got {ob}, expected {}",
-            expected[2]
-        );
     }
 }
 

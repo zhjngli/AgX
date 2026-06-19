@@ -18,7 +18,7 @@ struct Params {
     dehaze_amount: f32, _pad4: array<f32, 3>,
     grain_amount: f32, grain_size: f32, grain_type: f32, grain_seed: f32,
     tc_rgb_active: f32, tc_luma_active: f32, tc_red_active: f32, tc_green_active: f32,
-    tc_blue_active: f32, lut_active: f32, _pad_tc: vec2f,
+    tc_blue_active: f32, lut_active: f32, lut_encoding: f32, _pad_tc: f32,
     width: f32, height: f32, _pad5: vec2f,
     detail_strength: f32, detail_threshold: f32, detail_masking: f32, kernel_size: f32,
     nr_luminance: f32, nr_color: f32, nr_detail: f32, nr_channel: f32,

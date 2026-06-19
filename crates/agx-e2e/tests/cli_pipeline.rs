@@ -18,6 +18,7 @@ const ALL_LOOKS: &[&str] = &[
     "cinema_warm",
     "dune",
     "p3_heavy_edit",
+    "linear_demo",
 ];
 
 const BW_LOOKS: &[&str] = &["tri_x_400", "tmax_100", "high_contrast_bw", "faded_bw"];

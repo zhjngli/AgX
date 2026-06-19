@@ -91,6 +91,7 @@ pub fn parse_cube(text: &str) -> Result<Lut3D> {
         domain_min,
         domain_max,
         table,
+        encoding: crate::lut::LutEncoding::default(),
     })
 }
 

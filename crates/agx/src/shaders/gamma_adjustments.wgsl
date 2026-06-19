@@ -57,7 +57,8 @@ struct Params {
     tc_green_active: f32,
     tc_blue_active: f32,
     lut_active: f32,
-    _pad_tc: vec2f,
+    lut_encoding: f32,
+    _pad_tc: f32,
 
     width: f32,
     height: f32,
@@ -222,12 +223,14 @@ fn apply_color_grading_pixel(r: f32, g: f32, b: f32) -> vec3f {
 // --- LUT ---
 
 fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
-    // Input is gamma Rec.2020 (engine working space). LUTs are
-    // sRGB-gamma authored, so bracket the sample:
-    //   gamma Rec.2020 -> linear Rec.2020 -> linear sRGB -> gamma sRGB
-    //   -> LUT sample
-    //   -> gamma sRGB -> linear sRGB -> linear Rec.2020 -> gamma Rec.2020
-    // Mirrors crate::color_space::wrap_lut_lookup on the CPU side.
+    // Input is gamma Rec.2020 (engine working space). Mirrors the encoding-aware
+    // CPU LutStage + convert_buffer behavior:
+    //   - sRGB-encoded LUTs (params.lut_encoding < 0.5): sample in gamma sRGB
+    //       gamma Rec.2020 -> linear Rec.2020 -> linear sRGB -> gamma sRGB
+    //       -> LUT sample (gamma sRGB output) -> linear sRGB -> linear Rec.2020 -> gamma Rec.2020
+    //   - Linear LUTs (params.lut_encoding >= 0.5): sample in linear sRGB
+    //       gamma Rec.2020 -> linear Rec.2020 -> linear sRGB
+    //       -> LUT sample (linear sRGB output) -> linear Rec.2020 -> gamma Rec.2020
 
     let lin_rec2020 = vec3f(
         common::color::srgb_curve_signed_inverse(r),
@@ -235,28 +238,37 @@ fn apply_lut(r: f32, g: f32, b: f32) -> vec3f {
         common::color::srgb_curve_signed_inverse(b),
     );
     let lin_srgb = common::color::LINEAR_REC2020_TO_LINEAR_SRGB * lin_rec2020;
-    let gamma_srgb = vec3f(
-        common::color::srgb_curve_signed(lin_srgb.x),
-        common::color::srgb_curve_signed(lin_srgb.y),
-        common::color::srgb_curve_signed(lin_srgb.z),
-    );
 
-    // LUT sampler requires [0, 1] coords -- domain-safety clamp on the
-    // gamma-sRGB intermediate, not on the engine buffer.
-    let coord = vec3f(
-        clamp(gamma_srgb.x, 0.0, 1.0),
-        clamp(gamma_srgb.y, 0.0, 1.0),
-        clamp(gamma_srgb.z, 0.0, 1.0),
-    );
+    // sRGB-encoded LUTs sample in gamma sRGB; linear LUTs sample in linear sRGB.
+    var sample_coord = lin_srgb;
+    if params.lut_encoding < 0.5 {
+        sample_coord = vec3f(
+            common::color::srgb_curve_signed(lin_srgb.x),
+            common::color::srgb_curve_signed(lin_srgb.y),
+            common::color::srgb_curve_signed(lin_srgb.z),
+        );
+    }
+
+    // Clamp to the LUT sampler's [0,1] domain; does not clip the engine buffer.
+    let clamped = clamp(sample_coord, vec3f(0.0), vec3f(1.0));
+    let n = f32(textureDimensions(lut_texture).x);
+    // Half-texel correction: map [0,1] input to texel-center space so the
+    // hardware sampler reads LUT entry index c*(n-1), matching CPU Lut3D::lookup.
+    // (The raw sampler maps coord c to index c*n-0.5, which is wrong.)
+    // n=1 (fallback identity LUT): (1-1)/1=0, 0.5/1=0.5 -> coord=0.5, no div-by-zero.
+    let coord = clamped * ((n - 1.0) / n) + (0.5 / n);
     let sampled = textureSampleLevel(lut_texture, lut_sampler, coord, 0.0);
 
-    let out_lin_srgb = vec3f(
-        common::color::srgb_curve_signed_inverse(sampled.x),
-        common::color::srgb_curve_signed_inverse(sampled.y),
-        common::color::srgb_curve_signed_inverse(sampled.z),
-    );
-    let out_lin_rec2020 = common::color::LINEAR_SRGB_TO_LINEAR_REC2020 * out_lin_srgb;
+    var out_lin_srgb = sampled.xyz;
+    if params.lut_encoding < 0.5 {
+        out_lin_srgb = vec3f(
+            common::color::srgb_curve_signed_inverse(sampled.x),
+            common::color::srgb_curve_signed_inverse(sampled.y),
+            common::color::srgb_curve_signed_inverse(sampled.z),
+        );
+    }
 
+    let out_lin_rec2020 = common::color::LINEAR_SRGB_TO_LINEAR_REC2020 * out_lin_srgb;
     return vec3f(
         common::color::srgb_curve_signed(out_lin_rec2020.x),
         common::color::srgb_curve_signed(out_lin_rec2020.y),

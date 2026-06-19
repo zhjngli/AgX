@@ -73,13 +73,23 @@ impl GpuPipeline {
         let mut gpu_params = params::GpuParameters::from(params);
         gpu_params.width = w as f32;
         gpu_params.height = h as f32;
+
+        // Set LUT fields before the single params upload so we don't need a second one.
+        if let Some(lut) = lut {
+            gpu_params.lut_active = 1.0;
+            gpu_params.lut_encoding = match lut.encoding {
+                crate::lut::LutEncoding::Srgb => 0.0,
+                crate::lut::LutEncoding::Linear => 1.0,
+            };
+        }
+
         self.runtime.upload_params(&gpu_params);
 
         // Upload tone curves
         let tc_data = params::build_tone_curve_data(params);
         self.runtime.upload_tone_curves(&tc_data);
 
-        // Upload LUT if present
+        // Upload LUT texture if present
         if let Some(lut) = lut {
             self.runtime.upload_lut(lut);
         }

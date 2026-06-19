@@ -1,0 +1,10 @@
+[metadata]
+name = "Linear Demo"
+author = "agx"
+
+[tone]
+contrast = 10.0
+
+[lut]
+path = "luts/linear_demo.cube"
+encoding = "linear"
