@@ -103,7 +103,7 @@ impl CpuPipeline {
 
                 #[cfg(feature = "profiling")]
                 profile_stages.push((
-                    format!("convert: {needed:?}"),
+                    format!("convert: {current:?}→{needed:?}"),
                     conv_start.elapsed().as_secs_f64() * 1000.0,
                 ));
             }
@@ -133,7 +133,7 @@ impl CpuPipeline {
 
             #[cfg(feature = "profiling")]
             profile_stages.push((
-                "convert: LinearRec2020".to_string(),
+                format!("convert: {current:?}→LinearRec2020"),
                 conv_start.elapsed().as_secs_f64() * 1000.0,
             ));
         }

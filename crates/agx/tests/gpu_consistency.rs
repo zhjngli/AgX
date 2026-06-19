@@ -220,7 +220,7 @@ fn combined_adjustments() {
 /// missing half-texel correction produced — so it would still catch that bug.
 const LUT_TOLERANCE: f32 = 5e-3;
 
-/// Build a non-identity 3×3×3 LUT that swaps R and B channels and darkens by
+/// Build a non-identity 2×2×2 LUT that swaps R and B channels and darkens by
 /// 10%.  Using a non-identity transform ensures encoding differences are
 /// observable and that the test is not trivially satisfied by an identity LUT.
 fn non_identity_lut(encoding: agx::LutEncoding) -> agx::lut::Lut3D {
